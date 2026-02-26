@@ -12,6 +12,9 @@
 - Added use-case filter controls (chat, coding, vision, reasoning, math, embedding, general).
 - Added Hidden Gems filter for Hugging Face models with high downloads and relatively low likes.
 - Added publisher column and source metadata to show sub-publishers such as `unsloth`.
+- Added provider-specific rate-limit and HTTP error messaging for Hugging Face and Ollama registry.
+- Surfaced startup hint when Ollama is not running and local runtime features are unavailable.
+- Clarified Ollama requirement in project documentation.
 
 ## 0.1.0 - 2026-02-26
 

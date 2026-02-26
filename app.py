@@ -150,6 +150,7 @@ class AIModelViewer(App):
         self.current_filter = "All"
         self.use_case_filter = "all"
         self.hidden_gems_only = False
+        self.ollama_running = False
         self.last_search_error = ""
         self.search_counter = 0
         self.active_search_id = 0
@@ -205,6 +206,10 @@ class AIModelViewer(App):
         )
         self.update_status("Ready. Enter a model query and press Enter.")
         self.update_system_info()
+        if not self.ollama_running:
+            self.update_status(
+                "Ready. Ollama is not running; local install/runtime features are disabled."
+            )
         self.system_info_timer = self.set_interval(3.0, self.update_system_info)
 
     def _pause_system_updates(self):
@@ -224,6 +229,7 @@ class AIModelViewer(App):
     def update_system_info(self):
         specs = self.monitor.get_specs()
         ollama_running = check_ollama_running()
+        self.ollama_running = ollama_running
         self.query_one(SystemInfoWidget).update_info(specs, ollama_running)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -399,7 +405,7 @@ class AIModelViewer(App):
         if table.row_count > 0:
             self.update_status(f"{table.row_count} results listed.")
         elif self.last_search_error:
-            self.update_status("Search failed. Please check your connection.")
+            self.update_status(self.last_search_error[:120])
         else:
             self.update_status("No results found.")
 

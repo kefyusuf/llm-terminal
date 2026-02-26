@@ -16,7 +16,14 @@ AI Model Explorer is a Textual-based terminal UI that helps you find local-LLM m
 
 - Python 3.10+
 - Optional NVIDIA GPU for VRAM detection
-- Ollama (optional, for local model detection)
+- Ollama (required for local model runtime and installed-model detection)
+- Internet access (required for Hugging Face/Ollama registry search)
+
+## Ollama Requirement Clarification
+
+- The app UI runs without local Ollama.
+- Hugging Face browsing works without local Ollama.
+- Local features (installed checkmark and `ollama run ...`) require Ollama running locally.
 
 ## Install
 

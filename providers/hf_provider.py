@@ -42,6 +42,39 @@ def classify_hidden_gem(downloads, likes):
     return True, score
 
 
+def _get_status_code(exc):
+    response = getattr(exc, "response", None)
+    if response is not None and getattr(response, "status_code", None) is not None:
+        return response.status_code
+    return getattr(exc, "status_code", None)
+
+
+def _get_retry_after_seconds(exc):
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if not headers:
+        return None
+    retry_after = headers.get("Retry-After")
+    if not retry_after:
+        return None
+    try:
+        return int(retry_after)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_hf_http_error(exc):
+    status = _get_status_code(exc)
+    retry_after = _get_retry_after_seconds(exc)
+    if status == 429:
+        if retry_after is not None:
+            return f"Hugging Face rate-limited (429). Retry in {retry_after}s."
+        return "Hugging Face rate-limited (429). Retry shortly."
+    if status is not None:
+        return f"Hugging Face request failed (HTTP {status})."
+    return f"Hugging Face request failed: {exc}"
+
+
 def search_hf_models(
     query,
     specs,
@@ -62,7 +95,9 @@ def search_hf_models(
             filter="gguf",
             expand=["likes", "siblings", "downloads"],
         )
-    except (HfHubHTTPError, requests.RequestException, ValueError, OSError) as exc:
+    except HfHubHTTPError as exc:
+        return results, [_format_hf_http_error(exc)]
+    except (requests.RequestException, ValueError, OSError) as exc:
         return results, [f"Hugging Face search failed: {exc}"]
 
     for model in hf_models:

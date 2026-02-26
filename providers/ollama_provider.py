@@ -25,6 +25,16 @@ def get_installed_ollama_models():
     return []
 
 
+def _retry_after_from_response(response):
+    retry_after = response.headers.get("Retry-After")
+    if not retry_after:
+        return None
+    try:
+        return int(retry_after)
+    except (TypeError, ValueError):
+        return None
+
+
 def search_ollama_models(query, specs, local_models):
     results = []
     errors = []
@@ -34,7 +44,22 @@ def search_ollama_models(query, specs, local_models):
         url = f"https://ollama.com/search?q={query}"
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 429:
+            retry_after = _retry_after_from_response(response)
+            if retry_after is not None:
+                errors.append(
+                    f"Ollama registry rate-limited (429). Retry in {retry_after}s."
+                )
+            else:
+                errors.append("Ollama registry rate-limited (429). Retry shortly.")
+            return results, errors
+        if response.status_code >= 500:
+            errors.append(f"Ollama registry unavailable (HTTP {response.status_code}).")
+            return results, errors
         if response.status_code != 200:
+            errors.append(
+                f"Ollama registry request failed (HTTP {response.status_code})."
+            )
             return results, errors
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -99,6 +124,10 @@ def search_ollama_models(query, specs, local_models):
                     "size": f"~{size_gb} GB",
                 }
             )
+    except requests.Timeout:
+        errors.append("Ollama registry request timed out.")
+    except requests.ConnectionError:
+        errors.append("Ollama registry unreachable. Check network connectivity.")
     except requests.RequestException as exc:
         errors.append(f"Ollama search failed: {exc}")
     except (ValueError, AttributeError) as exc:
