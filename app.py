@@ -762,10 +762,12 @@ class AIModelViewer(App):
                 running_targets.add(target_id)
 
         self.active_downloads = running_targets
-        self._ensure_download_fields()
+        state_changed = self._ensure_download_fields()
         if force:
             self.refresh_table()
             self.refresh_download_history_table()
+        elif state_changed:
+            self.refresh_table()
 
     def refresh_download_history_table(self):
         table = self.query_one("#download-history-table", DataTable)
@@ -853,25 +855,21 @@ class AIModelViewer(App):
 
     def _download_cell_text(self, model):
         state = model.get("download_state", "idle")
-        label = model.get("download_label", "Idle")
-        detail = model.get("download_detail", "")
 
         if state == "completed":
             return "[green]Completed[/green]"
         if state == "failed":
-            return f"[red]Failed[/red] {detail}" if detail else "[red]Failed[/red]"
+            return "[red]Failed[/red]"
         if state == "cancelled":
             return "[yellow]Canceled[/yellow]"
         if state == "downloading":
-            frame = self.download_spinner_frames[
-                self.download_spinner_index % len(self.download_spinner_frames)
-            ]
-            return f"[yellow]{frame} {label}[/yellow] {detail}".strip()
+            return "[yellow]Downloading[/yellow]"
         if state == "queued":
             return "[cyan]Queued[/cyan]"
         return "[grey50]Idle[/grey50]"
 
     def _ensure_download_fields(self):
+        changed = False
         for item in self.all_results:
             target_id = download_target_id(item)
             entry = self.download_registry.get(target_id)
@@ -886,13 +884,23 @@ class AIModelViewer(App):
                         entry = value
                         break
             if entry:
-                item["download_state"] = entry.get("state", "idle")
-                item["download_label"] = entry.get("label", "Idle")
+                next_state = entry.get("state", "idle")
+                next_label = entry.get("label", "Idle")
+                if (
+                    item.get("download_state") != next_state
+                    or item.get("download_label") != next_label
+                ):
+                    changed = True
+                item["download_state"] = next_state
+                item["download_label"] = next_label
                 item["download_detail"] = entry.get("detail", "")
             else:
+                if item.get("download_state") not in {None, "idle"}:
+                    changed = True
                 item.setdefault("download_state", "idle")
                 item.setdefault("download_label", "Idle")
                 item.setdefault("download_detail", "")
+        return changed
 
     def refresh_download_progress(self):
         self.sync_download_jobs_from_service(force=False)
@@ -907,7 +915,6 @@ class AIModelViewer(App):
             for target_id in self.active_downloads
         ):
             self.request_download_history_refresh()
-            self.refresh_table()
 
     def refresh_download_debug(self):
         try:

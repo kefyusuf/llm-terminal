@@ -36,6 +36,7 @@
 - Added download service version reporting and compatibility checks.
 - Added legacy target-id normalization migration and fallback row matching for pre-normalized jobs.
 - Fixed recent-download modal cancel visibility by aligning modal state fields with registry data.
+- Kept search results stable during active downloads by showing state-only labels and avoiding per-tick table refresh.
 
 ## 0.1.0 - 2026-02-26
 
