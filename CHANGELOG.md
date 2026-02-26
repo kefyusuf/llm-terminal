@@ -25,6 +25,7 @@
 - Fixed Windows Unicode decode crash in download streaming by forcing UTF-8 with replacement fallback.
 - Added persistent recent-downloads panel so previous download states remain visible across new searches.
 - Reduced live download UI refresh pressure on the main results table to preserve smooth scrolling.
+- Throttled recent-downloads panel refresh frequency to keep scrolling responsive during active downloads.
 
 ## 0.1.0 - 2026-02-26
 

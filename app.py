@@ -198,6 +198,9 @@ class AIModelViewer(App):
         self.download_spinner_frames = ["-", "\\", "|", "/"]
         self.download_registry = {}
         self.download_history_limit = 50
+        self.download_history_refresh_interval = 0.5
+        self.last_download_history_refresh_at = 0.0
+        self.download_history_refresh_pending = False
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -254,6 +257,7 @@ class AIModelViewer(App):
             "Updated",
         )
         self.refresh_download_history_table()
+        self.last_download_history_refresh_at = time.monotonic()
         self.update_status("Ready. Enter a model query and press Enter.")
         self.update_system_info()
         if not self.ollama_running:
@@ -631,6 +635,18 @@ class AIModelViewer(App):
                 key=entry.get("target_id", "-"),
             )
 
+    def request_download_history_refresh(self, force=False):
+        now = time.monotonic()
+        if force or (
+            now - self.last_download_history_refresh_at
+            >= self.download_history_refresh_interval
+        ):
+            self.refresh_download_history_table()
+            self.last_download_history_refresh_at = now
+            self.download_history_refresh_pending = False
+            return
+        self.download_history_refresh_pending = True
+
     def _download_status_text_from_state(self, state, label):
         if state == "completed":
             return "[green]Completed[/green]"
@@ -671,7 +687,7 @@ class AIModelViewer(App):
             model["download_label"] = label
             model["download_detail"] = detail
         if refresh_history:
-            self.refresh_download_history_table()
+            self.request_download_history_refresh()
 
     def _download_cell_text(self, model):
         state = model.get("download_state", "idle")
@@ -708,6 +724,8 @@ class AIModelViewer(App):
 
     def refresh_download_progress(self):
         if not self.active_downloads:
+            if self.download_history_refresh_pending:
+                self.request_download_history_refresh()
             return
         self.download_spinner_index += 1
         now = time.monotonic()
@@ -745,7 +763,7 @@ class AIModelViewer(App):
             self.download_registry.get(target_id, {}).get("state") == "downloading"
             for target_id in self.active_downloads
         ):
-            self.refresh_download_history_table()
+            self.request_download_history_refresh()
 
     def on_download_progress(self, target_id, state, label, detail):
         self._set_download_state(
