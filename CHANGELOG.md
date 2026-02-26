@@ -19,6 +19,7 @@
 - Added direct model download action in detail modal for both Ollama and Hugging Face.
 - Added per-row download tracking column with live state updates during downloads.
 - Added cancel-download action and `Canceled` state handling for active downloads.
+- Fixed modal download actions and added timer-based fallback progress updates in the download column.
 
 ## 0.1.0 - 2026-02-26
 

@@ -114,11 +114,15 @@ class ModelDetailModal(ModalScreen):
 
     @on(Button.Pressed, "#download-btn")
     def start_download(self):
-        self.dismiss("download")
+        if hasattr(self.app, "start_model_download"):
+            self.app.start_model_download(self.data.copy())
+        self.dismiss()
 
     @on(Button.Pressed, "#cancel-download-btn")
     def cancel_download(self):
-        self.dismiss("cancel_download")
+        if hasattr(self.app, "cancel_model_download"):
+            self.app.cancel_model_download(self.data.copy())
+        self.dismiss()
 
 
 class SystemInfoWidget(Static):
@@ -175,10 +179,12 @@ class AIModelViewer(App):
         self.search_cache_vram_threshold_gb = 1.0
         self.system_metrics_timer = None
         self.ollama_status_timer = None
+        self.download_status_timer = None
         self.latest_specs = None
         self.active_downloads = set()
         self.download_processes = {}
         self.cancelled_downloads = set()
+        self.download_started_at = {}
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -231,6 +237,9 @@ class AIModelViewer(App):
             )
         self.system_metrics_timer = self.set_interval(3.0, self.update_system_info)
         self.ollama_status_timer = self.set_interval(0.5, self.poll_ollama_status)
+        self.download_status_timer = self.set_interval(
+            1.0, self.refresh_download_progress
+        )
 
     def update_status(self, text):
         self.query_one("#status-bar", Static).update(text)
@@ -378,32 +387,21 @@ class AIModelViewer(App):
                 self.open_model_detail_modal(selected_model)
 
     def open_model_detail_modal(self, model):
-        self.push_screen(
-            ModelDetailModal(model),
-            lambda result, selected=model: self.on_model_detail_action(
-                result, selected
-            ),
-        )
-
-    def on_model_detail_action(self, result, model):
-        if result != "download":
-            if result == "cancel_download":
-                self.cancel_model_download(model)
-            return
-        self.start_model_download(model)
+        self.push_screen(ModelDetailModal(model))
 
     def cancel_model_download(self, model):
         target_id = download_target_id(model)
         process = self.download_processes.get(target_id)
-        if process is None:
+        if process is None and target_id not in self.active_downloads:
             self.update_status("No active download to cancel for selected model.")
             return
 
         self.cancelled_downloads.add(target_id)
-        try:
-            process.terminate()
-        except OSError:
-            pass
+        if process is not None:
+            try:
+                process.terminate()
+            except OSError:
+                pass
         self._set_download_state(target_id, "cancelled", "Canceled", "")
         self.update_status(f"Cancel requested: {model.get('name', target_id)}")
 
@@ -414,6 +412,7 @@ class AIModelViewer(App):
             return
 
         self.active_downloads.add(target_id)
+        self.download_started_at[target_id] = time.monotonic()
         self._set_download_state(target_id, "queued", "Queued", "")
         self.update_status(f"Downloading: {model.get('name', target_id)}")
         self.download_model_worker(model.copy(), target_id)
@@ -425,6 +424,12 @@ class AIModelViewer(App):
         except ValueError as exc:
             self.call_from_thread(
                 self.on_download_finished, target_id, model, False, str(exc)
+            )
+            return
+
+        if target_id in self.cancelled_downloads:
+            self.call_from_thread(
+                self.on_download_finished, target_id, model, False, "canceled"
             )
             return
 
@@ -447,6 +452,12 @@ class AIModelViewer(App):
             self.download_processes[target_id] = process
             started_at = time.monotonic()
             last_report = started_at
+
+            if target_id in self.cancelled_downloads:
+                try:
+                    process.terminate()
+                except OSError:
+                    pass
 
             if process.stdout is not None:
                 for raw_line in process.stdout:
@@ -557,12 +568,38 @@ class AIModelViewer(App):
             item.setdefault("download_label", "Idle")
             item.setdefault("download_detail", "")
 
+    def refresh_download_progress(self):
+        if not self.active_downloads:
+            return
+        now = time.monotonic()
+        updated = False
+        for target_id in list(self.active_downloads):
+            model = self._find_model_by_target_id(target_id)
+            if not model:
+                continue
+            if model.get("download_state") != "downloading":
+                continue
+            detail = model.get("download_detail", "")
+            if "%" in detail:
+                continue
+            started = self.download_started_at.get(target_id)
+            if started is None:
+                continue
+            elapsed = int(now - started)
+            next_detail = f"{elapsed}s"
+            if detail != next_detail:
+                model["download_detail"] = next_detail
+                updated = True
+        if updated:
+            self.refresh_table()
+
     def on_download_progress(self, target_id, state, label, detail):
         self._set_download_state(target_id, state, label, detail)
 
     def on_download_finished(self, target_id, model, success, message):
         self.active_downloads.discard(target_id)
         self.download_processes.pop(target_id, None)
+        self.download_started_at.pop(target_id, None)
         if target_id in self.cancelled_downloads:
             self.cancelled_downloads.discard(target_id)
             self._set_download_state(target_id, "cancelled", "Canceled", "")
