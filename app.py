@@ -104,8 +104,13 @@ class ModelDetailModal(ModalScreen):
 
             yield Label("Run / Download Command:", classes="label-key")
             yield Label(cmd_text, id="cmd-box")
-            yield Button("Download Now", variant="primary", id="download-btn")
-            yield Button("Cancel Download", variant="warning", id="cancel-download-btn")
+            current_download_state = self.data.get("download_state", "idle")
+            if current_download_state in {"queued", "downloading"}:
+                yield Button(
+                    "Cancel Download", variant="warning", id="cancel-download-btn"
+                )
+            else:
+                yield Button("Download Now", variant="primary", id="download-btn")
             yield Button("Close", variant="error", id="close-btn")
 
     @on(Button.Pressed, "#close-btn")

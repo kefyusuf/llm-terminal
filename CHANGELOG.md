@@ -21,6 +21,7 @@
 - Added cancel-download action and `Canceled` state handling for active downloads.
 - Fixed modal download actions and added timer-based fallback progress updates in the download column.
 - Added animated spinner indicator in the download column during active downloads.
+- Made modal action buttons state-aware so `Cancel Download` only appears for active downloads.
 
 ## 0.1.0 - 2026-02-26
 
