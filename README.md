@@ -48,6 +48,12 @@ Run live platform checks (no mocks):
 pytest -q --run-live
 ```
 
+Release preflight check:
+
+```bash
+python scripts/release_check.py
+```
+
 ## Current Limitations
 
 - Network/API failures are currently handled conservatively and may return fewer diagnostics than ideal.
