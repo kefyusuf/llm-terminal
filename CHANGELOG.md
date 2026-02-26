@@ -43,6 +43,7 @@
 - Added service `/shutdown` endpoint for controlled app-driven restarts.
 - Improved quantization inference from model names and removed Ollama hardcoded `Q4_0` display.
 - Marked estimated Hugging Face sizes with `~` and clarified results table columns as estimated runtime/fit.
+- Added a dedicated size-confidence column (`Exact` vs `Estimated`) in the main results table.
 
 ## 0.1.0 - 2026-02-26
 
