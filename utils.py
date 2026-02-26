@@ -1,6 +1,17 @@
 import re
 
 
+USE_CASE_LABELS = {
+    "coding": "[bold blue]Coding[/bold blue]",
+    "vision": "[bold magenta]Vision[/bold magenta]",
+    "math": "[bold cyan]Math[/bold cyan]",
+    "reasoning": "[bold yellow]Reasoning[/bold yellow]",
+    "embedding": "[grey74]Embedding[/grey74]",
+    "chat": "[bold green]Chat[/bold green]",
+    "general": "[white]General[/white]",
+}
+
+
 def extract_params(name):
     match = re.search(r"(\d+(?:\.\d+)?[BbMm])", name, re.IGNORECASE)
     return match.group(1).upper() if match else "-"
@@ -14,21 +25,25 @@ def format_likes(num):
     return str(num)
 
 
-def determine_use_case(name):
+def determine_use_case_key(name):
     name_lower = name.lower()
     if any(kw in name_lower for kw in ["coder", "code", "starcoder", "deepseek-coder"]):
-        return "[bold blue]Coding[/bold blue]"
+        return "coding"
     if any(kw in name_lower for kw in ["vision", "vl", "llava", "pixtral"]):
-        return "[bold magenta]Vision[/bold magenta]"
+        return "vision"
     if any(kw in name_lower for kw in ["math"]):
-        return "[bold cyan]Math[/bold cyan]"
+        return "math"
     if any(kw in name_lower for kw in ["reasoning", "think", "-r1", "deepseek-r1"]):
-        return "[bold yellow]Reasoning[/bold yellow]"
+        return "reasoning"
     if any(kw in name_lower for kw in ["embed", "bge", "nomic"]):
-        return "[grey74]Embedding[/grey74]"
+        return "embedding"
     if any(kw in name_lower for kw in ["instruct", "chat", "dolphin", "hermes"]):
-        return "[bold green]Chat[/bold green]"
-    return "[white]General[/white]"
+        return "chat"
+    return "general"
+
+
+def determine_use_case(name):
+    return USE_CASE_LABELS[determine_use_case_key(name)]
 
 
 def calculate_fit(size_gb, specs):

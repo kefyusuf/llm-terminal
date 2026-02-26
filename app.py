@@ -6,6 +6,7 @@ from textual.containers import Grid, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
+    Checkbox,
     DataTable,
     Footer,
     Input,
@@ -85,6 +86,9 @@ class ModelDetailModal(ModalScreen):
             yield Label(f"{self.data['name']}", id="modal-title")
 
             with Grid(id="info-grid"):
+                yield Label(
+                    f"[bold]Source:[/bold] {self.data['source']} / {self.data.get('publisher', '-')}"
+                )
                 yield Label(f"[bold]Provider:[/bold] {self.data['provider']}")
                 yield Label(f"[bold]Use Case:[/bold] {self.data['use_case']}")
                 yield Label(f"[bold]Parameters:[/bold] {self.data['params']}")
@@ -127,6 +131,8 @@ class AIModelViewer(App):
     SystemInfoWidget { height: 3; border: round cyan; content-align: center middle; margin-bottom: 1; }
     Input { width: 100%; margin-bottom: 1; }
     RadioSet { layout: horizontal; width: 100%; height: 3; border: none; align: center middle; margin-bottom: 1; }
+    #use-case-filter { height: 3; }
+    #gem-toggle { margin-bottom: 1; }
     DataTable { height: 1fr; border: round grey; }
     #status-bar { height: 1; color: $text-muted; margin-top: 1; }
     """
@@ -142,6 +148,8 @@ class AIModelViewer(App):
         self.monitor = HardwareMonitor()
         self.all_results = []
         self.current_filter = "All"
+        self.use_case_filter = "all"
+        self.hidden_gems_only = False
         self.last_search_error = ""
         self.search_counter = 0
         self.active_search_id = 0
@@ -162,6 +170,18 @@ class AIModelViewer(App):
             yield RadioButton("All", value=True, id="filter-all")
             yield RadioButton("Ollama", id="filter-ollama")
             yield RadioButton("Hugging Face", id="filter-hf")
+        with RadioSet(id="use-case-filter"):
+            yield RadioButton("Any Use", value=True, id="uc-all")
+            yield RadioButton("Chat", id="uc-chat")
+            yield RadioButton("Coding", id="uc-coding")
+            yield RadioButton("Vision", id="uc-vision")
+            yield RadioButton("Reason", id="uc-reasoning")
+            yield RadioButton("Math", id="uc-math")
+            yield RadioButton("Embed", id="uc-embedding")
+            yield RadioButton("General", id="uc-general")
+        yield Checkbox(
+            "Hidden gems only (HF: high downloads, low likes)", id="gem-toggle"
+        )
         yield DataTable(id="results-table", cursor_type="row")
         yield Static("", id="status-bar")
         yield Footer()
@@ -172,6 +192,7 @@ class AIModelViewer(App):
         table.add_columns(
             "Installed",
             "Source",
+            "Publisher",
             "Model Name",
             "Params",
             "Use Case",
@@ -272,6 +293,12 @@ class AIModelViewer(App):
             self.search_cache.pop(oldest_key, None)
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        if event.radio_set.id == "use-case-filter":
+            pid = event.pressed.id
+            self.use_case_filter = pid.replace("uc-", "") if pid else "all"
+            self.refresh_table()
+            return
+
         pid = event.pressed.id
         if pid == "filter-all":
             self.current_filter = "All"
@@ -279,6 +306,12 @@ class AIModelViewer(App):
             self.current_filter = "Ollama"
         elif pid == "filter-hf":
             self.current_filter = "Hugging Face"
+        self.refresh_table()
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if event.checkbox.id != "gem-toggle":
+            return
+        self.hidden_gems_only = bool(event.value)
         self.refresh_table()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
@@ -358,6 +391,7 @@ class AIModelViewer(App):
             table.add_row(
                 "[red]![/red]",
                 "System",
+                "-",
                 "Search error",
                 "-",
                 "-",
@@ -374,10 +408,30 @@ class AIModelViewer(App):
         table.clear()
         added = set()
 
+        filtered_results = []
         for result in self.all_results:
             if self.current_filter != "All" and result["source"] != self.current_filter:
                 continue
+            if (
+                self.use_case_filter != "all"
+                and result.get("use_case_key") != self.use_case_filter
+            ):
+                continue
+            if self.hidden_gems_only and not result.get("is_hidden_gem", False):
+                continue
+            filtered_results.append(result)
 
+        if self.hidden_gems_only:
+            filtered_results.sort(
+                key=lambda item: (
+                    item.get("is_hidden_gem", False),
+                    item.get("gem_score", 0.0),
+                    item.get("downloads", 0),
+                ),
+                reverse=True,
+            )
+
+        for result in filtered_results:
             display_name = result["name"]
             if len(display_name) > 30:
                 display_name = display_name[:27] + "..."
@@ -390,6 +444,7 @@ class AIModelViewer(App):
             table.add_row(
                 result["inst"],
                 result["source"],
+                result.get("publisher", "-"),
                 display_name,
                 result["params"],
                 result["use_case"],

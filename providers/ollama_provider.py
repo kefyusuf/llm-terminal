@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from utils import (
     calculate_fit,
     determine_use_case,
+    determine_use_case_key,
     estimate_model_size_gb,
     extract_params,
 )
@@ -71,6 +72,7 @@ def search_ollama_models(query, specs, local_models):
                 else "[grey37]-[/grey37]"
             )
             use_case = determine_use_case(model_name)
+            use_case_key = determine_use_case_key(model_name)
             size_gb = estimate_model_size_gb(model_name)
             fit_str, mode_str, _ = calculate_fit(size_gb, specs)
 
@@ -79,11 +81,17 @@ def search_ollama_models(query, specs, local_models):
                     "inst": inst,
                     "source": "Ollama",
                     "provider": "Ollama Registry",
+                    "publisher": "ollama",
                     "id": model_name,
                     "name": model_name,
                     "params": params,
                     "use_case": use_case,
+                    "use_case_key": use_case_key,
                     "score": score_str,
+                    "likes": 0,
+                    "downloads": 0,
+                    "is_hidden_gem": False,
+                    "gem_score": 0.0,
                     "quant": "Q4_0",
                     "size_source": "estimated",
                     "mode": mode_str,

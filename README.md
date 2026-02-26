@@ -8,6 +8,8 @@ AI Model Explorer is a Textual-based terminal UI that helps you find local-LLM m
 - Show system snapshot: CPU, RAM, GPU VRAM, and Ollama process status.
 - Estimate run fit (`Perfect`, `Partial`, `Slow`, `No Fit`) based on available memory.
 - Filter results by source (`All`, `Ollama`, `Hugging Face`).
+- Filter results by use case and a Hidden Gems mode for high-download/low-like HF models.
+- Show publisher/source details (for example, `unsloth`) directly in the results table.
 - Open row details in a modal with a ready-to-run command.
 
 ## Requirements

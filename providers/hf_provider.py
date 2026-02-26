@@ -5,6 +5,7 @@ from huggingface_hub.errors import HfHubHTTPError
 from utils import (
     calculate_fit,
     determine_use_case,
+    determine_use_case_key,
     estimate_model_size_gb,
     extract_params,
     format_likes,
@@ -29,6 +30,18 @@ def _select_preferred_gguf(siblings):
     return next((name for name in filenames if name.endswith(".gguf")), None)
 
 
+def classify_hidden_gem(downloads, likes):
+    if downloads < 5000:
+        return False, 0.0
+    if likes > 200:
+        return False, 0.0
+    like_ratio = likes / max(downloads, 1)
+    if like_ratio > 0.005:
+        return False, 0.0
+    score = downloads / (likes + 1)
+    return True, score
+
+
 def search_hf_models(
     query,
     specs,
@@ -47,7 +60,7 @@ def search_hf_models(
             sort="downloads",
             limit=limit,
             filter="gguf",
-            expand=["likes", "siblings"],
+            expand=["likes", "siblings", "downloads"],
         )
     except (HfHubHTTPError, requests.RequestException, ValueError, OSError) as exc:
         return results, [f"Hugging Face search failed: {exc}"]
@@ -58,7 +71,8 @@ def search_hf_models(
             if not repo_id:
                 raise ValueError("missing model repository id")
 
-            provider = repo_id.split("/")[0][:15]
+            publisher = repo_id.split("/")[0]
+            provider = publisher[:15]
             name = repo_id.split("/")[-1]
             unique_key = f"Hugging Face:{repo_id.lower()}"
             if unique_key in found_keys:
@@ -67,12 +81,17 @@ def search_hf_models(
 
             params = extract_params(name)
             use_case = determine_use_case(name)
+            use_case_key = determine_use_case_key(name)
             likes = getattr(model, "likes", 0)
+            downloads = int(getattr(model, "downloads", 0) or 0)
+            is_hidden_gem, gem_score = classify_hidden_gem(downloads, likes)
             score_str = (
                 f"[red]❤️ {format_likes(likes)}[/red]"
                 if likes > 0
                 else "[grey50]-[/grey50]"
             )
+            if is_hidden_gem:
+                score_str = f"{score_str} [yellow]💎[/yellow]"
 
             quant = "GGUF"
             size = estimate_model_size_gb(name)
@@ -90,11 +109,17 @@ def search_hf_models(
                     "inst": "[grey37]-[/grey37]",
                     "source": "Hugging Face",
                     "provider": provider,
+                    "publisher": publisher,
                     "id": repo_id,
                     "name": name,
                     "params": params,
                     "use_case": use_case,
+                    "use_case_key": use_case_key,
                     "score": score_str,
+                    "likes": likes,
+                    "downloads": downloads,
+                    "is_hidden_gem": is_hidden_gem,
+                    "gem_score": gem_score,
                     "quant": quant,
                     "target_file": target,
                     "size_source": "estimated",

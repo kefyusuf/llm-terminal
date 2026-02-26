@@ -23,6 +23,7 @@ def test_live_hugging_face_search_returns_models():
     assert not errors, f"HF live search returned errors: {errors}"
     assert results, "HF live search returned no models"
     assert all(item["source"] == "Hugging Face" for item in results)
+    assert all("publisher" in item and item["publisher"] for item in results)
 
 
 @pytest.mark.live

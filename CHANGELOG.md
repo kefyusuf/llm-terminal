@@ -9,6 +9,9 @@
 - Added hardware-aware cache invalidation when free RAM/VRAM changes beyond threshold.
 - Added size-confidence indicator (estimated vs exact) in model details.
 - Color-coded size-confidence indicator for quicker visual scanning.
+- Added use-case filter controls (chat, coding, vision, reasoning, math, embedding, general).
+- Added Hidden Gems filter for Hugging Face models with high downloads and relatively low likes.
+- Added publisher column and source metadata to show sub-publishers such as `unsloth`.
 
 ## 0.1.0 - 2026-02-26
 

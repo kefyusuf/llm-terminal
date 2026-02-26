@@ -18,6 +18,10 @@ def test_determine_use_case_coding_priority():
     assert "Coding" in utils.determine_use_case("deepseek-coder-7b")
 
 
+def test_determine_use_case_key_reasoning():
+    assert utils.determine_use_case_key("deepseek-r1-7b") == "reasoning"
+
+
 def test_calculate_fit_perfect_gpu():
     specs = {
         "has_gpu": True,
