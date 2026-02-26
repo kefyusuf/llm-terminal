@@ -32,15 +32,13 @@ def _select_preferred_gguf(siblings):
 def search_hf_models(
     query,
     specs,
-    repo_files_cache,
     model_info_cache,
     limit=15,
-    detailed_limit=8,
 ):
     results = []
     errors = []
     found_keys = set()
-    _ = repo_files_cache
+    _ = model_info_cache
 
     try:
         api = HfApi()
@@ -54,7 +52,7 @@ def search_hf_models(
     except (HfHubHTTPError, requests.RequestException, ValueError, OSError) as exc:
         return results, [f"Hugging Face search failed: {exc}"]
 
-    for index, model in enumerate(hf_models):
+    for model in hf_models:
         try:
             repo_id = _repo_id_from_model(model)
             if not repo_id:
@@ -78,7 +76,6 @@ def search_hf_models(
 
             quant = "GGUF"
             size = estimate_model_size_gb(name)
-            detailed_lookup = index < detailed_limit
             siblings = getattr(model, "siblings", None) or []
             target = _select_preferred_gguf(siblings)
 
@@ -86,19 +83,6 @@ def search_hf_models(
                 quant = target.split(".")[-2] if len(target.split(".")) > 2 else "GGUF"
                 if "gguf" in quant.lower():
                     quant = "GGUF"
-
-            if detailed_lookup and target:
-                info = model_info_cache.get(repo_id)
-                if info is None:
-                    info = api.model_info(repo_id, files_metadata=True)
-                    model_info_cache[repo_id] = info
-
-                siblings = info.siblings or []
-                metadata = next(
-                    (item for item in siblings if item.rfilename == target), None
-                )
-                if metadata and metadata.size:
-                    size = metadata.size / (1024**3)
 
             fit_str, mode_str, _ = calculate_fit(size, specs)
             results.append(
@@ -112,6 +96,7 @@ def search_hf_models(
                     "use_case": use_case,
                     "score": score_str,
                     "quant": quant,
+                    "target_file": target,
                     "mode": mode_str,
                     "fit": fit_str,
                     "size": f"{size:.1f} GB",
@@ -128,3 +113,39 @@ def search_hf_models(
             errors.append(f"Hugging Face model parse failed: {exc}")
 
     return results, errors
+
+
+def enrich_hf_model_details(model, specs, model_info_cache):
+    repo_id = model.get("id")
+    if not repo_id:
+        return model
+
+    try:
+        api = HfApi()
+        info = model_info_cache.get(repo_id)
+        if info is None:
+            info = api.model_info(repo_id, files_metadata=True)
+            model_info_cache[repo_id] = info
+
+        siblings = info.siblings or []
+        target = model.get("target_file") or _select_preferred_gguf(siblings)
+        if not target:
+            return model
+
+        metadata = next((item for item in siblings if item.rfilename == target), None)
+        if metadata and metadata.size:
+            size = metadata.size / (1024**3)
+            fit_str, mode_str, _ = calculate_fit(size, specs)
+            model["size"] = f"{size:.1f} GB"
+            model["fit"] = fit_str
+            model["mode"] = mode_str
+
+        quant = target.split(".")[-2] if len(target.split(".")) > 2 else "GGUF"
+        if "gguf" in quant.lower():
+            quant = "GGUF"
+        model["quant"] = quant
+        model["target_file"] = target
+    except (HfHubHTTPError, requests.RequestException, OSError, ValueError, TypeError):
+        return model
+
+    return model

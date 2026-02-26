@@ -14,7 +14,7 @@ from textual.widgets import (
 )
 
 from hardware import HardwareMonitor, check_ollama_running
-from providers.hf_provider import search_hf_models
+from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
 
 
@@ -135,7 +135,6 @@ class AIModelViewer(App):
         self.last_search_error = ""
         self.search_counter = 0
         self.active_search_id = 0
-        self.hf_repo_files_cache = {}
         self.hf_model_info_cache = {}
 
     def compose(self) -> ComposeResult:
@@ -213,7 +212,32 @@ class AIModelViewer(App):
             None,
         )
         if selected_model:
-            self.push_screen(ModelDetailModal(selected_model))
+            if selected_model["source"] == "Hugging Face":
+                self.update_status("Loading detailed model metadata...")
+                self.open_hf_detail_worker(selected_model)
+            else:
+                self.push_screen(ModelDetailModal(selected_model))
+
+    @work(thread=True)
+    def open_hf_detail_worker(self, selected_model):
+        specs = self.monitor.get_specs()
+        enriched = enrich_hf_model_details(
+            selected_model.copy(),
+            specs,
+            self.hf_model_info_cache,
+        )
+        self.call_from_thread(self.on_hf_detail_ready, enriched)
+
+    def on_hf_detail_ready(self, enriched_model):
+        model_id = enriched_model.get("id")
+        if model_id:
+            for idx, item in enumerate(self.all_results):
+                if item.get("source") == "Hugging Face" and item.get("id") == model_id:
+                    self.all_results[idx] = enriched_model
+                    break
+            self.refresh_table()
+        self.push_screen(ModelDetailModal(enriched_model))
+        self.update_status("Detailed metadata loaded.")
 
     @work(thread=True)
     def run_search_worker(self, query: str, search_id: int) -> None:
@@ -224,7 +248,6 @@ class AIModelViewer(App):
         hf_results, hf_errors = search_hf_models(
             query,
             specs,
-            self.hf_repo_files_cache,
             self.hf_model_info_cache,
         )
 

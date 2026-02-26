@@ -31,10 +31,8 @@ def check_hf_search():
     results, errors = search_hf_models(
         query="qwen",
         specs=TEST_SPECS,
-        repo_files_cache={},
         model_info_cache={},
         limit=5,
-        detailed_limit=2,
     )
     if errors:
         raise RuntimeError("; ".join(errors))

@@ -16,10 +16,8 @@ def test_live_hugging_face_search_returns_models():
     results, errors = search_hf_models(
         query="qwen",
         specs=TEST_SPECS,
-        repo_files_cache={},
         model_info_cache={},
         limit=5,
-        detailed_limit=2,
     )
 
     assert not errors, f"HF live search returned errors: {errors}"
