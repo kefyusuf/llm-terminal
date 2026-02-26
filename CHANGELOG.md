@@ -24,6 +24,7 @@
 - Made modal action buttons state-aware so `Cancel Download` only appears for active downloads.
 - Fixed Windows Unicode decode crash in download streaming by forcing UTF-8 with replacement fallback.
 - Added persistent recent-downloads panel so previous download states remain visible across new searches.
+- Reduced live download UI refresh pressure on the main results table to preserve smooth scrolling.
 
 ## 0.1.0 - 2026-02-26
 

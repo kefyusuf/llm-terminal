@@ -647,17 +647,31 @@ class AIModelViewer(App):
             return "[cyan]Queued[/cyan]"
         return "[grey50]Idle[/grey50]"
 
-    def _set_download_state(self, target_id, state, label, detail, model=None):
+    def _set_download_state(
+        self,
+        target_id,
+        state,
+        label,
+        detail,
+        model=None,
+        refresh_results=True,
+        refresh_history=True,
+    ):
         self._record_download_entry(
             target_id, model=model, state=state, label=label, detail=detail
         )
         model = self._find_model_by_target_id(target_id)
-        if model:
+        if model and refresh_results:
             model["download_state"] = state
             model["download_label"] = label
             model["download_detail"] = detail
             self.refresh_table()
-        self.refresh_download_history_table()
+        elif model:
+            model["download_state"] = state
+            model["download_label"] = label
+            model["download_detail"] = detail
+        if refresh_history:
+            self.refresh_download_history_table()
 
     def _download_cell_text(self, model):
         state = model.get("download_state", "idle")
@@ -697,7 +711,6 @@ class AIModelViewer(App):
             return
         self.download_spinner_index += 1
         now = time.monotonic()
-        table_updated = False
         history_updated = False
         for target_id in list(self.active_downloads):
             model = self._find_model_by_target_id(target_id)
@@ -719,7 +732,6 @@ class AIModelViewer(App):
             if detail != next_detail:
                 if model:
                     model["download_detail"] = next_detail
-                    table_updated = True
                 self._record_download_entry(
                     target_id,
                     model=model,
@@ -729,11 +741,6 @@ class AIModelViewer(App):
                 )
                 history_updated = True
 
-        if table_updated or any(
-            self.download_registry.get(target_id, {}).get("state") == "downloading"
-            for target_id in self.active_downloads
-        ):
-            self.refresh_table()
         if history_updated or any(
             self.download_registry.get(target_id, {}).get("state") == "downloading"
             for target_id in self.active_downloads
@@ -741,7 +748,14 @@ class AIModelViewer(App):
             self.refresh_download_history_table()
 
     def on_download_progress(self, target_id, state, label, detail):
-        self._set_download_state(target_id, state, label, detail)
+        self._set_download_state(
+            target_id,
+            state,
+            label,
+            detail,
+            refresh_results=False,
+            refresh_history=True,
+        )
 
     def on_download_finished(self, target_id, model, success, message):
         self.active_downloads.discard(target_id)
