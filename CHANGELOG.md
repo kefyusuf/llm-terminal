@@ -51,6 +51,7 @@
 - Bumped service compatibility baseline to `1.2` so legacy instances are auto-restarted.
 - Added delete retry logic that restarts incompatible services when `/jobs/delete` is missing.
 - Switched the main results table from `Size` display to `Scale` (parameter class) for clearer model comparison.
+- Aligned modal terminology with table naming (`Scale`, `Disk Size`).
 
 ## 0.1.0 - 2026-02-26
 
