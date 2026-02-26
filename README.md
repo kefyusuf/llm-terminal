@@ -42,6 +42,12 @@ python main.py
 pytest -q
 ```
 
+Run live platform checks (no mocks):
+
+```bash
+pytest -q --run-live
+```
+
 ## Current Limitations
 
 - Network/API failures are currently handled conservatively and may return fewer diagnostics than ideal.
