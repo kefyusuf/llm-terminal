@@ -16,6 +16,7 @@
 - Surfaced startup hint when Ollama is not running and local runtime features are unavailable.
 - Clarified Ollama requirement in project documentation.
 - Added fast Ollama status polling so header state updates nearly instantly on start/stop.
+- Added direct model download action in detail modal for both Ollama and Hugging Face.
 
 ## 0.1.0 - 2026-02-26
 

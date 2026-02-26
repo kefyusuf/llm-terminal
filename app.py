@@ -1,4 +1,5 @@
 import time
+import subprocess
 
 from textual import on, work
 from textual.app import App, ComposeResult
@@ -17,6 +18,7 @@ from textual.widgets import (
 )
 
 from hardware import HardwareMonitor, check_ollama_running
+from download_manager import build_download_command, download_target_id
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
 
@@ -101,11 +103,16 @@ class ModelDetailModal(ModalScreen):
 
             yield Label("Run / Download Command:", classes="label-key")
             yield Label(cmd_text, id="cmd-box")
+            yield Button("Download Now", variant="primary", id="download-btn")
             yield Button("Close", variant="error", id="close-btn")
 
     @on(Button.Pressed, "#close-btn")
     def close_modal(self):
         self.dismiss()
+
+    @on(Button.Pressed, "#download-btn")
+    def start_download(self):
+        self.dismiss("download")
 
 
 class SystemInfoWidget(Static):
@@ -163,6 +170,7 @@ class AIModelViewer(App):
         self.system_metrics_timer = None
         self.ollama_status_timer = None
         self.latest_specs = None
+        self.active_downloads = set()
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -357,7 +365,90 @@ class AIModelViewer(App):
                 self.update_status("Loading detailed model metadata...")
                 self.open_hf_detail_worker(selected_model)
             else:
-                self.push_screen(ModelDetailModal(selected_model))
+                self.open_model_detail_modal(selected_model)
+
+    def open_model_detail_modal(self, model):
+        self.push_screen(
+            ModelDetailModal(model),
+            lambda result, selected=model: self.on_model_detail_action(
+                result, selected
+            ),
+        )
+
+    def on_model_detail_action(self, result, model):
+        if result != "download":
+            return
+        self.start_model_download(model)
+
+    def start_model_download(self, model):
+        target_id = download_target_id(model)
+        if target_id in self.active_downloads:
+            self.update_status("Download already in progress for selected model.")
+            return
+
+        self.active_downloads.add(target_id)
+        self.update_status(f"Downloading: {model.get('name', target_id)}")
+        self.download_model_worker(model.copy(), target_id)
+
+    @work(thread=True)
+    def download_model_worker(self, model, target_id):
+        try:
+            command = build_download_command(model)
+        except ValueError as exc:
+            self.call_from_thread(
+                self.on_download_finished, target_id, model, False, str(exc)
+            )
+            return
+
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            self.call_from_thread(
+                self.on_download_finished,
+                target_id,
+                model,
+                False,
+                f"Required command is not installed: {command[0]}",
+            )
+            return
+        except OSError as exc:
+            self.call_from_thread(
+                self.on_download_finished, target_id, model, False, str(exc)
+            )
+            return
+
+        if completed.returncode == 0:
+            self.call_from_thread(self.on_download_finished, target_id, model, True, "")
+            return
+
+        error_text = (completed.stderr or completed.stdout or "download failed").strip()
+        self.call_from_thread(
+            self.on_download_finished,
+            target_id,
+            model,
+            False,
+            error_text[:180],
+        )
+
+    def on_download_finished(self, target_id, model, success, message):
+        self.active_downloads.discard(target_id)
+        if success:
+            if model.get("source") == "Ollama":
+                self._mark_ollama_model_installed(model.get("name", ""))
+            self.update_status(f"Download complete: {model.get('name', target_id)}")
+            return
+        self.update_status(f"Download failed: {message}")
+
+    def _mark_ollama_model_installed(self, model_name):
+        for item in self.all_results:
+            if item.get("source") == "Ollama" and item.get("name") == model_name:
+                item["inst"] = "[green]✔[/green]"
+        self.refresh_table()
 
     @work(thread=True)
     def open_hf_detail_worker(self, selected_model):
@@ -377,7 +468,7 @@ class AIModelViewer(App):
                     self.all_results[idx] = enriched_model
                     break
             self.refresh_table()
-        self.push_screen(ModelDetailModal(enriched_model))
+        self.open_model_detail_modal(enriched_model)
         self.update_status("Detailed metadata loaded.")
 
     @work(thread=True)

@@ -11,6 +11,7 @@ AI Model Explorer is a Textual-based terminal UI that helps you find local-LLM m
 - Filter results by use case and a Hidden Gems mode for high-download/low-like HF models.
 - Show publisher/source details (for example, `unsloth`) directly in the results table.
 - Open row details in a modal with a ready-to-run command.
+- Start direct downloads from the model detail popup (`ollama pull` or Hugging Face CLI download).
 
 ## Requirements
 
