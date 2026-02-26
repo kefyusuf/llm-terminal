@@ -378,7 +378,7 @@ class AIModelViewer(App):
             (
                 m
                 for m in self.all_results
-                if f"{m['source']}:{m['name']}" == row_key_str
+                if f"{m['source']}:{m.get('id', m['name'])}" == row_key_str
             ),
             None,
         )
@@ -463,6 +463,7 @@ class AIModelViewer(App):
                                 "inst": inst,
                                 "source": "Ollama",
                                 "provider": "Ollama Registry",
+                                "id": model_name,
                                 "name": model_name,
                                 "params": params,
                                 "use_case": use_case,
@@ -487,7 +488,7 @@ class AIModelViewer(App):
             for model in hf_models:
                 provider = model.modelId.split("/")[0][:15]
                 name = model.modelId.split("/")[-1]
-                unique_k = f"Hugging Face:{name}"
+                unique_k = f"Hugging Face:{model.modelId.lower()}"
                 if unique_k in found_keys:
                     continue
                 found_keys.add(unique_k)
@@ -530,6 +531,7 @@ class AIModelViewer(App):
                                 "inst": "[grey37]-[/grey37]",
                                 "source": "Hugging Face",
                                 "provider": provider,
+                                "id": model.modelId,
                                 "name": name,
                                 "params": params,
                                 "use_case": use_case,
@@ -582,7 +584,7 @@ class AIModelViewer(App):
                 if len(disp_name) > 30:
                     disp_name = disp_name[:27] + "..."
 
-                unique_key = f"{r['source']}:{r['name']}"
+                unique_key = f"{r['source']}:{r.get('id', r['name'])}"
                 if unique_key in added_in_table:
                     continue
                 added_in_table.add(unique_key)
