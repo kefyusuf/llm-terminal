@@ -667,6 +667,7 @@ class AIModelViewer(App):
             "source": source,
             "publisher": publisher,
             "name": name,
+            "created_at": existing.get("created_at", time.time()),
             "state": state if state is not None else existing.get("state", "idle"),
             "label": label if label is not None else existing.get("label", "Idle"),
             "detail": detail if detail is not None else existing.get("detail", ""),
@@ -724,6 +725,14 @@ class AIModelViewer(App):
                 label=label,
                 detail=detail,
             )
+            self.download_registry[target_id]["created_at"] = job.get(
+                "created_at",
+                self.download_registry[target_id].get("created_at", time.time()),
+            )
+            self.download_registry[target_id]["updated_at"] = job.get(
+                "updated_at",
+                self.download_registry[target_id].get("updated_at", time.time()),
+            )
             if mapped_status in {"queued", "downloading"}:
                 running_targets.add(target_id)
 
@@ -739,7 +748,10 @@ class AIModelViewer(App):
 
         entries = sorted(
             self.download_registry.values(),
-            key=lambda item: item.get("updated_at", 0),
+            key=lambda item: (
+                item.get("created_at", 0),
+                item.get("target_id", ""),
+            ),
             reverse=True,
         )
 

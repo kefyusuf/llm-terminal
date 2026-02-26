@@ -70,7 +70,8 @@ class DownloadStore:
     def list_jobs(self, limit=50):
         with self.lock, self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM jobs ORDER BY updated_at DESC LIMIT ?", (int(limit),)
+                "SELECT * FROM jobs ORDER BY created_at DESC, id DESC LIMIT ?",
+                (int(limit),),
             ).fetchall()
         return [self._row_to_dict(row) for row in rows]
 
@@ -430,7 +431,7 @@ class Handler(BaseHTTPRequestHandler):
 
         self._json_response(404, {"error": "not found"})
 
-    def log_message(self, _format, *_args):
+    def log_message(self, format, *args):
         return
 
 

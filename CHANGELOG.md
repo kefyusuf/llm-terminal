@@ -28,6 +28,7 @@
 - Throttled recent-downloads panel refresh frequency to keep scrolling responsive during active downloads.
 - Added an auto-started local download service with persistent job storage so downloads survive TUI restarts.
 - Enabled cancel actions for active jobs directly from the recent-downloads panel.
+- Stabilized recent-download row ordering during concurrent downloads to prevent visual row swapping.
 
 ## 0.1.0 - 2026-02-26
 
