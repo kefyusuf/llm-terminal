@@ -1124,6 +1124,9 @@ class AIModelViewer(App):
 
     def refresh_table(self):
         table = self.query_one("#results-table", DataTable)
+        prev_cursor_row = table.cursor_row
+        prev_scroll_x = table.scroll_x
+        prev_scroll_y = table.scroll_y
         table.clear()
         added = set()
 
@@ -1173,4 +1176,14 @@ class AIModelViewer(App):
                 result["fit"],
                 self._download_cell_text(result),
                 key=unique_key,
+            )
+
+        if table.row_count > 0:
+            restored_row = max(0, min(prev_cursor_row, table.row_count - 1))
+            table.move_cursor(row=restored_row, animate=False, scroll=False)
+            table.scroll_to(
+                x=prev_scroll_x,
+                y=prev_scroll_y,
+                animate=False,
+                immediate=True,
             )
