@@ -10,8 +10,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from huggingface_hub import snapshot_download
-
 from download_manager import (
     build_download_command,
     download_target_id,
@@ -22,7 +20,7 @@ from download_manager import (
 DB_PATH = Path(__file__).resolve().with_name("downloads.db")
 HOST = "127.0.0.1"
 PORT = 8765
-SERVICE_VERSION = "1.4"
+SERVICE_VERSION = "1.5"
 
 
 class DownloadStore:
@@ -347,6 +345,12 @@ def _service_popen_kwargs():
     return kwargs
 
 
+def _can_terminate_process(process):
+    return hasattr(process, "terminate") and callable(
+        getattr(process, "terminate", None)
+    )
+
+
 def _has_duplicates(values):
     return len(values) != len(set(values))
 
@@ -406,10 +410,39 @@ def worker_loop():
                     detail="Downloading",
                     progress="",
                 )
-                STATE.set_process(target_id, object())
+                hf_script = (
+                    "from huggingface_hub import snapshot_download; "
+                    "import sys; "
+                    "snapshot_download(repo_id=sys.argv[1], allow_patterns=['*.gguf'])"
+                )
+                process = subprocess.Popen(
+                    [sys.executable, "-c", hf_script, repo_id],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    bufsize=1,
+                    **_service_popen_kwargs(),
+                )
+                STATE.set_process(target_id, process)
+                last_line = ""
 
                 try:
-                    snapshot_download(repo_id=repo_id, allow_patterns=["*.gguf"])
+                    if process.stdout is not None:
+                        for raw_line in process.stdout:
+                            line = raw_line.strip()
+                            if line:
+                                last_line = line
+
+                            latest = STATE.store.get_job_by_target(target_id)
+                            if latest and latest.get("cancel_requested"):
+                                try:
+                                    process.terminate()
+                                except OSError:
+                                    pass
+
+                    return_code = process.wait()
                     latest = STATE.store.get_job_by_target(target_id)
                     if latest and latest.get("cancel_requested"):
                         STATE.store.update_job(
@@ -417,15 +450,26 @@ def worker_loop():
                             status="cancelled",
                             detail="Canceled",
                             progress="",
-                            return_code=0,
+                            return_code=return_code,
                         )
-                    else:
+                    elif return_code == 0:
                         STATE.store.update_job(
                             target_id,
                             status="completed",
                             detail="Completed",
                             progress="",
                             return_code=0,
+                        )
+                    else:
+                        failure_detail = "hugging face download failed"
+                        if last_line:
+                            failure_detail = last_line[:180]
+                        STATE.store.update_job(
+                            target_id,
+                            status="failed",
+                            detail=failure_detail,
+                            progress="",
+                            return_code=return_code,
                         )
                 except Exception as exc:
                     detail = str(exc).strip() or "hugging face download failed"
@@ -436,6 +480,8 @@ def worker_loop():
                         progress="",
                         return_code=1,
                     )
+                finally:
+                    STATE.clear_process(target_id)
                 continue
 
             process = subprocess.Popen(
@@ -611,7 +657,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             process = STATE.get_process(target_id)
-            if process is not None:
+            if process is not None and _can_terminate_process(process):
                 try:
                     process.terminate()
                 except OSError:
@@ -628,6 +674,8 @@ class Handler(BaseHTTPRequestHandler):
                         process.wait(timeout=1.0)
                     except subprocess.TimeoutExpired:
                         pass
+            elif process is not None:
+                process = None
 
             if job.get("status") in {"queued", "running"} and process is None:
                 job = STATE.store.update_job(

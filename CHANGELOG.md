@@ -60,6 +60,9 @@
 - Preserved results-table cursor and scroll position across refreshes to prevent jump-to-top after download actions.
 - Hardened worker loop against transient queue polling exceptions and exposed worker liveness in debug status.
 - Bumped downloader service compatibility baseline to `1.4`.
+- Made Hugging Face downloads cancellable by running API downloads in a subprocess and tracking a real process handle.
+- Fixed cancel endpoint resilience when an active target had a non-terminable placeholder object.
+- Bumped downloader service compatibility baseline to `1.5` to enforce rollout of cancelability fixes.
 
 ## 0.1.0 - 2026-02-26
 
