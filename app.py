@@ -1,3 +1,5 @@
+import time
+
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Vertical
@@ -136,6 +138,9 @@ class AIModelViewer(App):
         self.search_counter = 0
         self.active_search_id = 0
         self.hf_model_info_cache = {}
+        self.search_cache = {}
+        self.search_cache_ttl_seconds = 90
+        self.search_cache_max_entries = 20
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -182,6 +187,7 @@ class AIModelViewer(App):
         query = event.value.strip()
         if not query:
             return
+        query_key = query.lower()
         self.last_search_error = ""
         self.search_counter += 1
         self.active_search_id = self.search_counter
@@ -189,7 +195,40 @@ class AIModelViewer(App):
         table.clear()
         table.loading = True
         self.update_status(f"Searching: {query}")
-        self.run_search_worker(query, self.active_search_id)
+
+        cached = self._get_cached_search(query_key)
+        if cached:
+            self.all_results = [item.copy() for item in cached["results"]]
+            self.last_search_error = cached["error"]
+            self.on_search_completed(self.active_search_id)
+            self.update_status(f"Loaded cached results: {query}")
+            return
+
+        self.run_search_worker(query, query_key, self.active_search_id)
+
+    def _get_cached_search(self, query_key):
+        entry = self.search_cache.get(query_key)
+        if not entry:
+            return None
+
+        age = time.monotonic() - entry["timestamp"]
+        if age > self.search_cache_ttl_seconds:
+            self.search_cache.pop(query_key, None)
+            return None
+        return entry
+
+    def _store_cached_search(self, query_key, results, error):
+        self.search_cache[query_key] = {
+            "timestamp": time.monotonic(),
+            "results": [item.copy() for item in results],
+            "error": error,
+        }
+        if len(self.search_cache) > self.search_cache_max_entries:
+            oldest_key = min(
+                self.search_cache,
+                key=lambda key: self.search_cache[key]["timestamp"],
+            )
+            self.search_cache.pop(oldest_key, None)
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         pid = event.pressed.id
@@ -240,7 +279,7 @@ class AIModelViewer(App):
         self.update_status("Detailed metadata loaded.")
 
     @work(thread=True)
-    def run_search_worker(self, query: str, search_id: int) -> None:
+    def run_search_worker(self, query: str, query_key: str, search_id: int) -> None:
         specs = self.monitor.get_specs()
         local_models = get_installed_ollama_models() if check_ollama_running() else []
 
@@ -256,6 +295,7 @@ class AIModelViewer(App):
 
         self.all_results = ollama_results + hf_results
         self.last_search_error = " | ".join((ollama_errors + hf_errors)[:2])
+        self._store_cached_search(query_key, self.all_results, self.last_search_error)
         self.call_from_thread(self.on_search_completed, search_id)
 
     def on_search_completed(self, search_id: int) -> None:
