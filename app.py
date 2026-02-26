@@ -522,7 +522,7 @@ class AIModelViewer(App):
             response = cancel_job(target_id)
             _ = response.get("job")
             self.update_status(f"Cancel requested: {model.get('name', target_id)}")
-            self.sync_download_jobs_from_service(force=True)
+            self.sync_download_jobs_from_service(force=False)
         except HTTPError as exc:
             detail = "Failed to cancel download through service."
             try:
@@ -600,7 +600,7 @@ class AIModelViewer(App):
                 self.update_status(
                     f"Download already active: {model.get('name', target_id)}"
                 )
-            self.sync_download_jobs_from_service(force=True)
+            self.sync_download_jobs_from_service(force=False)
         except Exception as exc:
             self.update_status(f"Failed to queue download: {exc}")
 

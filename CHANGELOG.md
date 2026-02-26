@@ -54,6 +54,8 @@
 - Aligned modal terminology with table naming (`Scale`, `Disk Size`).
 - Added Ollama model-page parsing for exact variant size lookup (prefers `:latest`) before fit/runtime estimation.
 - Added fallback parsing for Ollama card-style model listings when no HTML table is present.
+- Switched Hugging Face downloads from brittle CLI module invocation to `huggingface_hub.snapshot_download` in the background service.
+- Improved failed-download detail messages and reduced forced table refreshes on queue/cancel actions.
 
 ## 0.1.0 - 2026-02-26
 

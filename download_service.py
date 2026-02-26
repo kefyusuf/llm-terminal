@@ -10,6 +10,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from huggingface_hub import snapshot_download
+
 from download_manager import (
     build_download_command,
     download_target_id,
@@ -349,6 +351,54 @@ def worker_loop():
                 )
                 continue
 
+            if cmd[0] == "hf_api_download":
+                repo_id = cmd[1] if len(cmd) > 1 else ""
+                if not repo_id:
+                    STATE.store.update_job(
+                        target_id,
+                        status="failed",
+                        detail="missing Hugging Face repository id",
+                        return_code=1,
+                    )
+                    continue
+
+                STATE.store.update_job(
+                    target_id,
+                    status="running",
+                    detail="Downloading",
+                    progress="",
+                )
+
+                try:
+                    snapshot_download(repo_id=repo_id, allow_patterns=["*.gguf"])
+                    latest = STATE.store.get_job_by_target(target_id)
+                    if latest and latest.get("cancel_requested"):
+                        STATE.store.update_job(
+                            target_id,
+                            status="cancelled",
+                            detail="Canceled",
+                            progress="",
+                            return_code=0,
+                        )
+                    else:
+                        STATE.store.update_job(
+                            target_id,
+                            status="completed",
+                            detail="Completed",
+                            progress="",
+                            return_code=0,
+                        )
+                except Exception as exc:
+                    detail = str(exc).strip() or "hugging face download failed"
+                    STATE.store.update_job(
+                        target_id,
+                        status="failed",
+                        detail=detail[:180],
+                        progress="",
+                        return_code=1,
+                    )
+                continue
+
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -362,10 +412,13 @@ def worker_loop():
             STATE.set_process(target_id, process)
             start = time.monotonic()
             last_update = start
+            last_line = ""
 
             if process.stdout is not None:
                 for raw_line in process.stdout:
                     line = raw_line.strip()
+                    if line:
+                        last_line = line
 
                     latest = STATE.store.get_job_by_target(target_id)
                     if latest and latest.get("cancel_requested"):
@@ -415,10 +468,13 @@ def worker_loop():
                     return_code=0,
                 )
             else:
+                failure_detail = "download command exited with non-zero status"
+                if last_line:
+                    failure_detail = last_line[:180]
                 STATE.store.update_job(
                     target_id,
                     status="failed",
-                    detail="download command exited with non-zero status",
+                    detail=failure_detail,
                     progress="",
                     return_code=return_code,
                 )

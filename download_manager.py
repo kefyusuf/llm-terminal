@@ -1,6 +1,3 @@
-import sys
-
-
 def normalize_target_id(value):
     raw = str(value or "unknown:unknown").strip().lower()
     if ":" not in raw:
@@ -17,15 +14,7 @@ def build_download_command(model):
         repo_id = model.get("id") or model.get("name")
         if not repo_id:
             raise ValueError("missing Hugging Face repository id")
-        return [
-            sys.executable,
-            "-m",
-            "huggingface_hub.commands.huggingface_cli",
-            "download",
-            repo_id,
-            "--include",
-            "*.gguf",
-        ]
+        return ["hf_api_download", repo_id]
 
     if source == "Ollama":
         model_name = model.get("name")

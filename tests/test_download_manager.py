@@ -1,5 +1,3 @@
-import sys
-
 import pytest
 
 from download_manager import (
@@ -12,17 +10,7 @@ from download_manager import (
 def test_build_download_command_hf():
     model = {"source": "Hugging Face", "id": "unsloth/Qwen3-Coder-Next-GGUF"}
     command = build_download_command(model)
-    assert command[:3] == [
-        sys.executable,
-        "-m",
-        "huggingface_hub.commands.huggingface_cli",
-    ]
-    assert command[3:] == [
-        "download",
-        "unsloth/Qwen3-Coder-Next-GGUF",
-        "--include",
-        "*.gguf",
-    ]
+    assert command == ["hf_api_download", "unsloth/Qwen3-Coder-Next-GGUF"]
 
 
 def test_build_download_command_ollama():
