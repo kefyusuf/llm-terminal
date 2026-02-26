@@ -9,6 +9,7 @@ from utils import (
     determine_use_case_key,
     estimate_model_size_gb,
     extract_params,
+    infer_quant_from_name,
 )
 
 
@@ -100,6 +101,7 @@ def search_ollama_models(query, specs, local_models):
             use_case_key = determine_use_case_key(model_name)
             size_gb = estimate_model_size_gb(model_name)
             fit_str, mode_str, _ = calculate_fit(size_gb, specs)
+            quant = infer_quant_from_name(model_name, default="GGUF")
 
             results.append(
                 {
@@ -117,7 +119,7 @@ def search_ollama_models(query, specs, local_models):
                     "downloads": 0,
                     "is_hidden_gem": False,
                     "gem_score": 0.0,
-                    "quant": "Q4_0",
+                    "quant": quant,
                     "size_source": "estimated",
                     "mode": mode_str,
                     "fit": fit_str,

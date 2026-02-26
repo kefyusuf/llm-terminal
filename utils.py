@@ -79,3 +79,30 @@ def estimate_model_size_gb(model_name):
     if "0.5b" in mn:
         return 0.6
     return 4.8
+
+
+def infer_quant_from_name(name, default="GGUF"):
+    nm = name.lower().replace("-", "_")
+    if "q4_k_m" in nm:
+        return "Q4_K_M"
+    if "q5_k_m" in nm:
+        return "Q5_K_M"
+    if "q8_0" in nm:
+        return "Q8_0"
+    if "q6_k" in nm:
+        return "Q6_K"
+    if "q5_0" in nm:
+        return "Q5_0"
+    if "q5_1" in nm:
+        return "Q5_1"
+    if "q4_0" in nm:
+        return "Q4_0"
+    if "q4_1" in nm:
+        return "Q4_1"
+    if "q3_k" in nm:
+        return "Q3_K"
+    if "q2_k" in nm:
+        return "Q2_K"
+    if "fp16" in nm:
+        return "FP16"
+    return default

@@ -22,6 +22,14 @@ def test_determine_use_case_key_reasoning():
     assert utils.determine_use_case_key("deepseek-r1-7b") == "reasoning"
 
 
+def test_infer_quant_from_name_detects_known_quantization():
+    assert utils.infer_quant_from_name("qwen2.5-coder-q4_k_m-gguf") == "Q4_K_M"
+
+
+def test_infer_quant_from_name_returns_default():
+    assert utils.infer_quant_from_name("qwen2.5-coder", default="GGUF") == "GGUF"
+
+
 def test_calculate_fit_perfect_gpu():
     specs = {
         "has_gpu": True,

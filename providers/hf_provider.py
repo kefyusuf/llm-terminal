@@ -9,6 +9,7 @@ from utils import (
     estimate_model_size_gb,
     extract_params,
     format_likes,
+    infer_quant_from_name,
 )
 
 
@@ -128,7 +129,7 @@ def search_hf_models(
             if is_hidden_gem:
                 score_str = f"{score_str} [yellow]💎[/yellow]"
 
-            quant = "GGUF"
+            quant = infer_quant_from_name(name, default="GGUF")
             size = estimate_model_size_gb(name)
             siblings = getattr(model, "siblings", None) or []
             target = _select_preferred_gguf(siblings)
@@ -160,7 +161,7 @@ def search_hf_models(
                     "size_source": "estimated",
                     "mode": mode_str,
                     "fit": fit_str,
-                    "size": f"{size:.1f} GB",
+                    "size": f"~{size:.1f} GB",
                 }
             )
         except (

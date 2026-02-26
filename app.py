@@ -298,8 +298,8 @@ class AIModelViewer(App):
             "Use Case",
             "Score",
             "Format",
-            "Runtime",
-            "Fit",
+            "Est Runtime",
+            "Est Fit",
             "Size",
             "Download",
         )
