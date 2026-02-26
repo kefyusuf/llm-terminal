@@ -52,6 +52,8 @@
 - Added delete retry logic that restarts incompatible services when `/jobs/delete` is missing.
 - Switched the main results table from `Size` display to `Scale` (parameter class) for clearer model comparison.
 - Aligned modal terminology with table naming (`Scale`, `Disk Size`).
+- Added Ollama model-page parsing for exact variant size lookup (prefers `:latest`) before fit/runtime estimation.
+- Added fallback parsing for Ollama card-style model listings when no HTML table is present.
 
 ## 0.1.0 - 2026-02-26
 
