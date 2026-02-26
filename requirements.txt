@@ -1,0 +1,7 @@
+huggingface_hub
+psutil
+nvidia-ml-py
+requests
+beautifulsoup4
+rich
+textual
