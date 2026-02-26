@@ -76,18 +76,18 @@ class ModelDetailModal(ModalScreen):
             yield Label(f"{self.data['name']}", id="modal-title")
 
             with Grid(id="info-grid"):
-                yield Label(f"[bold]Sağlayıcı:[/bold] {self.data['provider']}")
-                yield Label(f"[bold]Kullanım:[/bold] {self.data['use_case']}")
-                yield Label(f"[bold]Parametre:[/bold] {self.data['params']}")
+                yield Label(f"[bold]Provider:[/bold] {self.data['provider']}")
+                yield Label(f"[bold]Use Case:[/bold] {self.data['use_case']}")
+                yield Label(f"[bold]Parameters:[/bold] {self.data['params']}")
                 yield Label(f"[bold]Format:[/bold] {self.data['quant']}")
-                yield Label(f"[bold]Skor:[/bold] {self.data['score']}")
-                yield Label(f"[bold]Tahmini Boyut:[/bold] {self.data['size']}")
-                yield Label(f"[bold]Donanım Durumu:[/bold] {self.data['fit']}")
-                yield Label(f"[bold]Çalışma Modu:[/bold] {self.data['mode']}")
+                yield Label(f"[bold]Score:[/bold] {self.data['score']}")
+                yield Label(f"[bold]Estimated Size:[/bold] {self.data['size']}")
+                yield Label(f"[bold]Hardware Fit:[/bold] {self.data['fit']}")
+                yield Label(f"[bold]Run Mode:[/bold] {self.data['mode']}")
 
-            yield Label("Çalıştırma / İndirme Komutu:", classes="label-key")
+            yield Label("Run / Download Command:", classes="label-key")
             yield Label(cmd_text, id="cmd-box")
-            yield Button("Kapat", variant="error", id="close-btn")
+            yield Button("Close", variant="error", id="close-btn")
 
     @on(Button.Pressed, "#close-btn")
     def close_modal(self):
@@ -98,14 +98,14 @@ class SystemInfoWidget(Static):
     def update_info(self, specs, ollama_running):
         gpu_color = "green" if specs["has_gpu"] else "red"
         ollama_status = (
-            "[bold green]✔ Açık[/bold green]"
+            "[bold green]✔ Running[/bold green]"
             if ollama_running
-            else "[bold red]X Kapalı[/bold red]"
+            else "[bold red]X Stopped[/bold red]"
         )
         text = (
             f"[bold]CPU:[/bold] {specs['cpu_name']} ({specs['cpu_cores']} cores) | "
-            f"[bold]RAM:[/bold][cyan]{specs['ram_free']:.1f} GB Boş[/cyan] / {specs['ram_total']:.1f} GB | "
-            f"[bold]GPU:[/bold] [{gpu_color}]{specs['gpu_name']} ({specs['vram_free']:.1f} GB Boş)[/{gpu_color}] | "
+            f"[bold]RAM:[/bold][cyan]{specs['ram_free']:.1f} GB Free[/cyan] / {specs['ram_total']:.1f} GB | "
+            f"[bold]GPU:[/bold] [{gpu_color}]{specs['gpu_name']} ({specs['vram_free']:.1f} GB Free)[/{gpu_color}] | "
             f"[bold]Ollama:[/bold] {ollama_status}"
         )
         self.update(text)
@@ -122,9 +122,9 @@ class AIModelViewer(App):
     """
 
     BINDINGS = [
-        ("q", "quit", "Çıkış"),
-        ("tab", "focus_next", "Sonraki"),
-        ("shift+tab", "focus_previous", "Önceki"),
+        ("q", "quit", "Quit"),
+        ("tab", "focus_next", "Next"),
+        ("shift+tab", "focus_previous", "Previous"),
     ]
 
     def __init__(self):
@@ -141,11 +141,11 @@ class AIModelViewer(App):
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
         yield Input(
-            placeholder="🔍 Model Ara (Örn: llama, qwen) ve Enter'a bas...",
+            placeholder="🔍 Search models (e.g., llama, qwen) and press Enter...",
             id="search-input",
         )
         with RadioSet(id="filter-set"):
-            yield RadioButton("Tümü", value=True, id="filter-all")
+            yield RadioButton("All", value=True, id="filter-all")
             yield RadioButton("Ollama", id="filter-ollama")
             yield RadioButton("Hugging Face", id="filter-hf")
         yield DataTable(id="results-table", cursor_type="row")
@@ -156,18 +156,18 @@ class AIModelViewer(App):
         self.title = "AI Model Explorer"
         table = self.query_one(DataTable)
         table.add_columns(
-            "Yüklü",
-            "Kaynak",
-            "Model Adı",
-            "Param",
-            "Kullanım",
-            "Skor",
+            "Installed",
+            "Source",
+            "Model Name",
+            "Params",
+            "Use Case",
+            "Score",
             "Format",
-            "Çalışma",
-            "Durum",
-            "Boyut",
+            "Runtime",
+            "Fit",
+            "Size",
         )
-        self.update_status("Hazır. Model araması için yazıp Enter'a basın.")
+        self.update_status("Ready. Enter a model query and press Enter.")
         self.update_system_info()
         self.set_interval(3.0, self.update_system_info)
 
@@ -189,7 +189,7 @@ class AIModelViewer(App):
         table = self.query_one(DataTable)
         table.clear()
         table.loading = True
-        self.update_status(f"Aranıyor: {query}")
+        self.update_status(f"Searching: {query}")
         self.run_search_worker(query, self.active_search_id)
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
@@ -244,17 +244,17 @@ class AIModelViewer(App):
         self.refresh_table()
 
         if table.row_count > 0:
-            self.update_status(f"{table.row_count} sonuç listelendi.")
+            self.update_status(f"{table.row_count} results listed.")
         elif self.last_search_error:
-            self.update_status("Arama sırasında hata oluştu. Bağlantıyı kontrol edin.")
+            self.update_status("Search failed. Please check your connection.")
         else:
-            self.update_status("Sonuç bulunamadı.")
+            self.update_status("No results found.")
 
         if table.row_count == 0 and self.last_search_error:
             table.add_row(
                 "[red]![/red]",
-                "Sistem",
-                "Arama hatası",
+                "System",
+                "Search error",
                 "-",
                 "-",
                 f"[red]{self.last_search_error[:40]}[/red]",

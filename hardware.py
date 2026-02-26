@@ -42,7 +42,7 @@ class HardwareMonitor:
     def __init__(self):
         self.nvidia_available = False
         self.handle = None
-        self.gpu_name = "NVIDIA GPU Yok"
+        self.gpu_name = "No NVIDIA GPU"
         self.cpu_name = get_real_cpu_name()
         self.cpu_cores = psutil.cpu_count(logical=True)
 

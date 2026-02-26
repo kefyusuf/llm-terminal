@@ -44,7 +44,7 @@ def calculate_fit(size_gb, specs):
         )
     if specs["ram_free"] >= req:
         return "[bold yellow]Slow[/bold yellow]", "[yellow]CPU[/yellow]", "RAM"
-    return "[bold red]No Fit[/bold red]", "[red]-[/red]", "Yetersiz"
+    return "[bold red]No Fit[/bold red]", "[red]-[/red]", "Insufficient"
 
 
 def estimate_model_size_gb(model_name):

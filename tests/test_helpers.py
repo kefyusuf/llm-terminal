@@ -38,4 +38,4 @@ def test_calculate_fit_no_fit_when_memory_low():
     }
     fit, mode, resource = utils.calculate_fit(8.0, specs)
     assert "No Fit" in fit
-    assert resource == "Yetersiz"
+    assert resource == "Insufficient"
