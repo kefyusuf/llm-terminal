@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Updated Hugging Face model search to use `list_models(..., expand=["likes", "siblings"])`.
+- Removed per-model repository file listing and now select GGUF candidates from expanded sibling metadata.
+
 ## 0.1.0 - 2026-02-26
 
 - Added baseline tests and project documentation.

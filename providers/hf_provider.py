@@ -11,6 +11,24 @@ from utils import (
 )
 
 
+def _repo_id_from_model(model):
+    return getattr(model, "modelId", None) or getattr(model, "id", None)
+
+
+def _select_preferred_gguf(siblings):
+    filenames = [
+        item.rfilename for item in siblings if getattr(item, "rfilename", None)
+    ]
+    priorities = ["Q4_K_M.gguf", "Q4_0.gguf", "Q5_K_M.gguf"]
+
+    for suffix in priorities:
+        target = next((name for name in filenames if suffix in name), None)
+        if target:
+            return target
+
+    return next((name for name in filenames if name.endswith(".gguf")), None)
+
+
 def search_hf_models(
     query,
     specs,
@@ -22,20 +40,29 @@ def search_hf_models(
     results = []
     errors = []
     found_keys = set()
+    _ = repo_files_cache
 
     try:
         api = HfApi()
         hf_models = api.list_models(
-            search=query, sort="downloads", limit=limit, filter="gguf"
+            search=query,
+            sort="downloads",
+            limit=limit,
+            filter="gguf",
+            expand=["likes", "siblings"],
         )
     except (HfHubHTTPError, requests.RequestException, ValueError, OSError) as exc:
         return results, [f"Hugging Face search failed: {exc}"]
 
     for index, model in enumerate(hf_models):
         try:
-            provider = model.modelId.split("/")[0][:15]
-            name = model.modelId.split("/")[-1]
-            unique_key = f"Hugging Face:{model.modelId.lower()}"
+            repo_id = _repo_id_from_model(model)
+            if not repo_id:
+                raise ValueError("missing model repository id")
+
+            provider = repo_id.split("/")[0][:15]
+            name = repo_id.split("/")[-1]
+            unique_key = f"Hugging Face:{repo_id.lower()}"
             if unique_key in found_keys:
                 continue
             found_keys.add(unique_key)
@@ -51,45 +78,27 @@ def search_hf_models(
 
             quant = "GGUF"
             size = estimate_model_size_gb(name)
-            target = None
             detailed_lookup = index < detailed_limit
+            siblings = getattr(model, "siblings", None) or []
+            target = _select_preferred_gguf(siblings)
 
-            if detailed_lookup:
-                files = repo_files_cache.get(model.modelId)
-                if files is None:
-                    files = api.list_repo_files(repo_id=model.modelId)
-                    repo_files_cache[model.modelId] = files
+            if target:
+                quant = target.split(".")[-2] if len(target.split(".")) > 2 else "GGUF"
+                if "gguf" in quant.lower():
+                    quant = "GGUF"
 
-                target = next((file for file in files if "Q4_K_M.gguf" in file), None)
-                if not target:
-                    target = next((file for file in files if "Q4_0.gguf" in file), None)
-                if not target:
-                    target = next(
-                        (file for file in files if "Q5_K_M.gguf" in file), None
-                    )
-                if not target:
-                    target = next(
-                        (file for file in files if file.endswith(".gguf")), None
-                    )
+            if detailed_lookup and target:
+                info = model_info_cache.get(repo_id)
+                if info is None:
+                    info = api.model_info(repo_id, files_metadata=True)
+                    model_info_cache[repo_id] = info
 
-                if target:
-                    info = model_info_cache.get(model.modelId)
-                    if info is None:
-                        info = api.model_info(model.modelId, files_metadata=True)
-                        model_info_cache[model.modelId] = info
-
-                    siblings = info.siblings or []
-                    metadata = next(
-                        (item for item in siblings if item.rfilename == target), None
-                    )
-                    if metadata and metadata.size:
-                        size = metadata.size / (1024**3)
-
-                    quant = (
-                        target.split(".")[-2] if len(target.split(".")) > 2 else "GGUF"
-                    )
-                    if "gguf" in quant.lower():
-                        quant = "GGUF"
+                siblings = info.siblings or []
+                metadata = next(
+                    (item for item in siblings if item.rfilename == target), None
+                )
+                if metadata and metadata.size:
+                    size = metadata.size / (1024**3)
 
             fit_str, mode_str, _ = calculate_fit(size, specs)
             results.append(
@@ -97,7 +106,7 @@ def search_hf_models(
                     "inst": "[grey37]-[/grey37]",
                     "source": "Hugging Face",
                     "provider": provider,
-                    "id": model.modelId,
+                    "id": repo_id,
                     "name": name,
                     "params": params,
                     "use_case": use_case,
