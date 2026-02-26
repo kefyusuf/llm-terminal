@@ -85,6 +85,7 @@ def search_ollama_models(query, specs, local_models):
                     "use_case": use_case,
                     "score": score_str,
                     "quant": "Q4_0",
+                    "size_source": "estimated",
                     "mode": mode_str,
                     "fit": fit_str,
                     "size": f"~{size_gb} GB",

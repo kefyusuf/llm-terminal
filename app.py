@@ -74,6 +74,9 @@ class ModelDetailModal(ModalScreen):
             repo_id = self.data.get("id", self.data["name"])
             cmd_text = f"huggingface-cli download {repo_id} --include '*.gguf'"
 
+        size_source = self.data.get("size_source", "estimated")
+        confidence_label = "Exact" if size_source == "exact" else "Estimated"
+
         with Vertical(id="modal-container"):
             yield Label(f"{self.data['name']}", id="modal-title")
 
@@ -84,6 +87,7 @@ class ModelDetailModal(ModalScreen):
                 yield Label(f"[bold]Format:[/bold] {self.data['quant']}")
                 yield Label(f"[bold]Score:[/bold] {self.data['score']}")
                 yield Label(f"[bold]Estimated Size:[/bold] {self.data['size']}")
+                yield Label(f"[bold]Size Confidence:[/bold] {confidence_label}")
                 yield Label(f"[bold]Hardware Fit:[/bold] {self.data['fit']}")
                 yield Label(f"[bold]Run Mode:[/bold] {self.data['mode']}")
 

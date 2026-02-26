@@ -97,6 +97,7 @@ def search_hf_models(
                     "score": score_str,
                     "quant": quant,
                     "target_file": target,
+                    "size_source": "estimated",
                     "mode": mode_str,
                     "fit": fit_str,
                     "size": f"{size:.1f} GB",
@@ -139,6 +140,7 @@ def enrich_hf_model_details(model, specs, model_info_cache):
             model["size"] = f"{size:.1f} GB"
             model["fit"] = fit_str
             model["mode"] = mode_str
+            model["size_source"] = "exact"
 
         quant = target.split(".")[-2] if len(target.split(".")) > 2 else "GGUF"
         if "gguf" in quant.lower():
