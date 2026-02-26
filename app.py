@@ -114,14 +114,16 @@ class ModelDetailModal(ModalScreen):
 
     @on(Button.Pressed, "#download-btn")
     def start_download(self):
-        if hasattr(self.app, "start_model_download"):
-            self.app.start_model_download(self.data.copy())
+        start_fn = getattr(self.app, "start_model_download", None)
+        if callable(start_fn):
+            start_fn(self.data.copy())
         self.dismiss()
 
     @on(Button.Pressed, "#cancel-download-btn")
     def cancel_download(self):
-        if hasattr(self.app, "cancel_model_download"):
-            self.app.cancel_model_download(self.data.copy())
+        cancel_fn = getattr(self.app, "cancel_model_download", None)
+        if callable(cancel_fn):
+            cancel_fn(self.data.copy())
         self.dismiss()
 
 
@@ -185,6 +187,8 @@ class AIModelViewer(App):
         self.download_processes = {}
         self.cancelled_downloads = set()
         self.download_started_at = {}
+        self.download_spinner_index = 0
+        self.download_spinner_frames = ["-", "\\", "|", "/"]
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -557,7 +561,10 @@ class AIModelViewer(App):
         if state == "cancelled":
             return "[yellow]Canceled[/yellow]"
         if state == "downloading":
-            return f"[yellow]{label}[/yellow] {detail}".strip()
+            frame = self.download_spinner_frames[
+                self.download_spinner_index % len(self.download_spinner_frames)
+            ]
+            return f"[yellow]{frame} {label}[/yellow] {detail}".strip()
         if state == "queued":
             return "[cyan]Queued[/cyan]"
         return "[grey50]Idle[/grey50]"
@@ -571,6 +578,7 @@ class AIModelViewer(App):
     def refresh_download_progress(self):
         if not self.active_downloads:
             return
+        self.download_spinner_index += 1
         now = time.monotonic()
         updated = False
         for target_id in list(self.active_downloads):
