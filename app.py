@@ -182,14 +182,15 @@ class DownloadJobModal(ModalScreen):
         self.entry = entry
 
     def compose(self) -> ComposeResult:
+        state = self.entry.get("state") or self.entry.get("status") or "-"
+        progress = self.entry.get("detail") or self.entry.get("progress") or "-"
         with Vertical(id="job-modal"):
             yield Label(f"Download: {self.entry.get('name', '-')}", id="job-title")
             yield Label(f"Source: {self.entry.get('source', '-')}")
             yield Label(f"Publisher: {self.entry.get('publisher', '-')}")
-            yield Label(f"Status: {self.entry.get('status', '-')}")
-            yield Label(f"Detail: {self.entry.get('detail', '-')}")
-            yield Label(f"Progress: {self.entry.get('progress', '-')}")
-            if self.entry.get("status") in {"queued", "running"}:
+            yield Label(f"Status: {state}")
+            yield Label(f"Progress: {progress}")
+            if state in {"queued", "downloading", "running"}:
                 yield Button("Cancel Download", variant="warning", id="job-cancel-btn")
             yield Button("Close", variant="error", id="job-close-btn")
 
