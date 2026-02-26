@@ -13,6 +13,7 @@ AI Model Explorer is a Textual-based terminal UI that helps you find local-LLM m
 - Open row details in a modal with a ready-to-run command.
 - Start direct downloads from the model detail popup (`ollama pull` or Hugging Face CLI download).
 - Track download state directly in the table (`Idle`, `Queued`, `Downloading`, `Completed`, `Failed`).
+- Cancel active downloads from the model detail popup when needed.
 
 ## Requirements
 

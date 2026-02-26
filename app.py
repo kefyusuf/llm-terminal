@@ -105,6 +105,7 @@ class ModelDetailModal(ModalScreen):
             yield Label("Run / Download Command:", classes="label-key")
             yield Label(cmd_text, id="cmd-box")
             yield Button("Download Now", variant="primary", id="download-btn")
+            yield Button("Cancel Download", variant="warning", id="cancel-download-btn")
             yield Button("Close", variant="error", id="close-btn")
 
     @on(Button.Pressed, "#close-btn")
@@ -114,6 +115,10 @@ class ModelDetailModal(ModalScreen):
     @on(Button.Pressed, "#download-btn")
     def start_download(self):
         self.dismiss("download")
+
+    @on(Button.Pressed, "#cancel-download-btn")
+    def cancel_download(self):
+        self.dismiss("cancel_download")
 
 
 class SystemInfoWidget(Static):
@@ -172,6 +177,8 @@ class AIModelViewer(App):
         self.ollama_status_timer = None
         self.latest_specs = None
         self.active_downloads = set()
+        self.download_processes = {}
+        self.cancelled_downloads = set()
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -380,8 +387,25 @@ class AIModelViewer(App):
 
     def on_model_detail_action(self, result, model):
         if result != "download":
+            if result == "cancel_download":
+                self.cancel_model_download(model)
             return
         self.start_model_download(model)
+
+    def cancel_model_download(self, model):
+        target_id = download_target_id(model)
+        process = self.download_processes.get(target_id)
+        if process is None:
+            self.update_status("No active download to cancel for selected model.")
+            return
+
+        self.cancelled_downloads.add(target_id)
+        try:
+            process.terminate()
+        except OSError:
+            pass
+        self._set_download_state(target_id, "cancelled", "Canceled", "")
+        self.update_status(f"Cancel requested: {model.get('name', target_id)}")
 
     def start_model_download(self, model):
         target_id = download_target_id(model)
@@ -420,6 +444,7 @@ class AIModelViewer(App):
                 text=True,
                 bufsize=1,
             )
+            self.download_processes[target_id] = process
             started_at = time.monotonic()
             last_report = started_at
 
@@ -453,6 +478,7 @@ class AIModelViewer(App):
 
             completed_code = process.wait()
         except FileNotFoundError:
+            self.download_processes.pop(target_id, None)
             self.call_from_thread(
                 self.on_download_finished,
                 target_id,
@@ -462,15 +488,18 @@ class AIModelViewer(App):
             )
             return
         except OSError as exc:
+            self.download_processes.pop(target_id, None)
             self.call_from_thread(
                 self.on_download_finished, target_id, model, False, str(exc)
             )
             return
 
         if completed_code == 0:
+            self.download_processes.pop(target_id, None)
             self.call_from_thread(self.on_download_finished, target_id, model, True, "")
             return
 
+        self.download_processes.pop(target_id, None)
         self.call_from_thread(
             self.on_download_finished,
             target_id,
@@ -514,6 +543,8 @@ class AIModelViewer(App):
             return "[green]Completed[/green]"
         if state == "failed":
             return f"[red]Failed[/red] {detail}" if detail else "[red]Failed[/red]"
+        if state == "cancelled":
+            return "[yellow]Canceled[/yellow]"
         if state == "downloading":
             return f"[yellow]{label}[/yellow] {detail}".strip()
         if state == "queued":
@@ -531,6 +562,12 @@ class AIModelViewer(App):
 
     def on_download_finished(self, target_id, model, success, message):
         self.active_downloads.discard(target_id)
+        self.download_processes.pop(target_id, None)
+        if target_id in self.cancelled_downloads:
+            self.cancelled_downloads.discard(target_id)
+            self._set_download_state(target_id, "cancelled", "Canceled", "")
+            self.update_status(f"Download canceled: {model.get('name', target_id)}")
+            return
         if success:
             self._set_download_state(target_id, "completed", "Completed", "")
             if model.get("source") == "Ollama":
