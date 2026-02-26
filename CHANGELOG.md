@@ -17,6 +17,7 @@
 - Clarified Ollama requirement in project documentation.
 - Added fast Ollama status polling so header state updates nearly instantly on start/stop.
 - Added direct model download action in detail modal for both Ollama and Hugging Face.
+- Added per-row download tracking column with live state updates during downloads.
 
 ## 0.1.0 - 2026-02-26
 

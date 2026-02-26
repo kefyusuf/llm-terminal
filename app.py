@@ -1,5 +1,6 @@
 import time
 import subprocess
+import re
 
 from textual import on, work
 from textual.app import App, ComposeResult
@@ -213,6 +214,7 @@ class AIModelViewer(App):
             "Runtime",
             "Fit",
             "Size",
+            "Download",
         )
         self.update_status("Ready. Enter a model query and press Enter.")
         self.update_system_info()
@@ -267,6 +269,7 @@ class AIModelViewer(App):
         cached = self._get_cached_search(query_key, current_specs)
         if cached:
             self.all_results = [item.copy() for item in cached["results"]]
+            self._ensure_download_fields()
             self.last_search_error = cached["error"]
             self.on_search_completed(self.active_search_id)
             self.update_status(f"Loaded cached results: {query}")
@@ -387,6 +390,7 @@ class AIModelViewer(App):
             return
 
         self.active_downloads.add(target_id)
+        self._set_download_state(target_id, "queued", "Queued", "")
         self.update_status(f"Downloading: {model.get('name', target_id)}")
         self.download_model_worker(model.copy(), target_id)
 
@@ -400,13 +404,54 @@ class AIModelViewer(App):
             )
             return
 
+        self.call_from_thread(
+            self.on_download_progress,
+            target_id,
+            "downloading",
+            "Downloading",
+            "",
+        )
+
         try:
-            completed = subprocess.run(
+            process = subprocess.Popen(
                 command,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
-                check=False,
+                bufsize=1,
             )
+            started_at = time.monotonic()
+            last_report = started_at
+
+            if process.stdout is not None:
+                for raw_line in process.stdout:
+                    line = raw_line.strip()
+                    progress = self._extract_download_progress(line)
+                    now = time.monotonic()
+
+                    if progress is not None:
+                        self.call_from_thread(
+                            self.on_download_progress,
+                            target_id,
+                            "downloading",
+                            "Downloading",
+                            f"{progress}%",
+                        )
+                        last_report = now
+                        continue
+
+                    if now - last_report >= 1.0:
+                        elapsed = int(now - started_at)
+                        self.call_from_thread(
+                            self.on_download_progress,
+                            target_id,
+                            "downloading",
+                            "Downloading",
+                            f"{elapsed}s",
+                        )
+                        last_report = now
+
+            completed_code = process.wait()
         except FileNotFoundError:
             self.call_from_thread(
                 self.on_download_finished,
@@ -422,26 +467,77 @@ class AIModelViewer(App):
             )
             return
 
-        if completed.returncode == 0:
+        if completed_code == 0:
             self.call_from_thread(self.on_download_finished, target_id, model, True, "")
             return
 
-        error_text = (completed.stderr or completed.stdout or "download failed").strip()
         self.call_from_thread(
             self.on_download_finished,
             target_id,
             model,
             False,
-            error_text[:180],
+            "download command exited with non-zero status",
         )
+
+    def _extract_download_progress(self, line):
+        if not line:
+            return None
+        match = re.search(r"(\d{1,3})%", line)
+        if not match:
+            return None
+        value = int(match.group(1))
+        if 0 <= value <= 100:
+            return value
+        return None
+
+    def _find_model_by_target_id(self, target_id):
+        for item in self.all_results:
+            if download_target_id(item) == target_id:
+                return item
+        return None
+
+    def _set_download_state(self, target_id, state, label, detail):
+        model = self._find_model_by_target_id(target_id)
+        if not model:
+            return
+        model["download_state"] = state
+        model["download_label"] = label
+        model["download_detail"] = detail
+        self.refresh_table()
+
+    def _download_cell_text(self, model):
+        state = model.get("download_state", "idle")
+        label = model.get("download_label", "Idle")
+        detail = model.get("download_detail", "")
+
+        if state == "completed":
+            return "[green]Completed[/green]"
+        if state == "failed":
+            return f"[red]Failed[/red] {detail}" if detail else "[red]Failed[/red]"
+        if state == "downloading":
+            return f"[yellow]{label}[/yellow] {detail}".strip()
+        if state == "queued":
+            return "[cyan]Queued[/cyan]"
+        return "[grey50]Idle[/grey50]"
+
+    def _ensure_download_fields(self):
+        for item in self.all_results:
+            item.setdefault("download_state", "idle")
+            item.setdefault("download_label", "Idle")
+            item.setdefault("download_detail", "")
+
+    def on_download_progress(self, target_id, state, label, detail):
+        self._set_download_state(target_id, state, label, detail)
 
     def on_download_finished(self, target_id, model, success, message):
         self.active_downloads.discard(target_id)
         if success:
+            self._set_download_state(target_id, "completed", "Completed", "")
             if model.get("source") == "Ollama":
                 self._mark_ollama_model_installed(model.get("name", ""))
             self.update_status(f"Download complete: {model.get('name', target_id)}")
             return
+        self._set_download_state(target_id, "failed", "Failed", message[:40])
         self.update_status(f"Download failed: {message}")
 
     def _mark_ollama_model_installed(self, model_name):
@@ -487,6 +583,7 @@ class AIModelViewer(App):
             return
 
         self.all_results = ollama_results + hf_results
+        self._ensure_download_fields()
         self.last_search_error = " | ".join((ollama_errors + hf_errors)[:2])
         self._store_cached_search(query_key, self.all_results, self.last_search_error)
         self.call_from_thread(self.on_search_completed, search_id)
@@ -515,6 +612,7 @@ class AIModelViewer(App):
                 "-",
                 "-",
                 f"[red]{self.last_search_error[:40]}[/red]",
+                "-",
                 "-",
                 "-",
                 "-",
@@ -572,5 +670,6 @@ class AIModelViewer(App):
                 result["mode"],
                 result["fit"],
                 result["size"],
+                self._download_cell_text(result),
                 key=unique_key,
             )
