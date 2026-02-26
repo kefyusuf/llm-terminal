@@ -317,14 +317,12 @@ class AIModelViewer(App):
             "Source",
             "Publisher",
             "Model Name",
-            "Params",
+            "Scale",
             "Use Case",
             "Score",
             "Format",
             "Est Runtime",
             "Est Fit",
-            "Size",
-            "Confidence",
             "Download",
         )
         download_table = self.query_one("#download-history-table", DataTable)
@@ -942,12 +940,6 @@ class AIModelViewer(App):
             return "[cyan]Queued[/cyan]"
         return "[grey50]Idle[/grey50]"
 
-    def _size_confidence_text(self, model):
-        source = model.get("size_source", "estimated")
-        if source == "exact":
-            return "[green]Exact[/green]"
-        return "[yellow]Estimated[/yellow]"
-
     def _ensure_download_fields(self):
         changed = False
         for item in self.all_results:
@@ -1127,8 +1119,6 @@ class AIModelViewer(App):
                 "-",
                 "-",
                 "-",
-                "-",
-                "-",
             )
         table.focus()
 
@@ -1181,8 +1171,6 @@ class AIModelViewer(App):
                 result["quant"],
                 result["mode"],
                 result["fit"],
-                result["size"],
-                self._size_confidence_text(result),
                 self._download_cell_text(result),
                 key=unique_key,
             )
