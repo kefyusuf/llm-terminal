@@ -6,7 +6,6 @@ __pycache__/
 downloads.db
 cache.db
 .env
-.env.example
 PAGINATION_*.md
 reset_all.bat
 reset_downloads.py
