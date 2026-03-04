@@ -1,12 +1,27 @@
-import time
-import subprocess
-import re
 import json
+import re
+import subprocess
+import time
 from urllib.error import HTTPError
 
-from textual import on, work
+import cache_db
+import config
+from download_manager import download_target_id
+from hardware import HardwareMonitor, check_ollama_running
+from providers.hf_provider import enrich_hf_model_details, search_hf_models
+from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
+from service_client import (
+    cancel_job,
+    create_job,
+    delete_job,
+    ensure_service_running,
+    get_active_download_debug,
+    get_service_health,
+    list_jobs,
+)
+from textual import events, on, work
 from textual.app import App, ComposeResult
-from textual.containers import Grid, Vertical
+from textual.containers import Grid, Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -20,62 +35,52 @@ from textual.widgets import (
     Static,
 )
 
-from hardware import HardwareMonitor, check_ollama_running
-from download_manager import build_download_command, download_target_id
-from service_client import (
-    cancel_job,
-    create_job,
-    delete_job,
-    ensure_service_running,
-    get_service_health,
-    get_active_download_debug,
-    list_jobs,
-)
-from providers.hf_provider import enrich_hf_model_details, search_hf_models
-from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
-
 
 class ModelDetailModal(ModalScreen):
+    """Modal overlay showing full metadata and the run/download command for a model."""
+
     CSS = """
     ModelDetailModal {
         align: center middle;
         background: $background;
     }
     #modal-container {
-        width: 60%;
+        width: 60;
         height: auto;
-        background: $surface;
-        border: round $accent;
+        background: #0f141f;
+        border: round #4a5568;
         padding: 1 2;
     }
+    #modal-header {
+        background: #1e3a5f;
+        padding: 0 2;
+        margin: -1 -2 1 -2;
+        height: 3;
+    }
     #modal-title {
+        text-style: bold;
+        color: #e2e8f0;
         text-align: center;
-        text-style: bold;
-        background: $primary;
-        color: white;
-        padding: 1;
-        margin-bottom: 1;
-    }
-    #info-grid {
-        layout: grid;
-        grid-size: 2;
-        grid-gutter: 1;
-        height: auto;
-    }
-    .label-key {
-        color: $text-muted;
-        text-style: bold;
-        margin-top: 1;
+        padding: 0;
     }
     #cmd-box {
-        background: $panel;
-        border: solid green;
+        background: #0d1117;
+        border: solid #2d3748;
         padding: 1;
-        margin: 1 0;
-        text-align: center;
-        color: $accent-lighten-2;
+        margin: 0 0 1 0;
+        color: #4fd1c5;
     }
-    #close-btn { width: 100%; margin-top: 1; }
+    #button-row {
+        layout: horizontal;
+        height: 3;
+        align: center middle;
+    }
+    #button-row Button {
+        margin: 0 1;
+    }
+    .fit-perfect { color: #48bb78; }
+    .fit-partial { color: #ecc94b; }
+    .fit-no-fit { color: #f56565; }
     """
 
     def __init__(self, data):
@@ -91,38 +96,57 @@ class ModelDetailModal(ModalScreen):
 
         size_source = self.data.get("size_source", "estimated")
         confidence_label = (
-            "[green]Exact[/green]"
-            if size_source == "exact"
-            else "[yellow]Estimated[/yellow]"
+            "[#48bb78]Exact[/#48bb78]" if size_source == "exact" else "[#ecc94b]Estimated[/#ecc94b]"
+        )
+
+        fit_text = self.data.get("fit", "").lower()
+        fit_class = (
+            "fit-perfect"
+            if "perfect" in fit_text or fit_text == "fit"
+            else "fit-partial"
+            if "partial" in fit_text or "slow" in fit_text
+            else "fit-no-fit"
         )
 
         with Vertical(id="modal-container"):
-            yield Label(f"{self.data['name']}", id="modal-title")
+            # Header
+            yield Label(f"🤖 {self.data['name']}", id="modal-title")
 
-            with Grid(id="info-grid"):
-                yield Label(
-                    f"[bold]Source:[/bold] {self.data['source']} / {self.data.get('publisher', '-')}"
-                )
-                yield Label(f"[bold]Provider:[/bold] {self.data['provider']}")
-                yield Label(f"[bold]Use Case:[/bold] {self.data['use_case']}")
-                yield Label(f"[bold]Scale:[/bold] {self.data['params']}")
-                yield Label(f"[bold]Format:[/bold] {self.data['quant']}")
-                yield Label(f"[bold]Score:[/bold] {self.data['score']}")
-                yield Label(f"[bold]Disk Size:[/bold] {self.data['size']}")
-                yield Label(f"[bold]Size Confidence:[/bold] {confidence_label}")
-                yield Label(f"[bold]Hardware Fit:[/bold] {self.data['fit']}")
-                yield Label(f"[bold]Run Mode:[/bold] {self.data['mode']}")
+            # Model Info
+            yield Label("")
+            yield Label("[bold #63b3ed]📊 Model Information[/bold #63b3ed]")
+            yield Label(
+                f"[#718096]Source:[/#718096] [#e2e8f0]{self.data['source']} / {self.data.get('publisher', '-')}[/#e2e8f0]"
+            )
+            yield Label(f"[#718096]Provider:[/#718096] [#e2e8f0]{self.data['provider']}[/#e2e8f0]")
+            yield Label(f"[#718096]Use Case:[/#718096] [#e2e8f0]{self.data['use_case']}[/#e2e8f0]")
+            yield Label(f"[#718096]Scale:[/#718096] [#e2e8f0]{self.data['params']}[/#e2e8f0]")
 
-            yield Label("Run / Download Command:", classes="label-key")
+            # Technical Specs
+            yield Label("")
+            yield Label("[bold #63b3ed]⚙️ Technical Specifications[/bold #63b3ed]")
+            yield Label(f"[#718096]Format:[/#718096] [#e2e8f0]{self.data['quant']}[/#e2e8f0]")
+            yield Label(f"[#718096]Score:[/#718096] [#4299e1]{self.data['score']}[/#4299e1]")
+            yield Label(
+                f"[#718096]Size:[/#718096] [#e2e8f0]{self.data['size']} {confidence_label}[/#e2e8f0]"
+            )
+            yield Label(f"[#718096]Fit:[/#718096] [{fit_class}]{self.data['fit']}[/{fit_class}]")
+            yield Label(f"[#718096]Mode:[/#718096] [#48bb78]{self.data['mode']}[/#48bb78]")
+
+            # Command
+            yield Label("")
+            yield Label("[bold #63b3ed]🚀 Run Command[/bold #63b3ed]")
             yield Label(cmd_text, id="cmd-box")
-            current_download_state = self.data.get("download_state", "idle")
-            if current_download_state in {"queued", "downloading"}:
-                yield Button(
-                    "Cancel Download", variant="warning", id="cancel-download-btn"
-                )
-            else:
-                yield Button("Download Now", variant="primary", id="download-btn")
-            yield Button("Close", variant="error", id="close-btn")
+
+            # Buttons
+            with Horizontal(id="button-row"):
+                current_download_state = self.data.get("download_state", "idle")
+                if current_download_state in {"queued", "downloading"}:
+                    yield Button("⏸ Cancel", variant="warning", id="cancel-download-btn")
+                else:
+                    yield Button("⬇ Download", id="download-btn")
+                yield Button("📋 Copy", id="copy-btn")
+                yield Button("✕ Close", id="close-btn")
 
     @on(Button.Pressed, "#close-btn")
     def close_modal(self):
@@ -142,41 +166,110 @@ class ModelDetailModal(ModalScreen):
             cancel_fn(self.data.copy())
         self.dismiss()
 
+    @on(Button.Pressed, "#copy-btn")
+    def copy_command(self):
+        if self.data["source"] == "Ollama":
+            cmd_text = f"ollama run {self.data['name']}"
+        else:
+            repo_id = self.data.get("id", self.data["name"])
+            cmd_text = f"huggingface-cli download {repo_id} --include '*.gguf'"
+
+        try:
+            import pyperclip
+
+            pyperclip.copy(cmd_text)
+            if hasattr(self.app, "update_status"):
+                self.app.update_status("Command copied to clipboard!")
+        except Exception:
+            if hasattr(self.app, "update_status"):
+                self.app.update_status(f"Copy failed. Command: {cmd_text}")
+
 
 class SystemInfoWidget(Static):
+    """Header widget displaying live CPU, RAM, GPU VRAM, and Ollama status."""
+
     def update_info(self, specs, ollama_running):
-        gpu_color = "green" if specs["has_gpu"] else "red"
+        """Re-render the widget with fresh hardware *specs* and Ollama running state."""
+        gpu_color = "#f0ef8a" if specs["has_gpu"] else "#ff7f8f"
         ollama_status = (
-            "[bold green]✔ Running[/bold green]"
+            "[bold #4fe08a]running[/bold #4fe08a]"
             if ollama_running
-            else "[bold red]X Stopped[/bold red]"
+            else "[bold #ff7f8f]stopped[/bold #ff7f8f]"
         )
         text = (
-            f"[bold]CPU:[/bold] {specs['cpu_name']} ({specs['cpu_cores']} cores) | "
-            f"[bold]RAM:[/bold][cyan]{specs['ram_free']:.1f} GB Free[/cyan] / {specs['ram_total']:.1f} GB | "
-            f"[bold]GPU:[/bold] [{gpu_color}]{specs['gpu_name']} ({specs['vram_free']:.1f} GB Free)[/{gpu_color}] | "
-            f"[bold]Ollama:[/bold] {ollama_status}"
+            f"[#93a7d9]CPU:[/#93a7d9] {specs['cpu_name']} ({specs['cpu_cores']} cores)  "
+            f"[#5f6f97]|[/#5f6f97] [#93a7d9]RAM:[/#93a7d9] [bold #7edfff]{specs['ram_free']:.1f} GB avail[/bold #7edfff] / {specs['ram_total']:.1f} GB  "
+            f"[#5f6f97]|[/#5f6f97] [#93a7d9]GPU:[/#93a7d9] [{gpu_color}]{specs['gpu_name']} ({specs['vram_free']:.1f} GB)[/{gpu_color}]  "
+            f"[#5f6f97]|[/#5f6f97] [#93a7d9]Ollama:[/#93a7d9] {ollama_status}"
         )
         self.update(text)
 
 
 class DownloadJobModal(ModalScreen):
+    """Modal overlay showing download job history details with cancel / delete actions."""
+
     CSS = """
     DownloadJobModal {
         align: center middle;
         background: $background;
     }
     #job-modal {
-        width: 60%;
+        width: 50;
         height: auto;
-        background: $surface;
-        border: round $accent;
+        background: #0f141f;
+        border: round #4a5568;
         padding: 1 2;
+    }
+    #job-header {
+        background: #2d4a6f;
+        padding: 0 2;
+        margin: -1 -2 1 -2;
+        height: 3;
     }
     #job-title {
         text-style: bold;
+        color: #e2e8f0;
         text-align: center;
-        margin-bottom: 1;
+    }
+    .job-label {
+        color: #718096;
+    }
+    .job-value {
+        color: #e2e8f0;
+    }
+    .job-status-downloading { color: #4299e1; }
+    .job-status-queued { color: #ed8936; }
+    .job-status-completed { color: #48bb78; }
+    .job-status-failed { color: #f56565; }
+    .job-status-cancelled { color: #ecc94b; }
+    #job-button-row {
+        layout: horizontal;
+        height: 3;
+        align: center middle;
+        margin-top: 1;
+    }
+    #job-button-row Button {
+        margin: 0 1;
+    }
+    #job-cancel-btn {
+        background: #dd8448;
+        color: white;
+    }
+    #job-cancel-delete-btn {
+        background: #9b2c2c;
+        color: white;
+    }
+    #job-delete-btn {
+        background: #c05621;
+        color: white;
+    }
+    #job-delete-all-btn {
+        background: #9b2c2c;
+        color: white;
+    }
+    #job-close-btn {
+        background: #718096;
+        color: white;
     }
     """
 
@@ -185,19 +278,44 @@ class DownloadJobModal(ModalScreen):
         self.entry = entry
 
     def compose(self) -> ComposeResult:
-        state = self.entry.get("state") or self.entry.get("status") or "-"
+        state = (self.entry.get("state") or self.entry.get("status") or "idle").lower()
         progress = self.entry.get("detail") or self.entry.get("progress") or "-"
+
+        # Determine status color class
+        status_class = {
+            "downloading": "job-status-downloading",
+            "queued": "job-status-queued",
+            "completed": "job-status-completed",
+            "failed": "job-status-failed",
+            "cancelled": "job-status-cancelled",
+        }.get(state, "")
+
+        # Check if this is an active download
+        is_active = state in {"queued", "downloading", "running"}
+
         with Vertical(id="job-modal"):
-            yield Label(f"Download: {self.entry.get('name', '-')}", id="job-title")
-            yield Label(f"Source: {self.entry.get('source', '-')}")
-            yield Label(f"Publisher: {self.entry.get('publisher', '-')}")
-            yield Label(f"Status: {state}")
-            yield Label(f"Progress: {progress}")
-            if state in {"queued", "downloading", "running"}:
-                yield Button("Cancel Download", variant="warning", id="job-cancel-btn")
-            else:
-                yield Button("Delete Entry", variant="error", id="job-delete-btn")
-            yield Button("Close", variant="error", id="job-close-btn")
+            # Header
+            yield Label(f"⬇ {self.entry.get('name', '-')}", id="job-title")
+
+            # Info
+            yield Label(
+                f"[#718096]Source:[/#718096] [#e2e8f0]{self.entry.get('source', '-')}[/#e2e8f0]"
+            )
+            yield Label(
+                f"[#718096]Publisher:[/#718096] [#e2e8f0]{self.entry.get('publisher', '-')}[/#e2e8f0]"
+            )
+            yield Label(f"[#718096]Status:[/#718096] [{status_class}]{state}[/{status_class}]")
+            yield Label(f"[#718096]Progress:[/#718096] [#e2e8f0]{progress}[/#e2e8f0]")
+
+            # Buttons
+            with Horizontal(id="job-button-row"):
+                if is_active:
+                    yield Button("Cancel", id="job-cancel-btn")
+                    yield Button("Cancel & Delete", id="job-cancel-delete-btn")
+                else:
+                    yield Button("Delete", id="job-delete-btn")
+                    yield Button("Delete All", id="job-delete-all-btn")
+                yield Button("Close", id="job-close-btn")
 
     @on(Button.Pressed, "#job-cancel-btn")
     def cancel(self):
@@ -214,6 +332,29 @@ class DownloadJobModal(ModalScreen):
             )
         self.dismiss()
 
+    @on(Button.Pressed, "#job-cancel-delete-btn")
+    def cancel_and_delete(self):
+        """Cancel active download AND delete partial data"""
+        model_data = {
+            "source": self.entry.get("source", "-"),
+            "name": self.entry.get("name", "-"),
+            "id": self.entry.get("target_id", "").split(":", maxsplit=1)[1]
+            if ":" in str(self.entry.get("target_id", ""))
+            else self.entry.get("target_id", ""),
+        }
+
+        # Cancel the download first
+        cancel_fn = getattr(self.app, "cancel_model_download", None)
+        if callable(cancel_fn):
+            cancel_fn(model_data)
+
+        # Then delete the data
+        delete_fn = getattr(self.app, "delete_download_entry", None)
+        if callable(delete_fn):
+            delete_fn(str(self.entry.get("target_id", "")), delete_data=True)
+
+        self.dismiss()
+
     @on(Button.Pressed, "#job-close-btn")
     def close(self):
         self.dismiss()
@@ -222,36 +363,173 @@ class DownloadJobModal(ModalScreen):
     def delete(self):
         delete_fn = getattr(self.app, "delete_download_entry", None)
         if callable(delete_fn):
-            delete_fn(str(self.entry.get("target_id", "")))
+            delete_fn(str(self.entry.get("target_id", "")), delete_data=False)
+        self.dismiss()
+
+    @on(Button.Pressed, "#job-delete-all-btn")
+    def delete_all(self):
+        """Delete entry AND downloaded/partial data"""
+        delete_fn = getattr(self.app, "delete_download_entry", None)
+        if callable(delete_fn):
+            delete_fn(str(self.entry.get("target_id", "")), delete_data=True)
         self.dismiss()
 
 
 class AIModelViewer(App):
+    """Main TUI application for discovering, comparing, and downloading local LLM models.
+
+    Connects to a background :mod:`download_service` over HTTP, polls hardware
+    metrics via :class:`~hardware.HardwareMonitor`, and queries both the
+    Ollama registry and Hugging Face for GGUF model results.
+    """
+
     CSS = """
-    Screen { layout: vertical; padding: 1; }
-    SystemInfoWidget { height: 3; border: round cyan; content-align: center middle; margin-bottom: 1; }
-    Input { width: 100%; margin-bottom: 1; }
-    RadioSet { layout: horizontal; width: 100%; height: 3; border: none; align: center middle; margin-bottom: 1; }
+    Screen { layout: vertical; padding: 1; background: #090c14; }
+    SystemInfoWidget {
+        height: 3;
+        border: round #3a4666;
+        background: #101728;
+        color: #d5def0;
+        padding: 0 1;
+        content-align: center middle;
+        margin-bottom: 1;
+    }
+    Input {
+        width: 100%;
+        margin-bottom: 0;
+        background: #1b2235;
+        color: #dbe7ff;
+        border: round #3a4666;
+    }
+    #search-filters-row { height: 3; margin-bottom: 1; }
+    #search-panel { width: 42%; min-width: 38; margin-right: 1; height: 3; }
+    #provider-panel { width: 1fr; height: 3; }
+    #search-input { height: 3; }
+    RadioSet {
+        layout: horizontal;
+        width: 100%;
+        height: 3;
+        border: round #2f3850;
+        align: center middle;
+        margin-bottom: 0;
+        background: #11192b;
+        color: #7f8fb8;
+    }
+    RadioButton { color: #9fb2df; }
+    RadioButton.-selected { color: #4fe08a; text-style: bold; }
+    #filter-set { margin-bottom: 0; }
     #use-case-filter { height: 3; }
-    #gem-toggle { margin-bottom: 1; }
-    #results-table { height: 1fr; border: round grey; }
-    #downloads-label { margin-top: 1; }
-    #downloads-debug { color: $text-muted; margin-bottom: 1; }
-    #download-history-table { height: 8; border: round grey; }
-    #status-bar { height: 1; color: $text-muted; margin-top: 1; }
+    #gem-toggle {
+        margin-top: 1;
+        margin-bottom: 1;
+        height: auto;
+        padding: 0 1;
+        background: transparent;
+        border: none;
+        color: #95a8d6;
+    }
+    #results-meta {
+        margin-bottom: 1;
+        color: #a9b7dc;
+        text-style: bold;
+    }
+    #results-table {
+        height: 2fr;
+        min-height: 15;
+        border: round #3a4666;
+        background: #161d31;
+        color: #dde4f8;
+        overflow-x: hidden;
+    }
+    #results-table .datatable--header {
+        overflow-x: hidden;
+    }
+    #results-table .datatable--header:first-child {
+        min-width: 8;
+        padding-left: 1;
+    }
+    #pagination-controls {
+        height: 3;
+        margin-top: 1;
+        margin-bottom: 1;
+        align: center middle;
+        width: 100%;
+    }
+    #pagination-controls Button {
+        margin: 0 5;
+        min-width: 15;
+        width: auto;
+    }
+    #page-indicator {
+        color: #9fe8ff;
+        text-style: bold;
+        padding: 0 5;
+        min-width: 30;
+        text-align: center;
+        content-align: center middle;
+        width: auto;
+    }
+    .hidden {
+        display: none;
+    }
+    .datatable--header { background: #2b3754; color: #9fe8ff; text-style: bold; }
+    .datatable--cursor { background: #425071; color: #ffffff; text-style: bold; }
+    .datatable--fixed-cursor { background: #425071; color: #ffffff; text-style: bold; }
+    .datatable--odd-row { background: #151c30; }
+    .datatable--even-row { background: #1c2540; }
+    #downloads-label { margin-top: 1; color: #c6d3f2; }
+    #downloads-debug { color: #7f8fb8; margin-bottom: 1; }
+    #download-history-table {
+        height: 6;
+        min-height: 4;
+        border: round #3a4666;
+        background: #161d31;
+        color: #d3dcf4;
+    }
+    #download-history-table .datatable--cursor {
+        background: #2d3748;
+    }
+    .action-cancel {
+        color: #dd8448;
+        text-style: bold;
+    }
+    .action-delete {
+        color: #c05621;
+        text-style: bold;
+    }
+    #status-bar { height: 1; color: #8ea3cf; margin-top: 1; }
+    Footer { background: #22324d; color: #b9c9ec; }
     """
 
     BINDINGS = [
         ("q", "quit", "Quit"),
+        ("/", "focus_search", "Search"),
+        ("r", "refresh_search", "Refresh"),
+        ("p", "cycle_provider", "Providers"),
+        ("h", "toggle_hidden_gems", "Hidden Gems"),
         ("tab", "focus_next", "Next"),
         ("shift+tab", "focus_previous", "Previous"),
     ]
+
+    RESULTS_COLUMN_LABELS = {
+        "inst": "Install",
+        "source": "Source",
+        "publisher": "Provider",
+        "name": "Model",
+        "params": "Scale",
+        "use_case": "Use Case",
+        "score": "Score",
+        "quant": "Format",
+        "mode": "Mode",
+        "fit": "Fit",
+        "download": "Download",
+    }
 
     def __init__(self):
         super().__init__()
         self.monitor = HardwareMonitor()
         self.all_results = []
-        self.current_filter = "All"
+        self.current_filter = "Ollama"
         self.use_case_filter = "all"
         self.hidden_gems_only = False
         self.ollama_running = False
@@ -260,36 +538,42 @@ class AIModelViewer(App):
         self.active_search_id = 0
         self.hf_model_info_cache = {}
         self.search_cache = {}
-        self.search_cache_ttl_seconds = 90
-        self.search_cache_max_entries = 20
-        self.search_cache_ram_threshold_gb = 1.0
-        self.search_cache_vram_threshold_gb = 1.0
+        self.search_cache_ttl_seconds = config.settings.search_cache_ttl_seconds
+        self.search_cache_max_entries = config.settings.search_cache_max_entries
+        self.search_cache_ram_threshold_gb = config.settings.search_cache_ram_threshold_gb
+        self.search_cache_vram_threshold_gb = config.settings.search_cache_vram_threshold_gb
         self.system_metrics_timer = None
         self.ollama_status_timer = None
         self.download_status_timer = None
         self.latest_specs = None
         self.active_downloads = set()
-        self.download_processes = {}
-        self.cancelled_downloads = set()
-        self.download_started_at = {}
         self.download_spinner_index = 0
         self.download_spinner_frames = ["-", "\\", "|", "/"]
         self.download_registry = {}
-        self.download_history_limit = 50
-        self.download_history_refresh_interval = 0.5
+        self.download_history_limit = config.settings.download_history_limit
+        self.download_history_refresh_interval = config.settings.download_history_refresh_interval
         self.last_download_history_refresh_at = 0.0
         self.download_history_refresh_pending = False
+        self.results_column_keys = []
+        self.results_column_widths = {}
+        self.current_page = 0
+        self.page_size = config.settings.hf_search_limit
+        self.max_pages = config.settings.hf_search_max_pages
+        self.total_results = 0
+        self.has_more_pages = True
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
-        yield Input(
-            placeholder="🔍 Search models (e.g., llama, qwen) and press Enter...",
-            id="search-input",
-        )
-        with RadioSet(id="filter-set"):
-            yield RadioButton("All", value=True, id="filter-all")
-            yield RadioButton("Ollama", id="filter-ollama")
-            yield RadioButton("Hugging Face", id="filter-hf")
+        with Horizontal(id="search-filters-row"):
+            with Vertical(id="search-panel"):
+                yield Input(
+                    placeholder="Press / to search Ollama models (e.g., qwen, llama)",
+                    id="search-input",
+                )
+            with Vertical(id="provider-panel"):
+                with RadioSet(id="filter-set"):
+                    yield RadioButton("Ollama", value=True, id="filter-ollama")
+                    yield RadioButton("Hugging Face", id="filter-hf")
         with RadioSet(id="use-case-filter"):
             yield RadioButton("Any Use", value=True, id="uc-all")
             yield RadioButton("Chat", id="uc-chat")
@@ -299,10 +583,13 @@ class AIModelViewer(App):
             yield RadioButton("Math", id="uc-math")
             yield RadioButton("Embed", id="uc-embedding")
             yield RadioButton("General", id="uc-general")
-        yield Checkbox(
-            "Hidden gems only (HF: high downloads, low likes)", id="gem-toggle"
-        )
+        yield Checkbox("Hidden gems only (Hugging Face)", id="gem-toggle")
+        yield Static("Models (0 shown / 0 total)", id="results-meta")
         yield DataTable(id="results-table", cursor_type="row")
+        with Horizontal(id="pagination-controls"):
+            yield Button("◀ Prev", id="prev-page", variant="default", disabled=True)
+            yield Static("Page 1", id="page-indicator")
+            yield Button("Next ▶", id="next-page", variant="default", disabled=True)
         yield Label("Recent Downloads", id="downloads-label")
         yield Static("Workers: - | Duplicates: -", id="downloads-debug")
         yield DataTable(id="download-history-table", cursor_type="row")
@@ -310,21 +597,10 @@ class AIModelViewer(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        """Initialise the UI, start the download service, and set up polling timers."""
         self.title = "AI Model Explorer"
-        table = self.query_one("#results-table", DataTable)
-        table.add_columns(
-            "Installed",
-            "Source",
-            "Publisher",
-            "Model Name",
-            "Scale",
-            "Use Case",
-            "Score",
-            "Format",
-            "Est Runtime",
-            "Est Fit",
-            "Download",
-        )
+        self._configure_results_table_columns(force=True)
+        self.query_one("#results-table", DataTable).zebra_stripes = True
         download_table = self.query_one("#download-history-table", DataTable)
         download_table.add_columns(
             "Source",
@@ -332,7 +608,7 @@ class AIModelViewer(App):
             "Model",
             "Status",
             "Detail",
-            "Updated",
+            "Action",
         )
         service_ok = ensure_service_running()
         if not service_ok:
@@ -341,38 +617,357 @@ class AIModelViewer(App):
             )
         else:
             self.sync_download_jobs_from_service(force=True)
+
+        cache_db.init_db()
+        cache_db.cleanup_old_entries()
+
+        cached_specs = cache_db.get_hardware_snapshot()
+        if cached_specs is not None:
+            self.latest_specs = cached_specs
+            self.query_one(SystemInfoWidget).update_info(cached_specs, check_ollama_running())
+
         self.refresh_download_history_table()
         self.last_download_history_refresh_at = time.monotonic()
-        self.update_status("Ready. Enter a model query and press Enter.")
+        self._update_results_meta(0)
+        self.update_status(
+            "Ready. Search defaults to Ollama. Select 'Hugging Face' filter for HF models."
+        )
         self.update_system_info()
         if not self.ollama_running:
             self.update_status(
-                "Ready. Ollama is not running; local install/runtime features are disabled."
+                "Ready. Ollama is not running; local install/runtime features disabled. Search HF for more models."
             )
-        self.system_metrics_timer = self.set_interval(3.0, self.update_system_info)
-        self.ollama_status_timer = self.set_interval(0.5, self.poll_ollama_status)
+        self.system_metrics_timer = self.set_interval(
+            config.settings.hardware_poll_interval, self.update_system_info
+        )
+        self.ollama_status_timer = self.set_interval(
+            config.settings.ollama_status_poll_interval, self.poll_ollama_status
+        )
         self.download_status_timer = self.set_interval(
-            1.0, self.refresh_download_progress
+            config.settings.ui_download_poll_interval, self.refresh_download_progress
+        )
+
+    def on_resize(self, event: events.Resize) -> None:
+        _ = event
+        self._configure_results_table_columns(refresh_rows=True)
+
+    def action_focus_search(self) -> None:
+        self.query_one("#search-input", Input).focus()
+        self.update_status("Search focused. Type query and press Enter.")
+
+    def action_refresh_search(self) -> None:
+        query = self.query_one("#search-input", Input).value.strip()
+        if not query:
+            self.update_status("Nothing to refresh. Enter a search query first.")
+            return
+        self.start_search(query)
+
+    def action_cycle_provider(self) -> None:
+        cycle = ["Ollama", "Hugging Face"]
+        current = self.current_filter if self.current_filter in cycle else "Ollama"
+        next_filter = cycle[(cycle.index(current) + 1) % len(cycle)]
+        self.current_filter = next_filter
+
+        current_query = self.query_one("#search-input", Input).value.strip()
+        if current_query:
+            self.start_search(current_query)
+            provider_name = "Hugging Face" if next_filter == "Hugging Face" else "Ollama"
+            self.update_status(f"Provider: {next_filter}. Searching {provider_name}...")
+        else:
+            self.refresh_table()
+            self.update_status(f"Provider filter: {next_filter}")
+
+    def action_toggle_hidden_gems(self) -> None:
+        checkbox = self.query_one("#gem-toggle", Checkbox)
+        checkbox.value = not checkbox.value
+        self.hidden_gems_only = bool(checkbox.value)
+        self.refresh_table()
+        self.update_status(
+            "Hidden gems filter enabled."
+            if self.hidden_gems_only
+            else "Hidden gems filter disabled."
+        )
+
+    def _configure_results_table_columns(self, force: bool = False, refresh_rows: bool = False):
+        table = self.query_one("#results-table", DataTable)
+        available_width = max(table.size.width, self.size.width, 80)
+
+        if available_width >= 140:
+            next_keys = [
+                "inst",
+                "source",
+                "publisher",
+                "name",
+                "params",
+                "use_case",
+                "score",
+                "quant",
+                "mode",
+                "fit",
+                "download",
+            ]
+        elif available_width >= 120:
+            next_keys = [
+                "inst",
+                "source",
+                "publisher",
+                "name",
+                "params",
+                "score",
+                "quant",
+                "fit",
+                "download",
+            ]
+        elif available_width >= 100:
+            next_keys = [
+                "inst",
+                "source",
+                "name",
+                "params",
+                "score",
+                "fit",
+                "download",
+            ]
+        else:
+            next_keys = ["inst", "source", "name", "score", "download"]
+
+        if not force and next_keys == self.results_column_keys:
+            return
+
+        min_widths = {
+            "inst": 8,
+            "source": 10,
+            "publisher": 8,
+            "name": 18,
+            "params": 6,
+            "use_case": 5,
+            "score": 8,
+            "quant": 6,
+            "mode": 8,
+            "fit": 7,
+            "download": 4,
+        }
+        separator_budget = len(next_keys) + 2
+        target_content_width = max(40, available_width - separator_budget)
+        base_widths = {key: min_widths[key] for key in next_keys}
+        min_total = sum(base_widths.values())
+        extra = max(0, target_content_width - min_total)
+
+        expandable = ["name", "publisher", "use_case", "download"]
+        while extra > 0:
+            expanded = False
+            for key in expandable:
+                if key in base_widths and extra > 0:
+                    base_widths[key] += 1
+                    extra -= 1
+                    expanded = True
+            if not expanded:
+                break
+
+        table.clear(columns=True)
+        for key in next_keys:
+            width = base_widths[key]
+            table.add_column(
+                self._format_header_label(self.RESULTS_COLUMN_LABELS[key], width),
+                width=width,
+                key=key,
+            )
+
+        self.results_column_keys = next_keys
+        self.results_column_widths = {key: base_widths[key] for key in next_keys}
+
+        if refresh_rows:
+            self.refresh_table()
+
+    def _truncate_cell(self, value, max_len):
+        text = str(value or "-")
+        if len(text) <= max_len:
+            return text
+        if max_len <= 3:
+            return text[:max_len]
+        return text[: max_len - 3] + "..."
+
+    def _truncate_plain_cell(self, value, max_len):
+        text = re.sub(r"\[[^\]]+\]", "", str(value or "-")).strip()
+        if not text:
+            text = "-"
+        return self._truncate_cell(text, max_len)
+
+    def _format_header_label(self, label, width):
+        if width <= 0:
+            return str(label)
+        text = self._truncate_plain_cell(label, width)
+        return text.ljust(width)
+
+    def _align_plain_cell(self, value, width, align="left"):
+        text = str(value or "-")
+        if width <= 0:
+            return text
+        if len(text) > width:
+            text = self._truncate_cell(text, width)
+        if align == "center":
+            return text.center(width)
+        if align == "right":
+            return text.rjust(width)
+        return text.ljust(width)
+
+    def _blank_result_row(self):
+        return {
+            "inst": "-",
+            "source": "-",
+            "publisher": "-",
+            "name": "-",
+            "params": "-",
+            "use_case": "-",
+            "score": "-",
+            "quant": "-",
+            "mode": "-",
+            "fit": "-",
+            "download": "-",
+        }
+
+    def _fit_cell_markup(self, fit_text):
+        plain = self._truncate_plain_cell(fit_text, 20)
+        width = max(5, self.results_column_widths.get("fit", 7) - 1)
+        plain = self._align_plain_cell(plain, width, "left")
+        lowered = plain.lower()
+        if "perfect" in lowered or lowered == "fit":
+            return f"[bold #4fe08a]{plain}[/bold #4fe08a]"
+        if "partial" in lowered or "slow" in lowered:
+            return f"[bold #f2c46d]{plain}[/bold #f2c46d]"
+        if "no fit" in lowered or "tight" in lowered:
+            return f"[bold #ff7f8f]{plain}[/bold #ff7f8f]"
+        return plain
+
+    def _mode_cell_markup(self, mode_text):
+        plain = self._truncate_plain_cell(mode_text, 20)
+        width = max(5, self.results_column_widths.get("mode", 8) - 1)
+        plain = self._align_plain_cell(plain, width, "left")
+        lowered = plain.lower()
+        if "gpu+cpu" in lowered:
+            return f"[bold #f2c46d]{plain}[/bold #f2c46d]"
+        if "gpu" in lowered:
+            return f"[bold #4fe08a]{plain}[/bold #4fe08a]"
+        if "cpu" in lowered:
+            return f"[bold #f2c46d]{plain}[/bold #f2c46d]"
+        return f"[#ff7f8f]{plain}[/#ff7f8f]" if plain != "-" else plain
+
+    def _installed_cell_markup(self, installed_text):
+        plain = self._truncate_plain_cell(installed_text, 8)
+        if "✔" in plain or "installed" in plain.lower():
+            marker = "●"
+        else:
+            marker = "·"
+        width = max(3, self.results_column_widths.get("inst", 7) - 2)
+        return (
+            f"[bold #4fe08a]{self._align_plain_cell(marker, width, 'left')}[/bold #4fe08a]"
+            if marker == "●"
+            else f"[#6b789e]{self._align_plain_cell(marker, width, 'left')}[/#6b789e]"
+        )
+
+    def _source_cell_markup(self, source_text):
+        plain = self._truncate_plain_cell(source_text, 20)
+        width = max(10, self.results_column_widths.get("source", 13) - 1)
+        plain = self._align_plain_cell(plain, width, "left")
+        lowered = plain.lower()
+        if "ollama" in lowered:
+            return f"[bold #7edfff]{plain}[/bold #7edfff]"
+        if "hugging" in lowered:
+            return f"[bold #b6a3ff]{plain}[/bold #b6a3ff]"
+        return f"[#9bb1e0]{plain}[/#9bb1e0]"
+
+    def _score_cell_markup(self, score_text):
+        plain = self._truncate_plain_cell(score_text, 24)
+        match = re.search(r"(\d+(?:\.\d+)?)([KkMm]?)", plain)
+        if not match:
+            return "[#6b789e]-[/#6b789e]"
+
+        value = float(match.group(1))
+        suffix = match.group(2).upper()
+        if suffix == "K":
+            numeric = value * 1000.0
+        elif suffix == "M":
+            numeric = value * 1000000.0
+        else:
+            numeric = value
+
+        if numeric >= 1000000:
+            color = "#4fe08a"
+        elif numeric >= 100000:
+            color = "#7edfff"
+        else:
+            color = "#f2c46d"
+        width = max(5, self.results_column_widths.get("score", 8) - 1)
+        shown = self._align_plain_cell(f"{value:g}{suffix}", width, "left")
+        return f"[bold {color}]{shown}[/bold {color}]"
+
+    def _use_case_cell_markup(self, use_case_text):
+        plain = self._truncate_plain_cell(use_case_text, 20)
+        width = max(4, self.results_column_widths.get("use_case", 6) - 1)
+        plain = self._align_plain_cell(plain, width, "left")
+        lowered = plain.lower()
+        if "coding" in lowered:
+            return f"[#86a7ff]{plain}[/#86a7ff]"
+        if "chat" in lowered:
+            return f"[#8e97c7]{plain}[/#8e97c7]"
+        if "reason" in lowered:
+            return f"[#b89df3]{plain}[/#b89df3]"
+        if "vision" in lowered:
+            return f"[#9fc6ff]{plain}[/#9fc6ff]"
+        return f"[#8ea3cf]{plain}[/#8ea3cf]"
+
+    def _download_cell_markup(self, download_text, width=None):
+        if width is None:
+            width = max(3, self.results_column_widths.get("download", 4) - 1)
+        plain = self._truncate_plain_cell(download_text, 24)
+        aligned = self._align_plain_cell(plain, width, "left")
+        lowered = plain.lower()
+        if "downloading" in lowered or "queued" in lowered:
+            return f"[bold #f2c46d]{aligned}[/bold #f2c46d]"
+        if "done" in lowered or "installed" in lowered:
+            return f"[bold #4fe08a]{aligned}[/bold #4fe08a]"
+        if "failed" in lowered or "error" in lowered:
+            return f"[bold #ff7f8f]{aligned}[/bold #ff7f8f]"
+        return f"[#9bb1e0]{aligned}[/#9bb1e0]"
+
+    def _row_cells_for_current_layout(self, row_data):
+        return [row_data.get(key, "-") for key in self.results_column_keys]
+
+    def _update_results_meta(self, shown_count):
+        total = len(self.all_results)
+        self.query_one("#results-meta", Static).update(
+            f"Models ({shown_count} shown / {total} total)"
         )
 
     def update_status(self, text):
+        """Update the status bar at the bottom of the screen with *text*."""
         self.query_one("#status-bar", Static).update(text)
-
-    def update_system_info(self):
         specs = self.monitor.get_specs()
         self.latest_specs = specs
+        cache_db.set_hardware_snapshot(specs)
         self.poll_ollama_status(refresh_only=True)
+
+    def update_system_info(self):
+        """Update the system info header widget with current hardware specs."""
+        specs = self.monitor.get_specs()
+        self.latest_specs = specs
+        cache_db.set_hardware_snapshot(specs)
+        running_now = check_ollama_running()
+        self.query_one(SystemInfoWidget).update_info(specs, running_now)
+
+    def _find_model_by_target_id(self, target_id):
+        """Find a model in all_results by its target_id."""
+        for item in self.all_results:
+            if download_target_id(item) == target_id:
+                return item
+        return None
 
     def poll_ollama_status(self, refresh_only=False):
         running_now = check_ollama_running()
         state_changed = running_now != self.ollama_running
         self.ollama_running = running_now
 
-        specs = (
-            self.latest_specs
-            if self.latest_specs is not None
-            else self.monitor.get_specs()
-        )
+        specs = self.latest_specs if self.latest_specs is not None else self.monitor.get_specs()
         self.query_one(SystemInfoWidget).update_info(specs, running_now)
 
         if refresh_only or not state_changed:
@@ -384,28 +979,77 @@ class AIModelViewer(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         query = event.value.strip()
+        self.start_search(query)
+
+    def start_search(self, query: str) -> None:
         if not query:
             return
-        query_key = query.lower()
+        providers = self._get_search_providers()
+        provider_prefix = "hf" if providers == ["huggingface"] else "ollama"
+
+        # Ollama doesn't support pagination, only HF does
+        if providers == ["huggingface"]:
+            query_key = f"{provider_prefix}:{query.lower()}:page{self.current_page}"
+        else:
+            query_key = f"{provider_prefix}:{query.lower()}"
+            self.current_page = 0  # Reset page for Ollama
+
         current_specs = self.monitor.get_specs()
         self.last_search_error = ""
         self.search_counter += 1
         self.active_search_id = self.search_counter
         table = self.query_one("#results-table", DataTable)
         table.clear()
-        table.loading = True
-        self.update_status(f"Searching: {query}")
+        table.loading = False
+        self._update_results_meta(0)
+
+        provider_name = "Hugging Face" if providers == ["huggingface"] else "Ollama"
+        self.on_search_progress(self.active_search_id, f"Searching {provider_name}: {query}")
 
         cached = self._get_cached_search(query_key, current_specs)
         if cached:
             self.all_results = [item.copy() for item in cached["results"]]
             self._ensure_download_fields()
             self.last_search_error = cached["error"]
+            if "has_more_pages" in cached:
+                self.has_more_pages = cached["has_more_pages"]
             self.on_search_completed(self.active_search_id)
-            self.update_status(f"Loaded cached results: {query}")
+            cache_msg = (
+                " (cached)"
+                if providers == ["huggingface"]
+                else f" (cached page {self.current_page + 1})"
+            )
+            self.update_status(f"Loaded{cache_msg}")
             return
 
-        self.run_search_worker(query, query_key, self.active_search_id)
+        self.run_search_worker(query, query_key, self.active_search_id, providers)
+
+    def on_search_progress(self, search_id: int, message: str) -> None:
+        if search_id != self.active_search_id:
+            return
+
+        self.update_status(message)
+        table = self.query_one("#results-table", DataTable)
+        self._configure_results_table_columns()
+        table.clear()
+        row_data = self._blank_result_row()
+        row_data["inst"] = "[cyan]...[/cyan]"
+        row_data["source"] = "System"
+        name_width = max(16, self.results_column_widths.get("name", 24))
+        short_message = self._truncate_cell(f"Status: {message}", max(10, name_width - 1))
+        row_data["name"] = short_message
+        row_data["download"] = self._download_cell_markup("Working")
+        table.add_row(*self._row_cells_for_current_layout(row_data), key="search-progress")
+        self._update_results_meta(0)
+        table.move_cursor(row=0, animate=False, scroll=False)
+        table.scroll_to(x=0, y=0, animate=False, immediate=True)
+
+    def _get_search_providers(self) -> list[str]:
+        """Return list of providers to search based on current_filter."""
+        if self.current_filter == "Hugging Face":
+            return ["huggingface"]
+        else:
+            return ["ollama"]
 
     def _is_cache_compatible(self, current_specs, cached_specs):
         if not cached_specs:
@@ -413,9 +1057,7 @@ class AIModelViewer(App):
         if current_specs.get("has_gpu") != cached_specs.get("has_gpu"):
             return False
 
-        ram_delta = abs(
-            current_specs.get("ram_free", 0.0) - cached_specs.get("ram_free", 0.0)
-        )
+        ram_delta = abs(current_specs.get("ram_free", 0.0) - cached_specs.get("ram_free", 0.0))
         if ram_delta > self.search_cache_ram_threshold_gb:
             return False
 
@@ -448,6 +1090,7 @@ class AIModelViewer(App):
             "timestamp": time.monotonic(),
             "results": [item.copy() for item in results],
             "error": error,
+            "has_more_pages": self.has_more_pages,
             "specs": {
                 "has_gpu": specs.get("has_gpu", False),
                 "ram_free": specs.get("ram_free", 0.0),
@@ -469,26 +1112,123 @@ class AIModelViewer(App):
             return
 
         pid = event.pressed.id
-        if pid == "filter-all":
-            self.current_filter = "All"
-        elif pid == "filter-ollama":
+        if pid == "filter-ollama":
             self.current_filter = "Ollama"
         elif pid == "filter-hf":
             self.current_filter = "Hugging Face"
-        self.refresh_table()
+
+        current_query = self.query_one("#search-input", Input).value.strip()
+        if current_query:
+            self.start_search(current_query)
+        else:
+            self.refresh_table()
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         if event.checkbox.id != "gem-toggle":
             return
         self.hidden_gems_only = bool(event.value)
+        providers = self._get_search_providers()
+        if self.hidden_gems_only and providers == ["ollama"]:
+            self.update_status(
+                "Hidden gems only available for Hugging Face. Switch provider filter."
+            )
         self.refresh_table()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        button_id = event.button.id
+        if button_id == "prev-page":
+            self._go_to_page(self.current_page - 1)
+        elif button_id == "next-page":
+            self._go_to_page(self.current_page + 1)
+
+    def _go_to_page(self, page_num: int) -> None:
+        if page_num < 0:
+            return
+        current_query = self.query_one("#search-input", Input).value.strip()
+        if not current_query:
+            return
+        self.current_page = page_num
+        self.start_search(current_query)
+
+    def _update_pagination_controls(self) -> None:
+        try:
+            prev_btn = self.query_one("#prev-page", Button)
+            next_btn = self.query_one("#next-page", Button)
+            indicator = self.query_one("#page-indicator", Static)
+        except Exception as e:
+            self.update_status(f"Pagination UI error: {e}")
+            return
+
+        providers = self._get_search_providers()
+        is_hf = providers == ["huggingface"]
+
+        # Only show pagination controls for HuggingFace (Ollama doesn't support it)
+        if is_hf:
+            prev_btn.disabled = self.current_page == 0
+            next_btn.disabled = not self.has_more_pages
+            indicator.update(f"Page {self.current_page + 1}")
+            prev_btn.styles.display = "block"
+            next_btn.styles.display = "block"
+            indicator.styles.display = "block"
+        else:
+            # Hide pagination for Ollama
+            prev_btn.styles.display = "none"
+            next_btn.styles.display = "none"
+            indicator.styles.display = "none"
+
+        prev_btn.refresh()
+        next_btn.refresh()
+        indicator.refresh()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         data_table = getattr(event, "data_table", None)
         if data_table is not None and data_table.id == "download-history-table":
             target_id = str(event.row_key.value)
             entry = self.download_registry.get(target_id)
-            if entry:
+
+            # If no entry found, still try to show modal with basic info
+            if not entry:
+                # Try to create entry from row data
+                entry = {
+                    "target_id": target_id,
+                    "source": target_id.split(":")[0] if ":" in target_id else "unknown",
+                    "name": target_id.split(":")[1] if ":" in target_id else target_id,
+                    "state": "idle",
+                    "detail": "External download",
+                }
+
+            # Check if action column was clicked (column index 5)
+            cursor_column = data_table.cursor_column
+            if cursor_column == 5:  # Action column
+                state = entry.get("state", "idle")
+
+                # Check if this is external/unkown
+                is_external = state == "idle" and not any(
+                    x in str(entry.get("detail", "")).lower()
+                    for x in ["download", "pull", "queue", "completed", "failed", "cancel"]
+                )
+
+                if is_external:
+                    # External download - can't manage through our system
+                    self.update_status("External download - cannot manage through this app")
+                    return
+
+                if state in {"downloading", "queued", "running"}:
+                    # Cancel download
+                    self.cancel_model_download(
+                        {
+                            "source": entry.get("source", "-"),
+                            "name": entry.get("name", "-"),
+                            "id": target_id.split(":", maxsplit=1)[1]
+                            if ":" in target_id
+                            else target_id,
+                        }
+                    )
+                else:
+                    # Delete entry (just history, keeps data for resume)
+                    self.delete_download_entry(target_id, delete_data=False)
+            else:
+                # Show detail modal
                 self.push_screen(DownloadJobModal(entry))
             return
 
@@ -517,12 +1257,15 @@ class AIModelViewer(App):
         _ = (result, target_id)
 
     def cancel_model_download(self, model):
+        """Request cancellation of an in-progress or queued download for *model*."""
         target_id = download_target_id(model)
         try:
             response = cancel_job(target_id)
             _ = response.get("job")
             self.update_status(f"Cancel requested: {model.get('name', target_id)}")
-            self.sync_download_jobs_from_service(force=False)
+            self.sync_download_jobs_from_service(force=True)
+            self.refresh_download_history_table()
+            self.refresh_table()  # Also refresh main results table
         except HTTPError as exc:
             detail = "Failed to cancel download through service."
             try:
@@ -536,7 +1279,57 @@ class AIModelViewer(App):
         except Exception:
             self.update_status("Failed to cancel download through service.")
 
-    def delete_download_entry(self, target_id):
+    def delete_download_entry(self, target_id, delete_data=False):
+        """Delete download entry from history.
+
+        Args:
+            target_id: The download target ID
+            delete_data: If True, also delete downloaded/partial data (e.g., ollama rm)
+        """
+        entry = self.download_registry.get(target_id)
+        source = entry.get("source", "").lower() if entry else ""
+        model_name = entry.get("name", "") if entry else ""
+        state = entry.get("state", "idle") if entry else "idle"
+
+        # If deleting data for active download, cancel it first
+        if delete_data and state in {"downloading", "queued", "running"}:
+            try:
+                # Cancel the job through the service
+                cancel_job(target_id)
+                time.sleep(1)  # Wait a moment for cancellation
+                self.update_status(f"Download canceled: {model_name}")
+            except Exception as e:
+                self.update_status(f"Could not cancel download: {e}")
+
+        # If deleting data, remove the actual model/partial files
+        if delete_data and source == "ollama" and model_name:
+            try:
+                # Try with :latest tag first, then without
+                result = subprocess.run(
+                    ["ollama", "rm", model_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    self.update_status(f"✅ Deleted model: {model_name}")
+                else:
+                    # Try with :latest suffix
+                    result2 = subprocess.run(
+                        ["ollama", "rm", f"{model_name}:latest"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    if result2.returncode == 0:
+                        self.update_status(f"✅ Deleted model: {model_name}:latest")
+                    else:
+                        self.update_status(f"⚠️ Could not delete: {result2.stderr.strip()}")
+            except subprocess.TimeoutExpired:
+                self.update_status(f"⚠️ Timeout deleting model: {model_name}")
+            except Exception as e:
+                self.update_status(f"⚠️ Delete error: {str(e)}")
+
         try:
             delete_job(target_id)
         except HTTPError as exc:
@@ -552,8 +1345,8 @@ class AIModelViewer(App):
                 pass
             self.update_status(detail)
             return
-        except Exception:
-            self.update_status("Failed to delete download entry.")
+        except Exception as exc:
+            self.update_status(f"Failed to delete download entry: {exc}")
             return
 
         deleted_entry = self.download_registry.pop(target_id, None)
@@ -597,137 +1390,13 @@ class AIModelViewer(App):
             if queued:
                 self.update_status(f"Download queued: {model.get('name', target_id)}")
             else:
-                self.update_status(
-                    f"Download already active: {model.get('name', target_id)}"
-                )
-            self.sync_download_jobs_from_service(force=False)
+                self.update_status(f"Download already active: {model.get('name', target_id)}")
+            self.sync_download_jobs_from_service(force=True)
+            self.refresh_download_history_table()
         except Exception as exc:
             self.update_status(f"Failed to queue download: {exc}")
 
-    @work(thread=True)
-    def download_model_worker(self, model, target_id):
-        try:
-            command = build_download_command(model)
-        except ValueError as exc:
-            self.call_from_thread(
-                self.on_download_finished, target_id, model, False, str(exc)
-            )
-            return
-
-        if target_id in self.cancelled_downloads:
-            self.call_from_thread(
-                self.on_download_finished, target_id, model, False, "canceled"
-            )
-            return
-
-        self.call_from_thread(
-            self.on_download_progress,
-            target_id,
-            "downloading",
-            "Downloading",
-            "",
-        )
-
-        try:
-            process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                bufsize=1,
-            )
-            self.download_processes[target_id] = process
-            started_at = time.monotonic()
-            last_report = started_at
-
-            if target_id in self.cancelled_downloads:
-                try:
-                    process.terminate()
-                except OSError:
-                    pass
-
-            if process.stdout is not None:
-                for raw_line in process.stdout:
-                    line = raw_line.strip()
-                    progress = self._extract_download_progress(line)
-                    now = time.monotonic()
-
-                    if progress is not None:
-                        self.call_from_thread(
-                            self.on_download_progress,
-                            target_id,
-                            "downloading",
-                            "Downloading",
-                            f"{progress}%",
-                        )
-                        last_report = now
-                        continue
-
-                    if now - last_report >= 1.0:
-                        elapsed = int(now - started_at)
-                        self.call_from_thread(
-                            self.on_download_progress,
-                            target_id,
-                            "downloading",
-                            "Downloading",
-                            f"{elapsed}s",
-                        )
-                        last_report = now
-
-            completed_code = process.wait()
-        except FileNotFoundError:
-            self.download_processes.pop(target_id, None)
-            self.call_from_thread(
-                self.on_download_finished,
-                target_id,
-                model,
-                False,
-                f"Required command is not installed: {command[0]}",
-            )
-            return
-        except OSError as exc:
-            self.download_processes.pop(target_id, None)
-            self.call_from_thread(
-                self.on_download_finished, target_id, model, False, str(exc)
-            )
-            return
-
-        if completed_code == 0:
-            self.download_processes.pop(target_id, None)
-            self.call_from_thread(self.on_download_finished, target_id, model, True, "")
-            return
-
-        self.download_processes.pop(target_id, None)
-        self.call_from_thread(
-            self.on_download_finished,
-            target_id,
-            model,
-            False,
-            "download command exited with non-zero status",
-        )
-
-    def _extract_download_progress(self, line):
-        if not line:
-            return None
-        match = re.search(r"(\d{1,3})%", line)
-        if not match:
-            return None
-        value = int(match.group(1))
-        if 0 <= value <= 100:
-            return value
-        return None
-
-    def _find_model_by_target_id(self, target_id):
-        for item in self.all_results:
-            if download_target_id(item) == target_id:
-                return item
-        return None
-
-    def _record_download_entry(
-        self, target_id, model=None, state=None, label=None, detail=None
-    ):
+    def _record_download_entry(self, target_id, model=None, state=None, label=None, detail=None):
         existing = self.download_registry.get(target_id, {})
 
         source = existing.get("source", "-")
@@ -759,9 +1428,7 @@ class AIModelViewer(App):
                 self.download_registry,
                 key=lambda key: self.download_registry[key].get("updated_at", 0),
             )
-            for key in sorted_keys[
-                : len(self.download_registry) - self.download_history_limit
-            ]:
+            for key in sorted_keys[: len(self.download_registry) - self.download_history_limit]:
                 self.download_registry.pop(key, None)
 
     def sync_download_jobs_from_service(self, force=False):
@@ -778,9 +1445,7 @@ class AIModelViewer(App):
             target_id = download_target_id(
                 {
                     "source": job.get("source", "unknown"),
-                    "id": target_id.split(":", maxsplit=1)[1]
-                    if ":" in target_id
-                    else target_id,
+                    "id": target_id.split(":", maxsplit=1)[1] if ":" in target_id else target_id,
                 }
             )
             raw_status = job.get("status", "idle")
@@ -855,9 +1520,23 @@ class AIModelViewer(App):
         )
 
         for entry in entries[: self.download_history_limit]:
-            updated = time.strftime(
-                "%H:%M:%S", time.localtime(entry.get("updated_at", 0))
+            state = entry.get("state", "idle")
+            target_id = entry.get("target_id", "-")
+
+            # Check if this is an external download (not tracked by our system)
+            is_external = state == "idle" and not any(
+                x in str(entry.get("detail", "")).lower()
+                for x in ["download", "pull", "queue", "completed", "failed", "cancel"]
             )
+
+            # Create action button based on state
+            if is_external:
+                action_btn = "⚠️ External"
+            elif state in {"downloading", "queued", "running"}:
+                action_btn = "Cancel"
+            else:
+                action_btn = "Delete"
+
             table.add_row(
                 entry.get("source", "-"),
                 entry.get("publisher", "-"),
@@ -867,15 +1546,14 @@ class AIModelViewer(App):
                     entry.get("label", "Idle"),
                 ),
                 entry.get("detail", ""),
-                updated,
-                key=entry.get("target_id", "-"),
+                action_btn,
+                key=target_id,
             )
 
     def request_download_history_refresh(self, force=False):
         now = time.monotonic()
         if force or (
-            now - self.last_download_history_refresh_at
-            >= self.download_history_refresh_interval
+            now - self.last_download_history_refresh_at >= self.download_history_refresh_interval
         ):
             self.refresh_download_history_table()
             self.last_download_history_refresh_at = now
@@ -883,21 +1561,41 @@ class AIModelViewer(App):
             return
         self.download_history_refresh_pending = True
 
-    def _download_status_text_from_state(self, state, label):
+    def _download_status_text_from_state(self, state, label=None):
+        # Normalize state
+        state = str(state).lower().strip() if state else "idle"
+        label = str(label).lower().strip() if label else ""
+
+        # Check based on state value first
         if state == "completed":
             return "[green]Completed[/green]"
         if state == "failed":
             return "[red]Failed[/red]"
-        if state == "cancelled":
+        if state == "cancelled" or state == "canceled":
             return "[yellow]Canceled[/yellow]"
         if state == "downloading":
-            frame = self.download_spinner_frames[
-                self.download_spinner_index % len(self.download_spinner_frames)
-            ]
-            return f"[yellow]{frame} {label}[/yellow]"
+            return "[yellow]Downloading[/yellow]"
         if state == "queued":
             return "[cyan]Queued[/cyan]"
-        return "[grey50]Idle[/grey50]"
+        if state == "running":
+            return "[yellow]Running[/yellow]"
+        if state == "canceling":
+            return "[orange]Canceling[/orange]"
+
+        # Fallback: check label for status hints
+        if "completed" in label or "done" in label:
+            return "[green]Completed[/green]"
+        if "failed" in label or "error" in label:
+            return "[red]Failed[/red]"
+        if "cancel" in label:
+            return "[yellow]Canceled[/yellow]"
+        if "download" in label or "pull" in label:
+            return "[yellow]Downloading[/yellow]"
+        if "queue" in label:
+            return "[cyan]Queued[/cyan]"
+
+        # External/unknown download - not from our system
+        return "[red]![/red] External"
 
     def _set_download_state(
         self,
@@ -909,9 +1607,7 @@ class AIModelViewer(App):
         refresh_results=True,
         refresh_history=True,
     ):
-        self._record_download_entry(
-            target_id, model=model, state=state, label=label, detail=detail
-        )
+        self._record_download_entry(target_id, model=model, state=state, label=label, detail=detail)
         model = self._find_model_by_target_id(target_id)
         if model and refresh_results:
             model["download_state"] = state
@@ -977,11 +1673,12 @@ class AIModelViewer(App):
     def refresh_download_progress(self):
         self.sync_download_jobs_from_service(force=False)
         self.refresh_download_debug()
+        # Always refresh history table to catch state changes
+        self.refresh_download_history_table()
         if not self.active_downloads:
             if self.download_history_refresh_pending:
                 self.request_download_history_refresh()
             return
-        self.download_spinner_index += 1
         if any(
             self.download_registry.get(target_id, {}).get("state") == "downloading"
             for target_id in self.active_downloads
@@ -1011,40 +1708,6 @@ class AIModelViewer(App):
                     "Workers: unavailable | Duplicates: unknown"
                 )
 
-    def on_download_progress(self, target_id, state, label, detail):
-        self._set_download_state(
-            target_id,
-            state,
-            label,
-            detail,
-            refresh_results=False,
-            refresh_history=True,
-        )
-
-    def on_download_finished(self, target_id, model, success, message):
-        self.active_downloads.discard(target_id)
-        self.download_processes.pop(target_id, None)
-        self.download_started_at.pop(target_id, None)
-        if target_id in self.cancelled_downloads:
-            self.cancelled_downloads.discard(target_id)
-            self._set_download_state(
-                target_id, "cancelled", "Canceled", "", model=model
-            )
-            self.update_status(f"Download canceled: {model.get('name', target_id)}")
-            return
-        if success:
-            self._set_download_state(
-                target_id, "completed", "Completed", "", model=model
-            )
-            if model.get("source") == "Ollama":
-                self._mark_ollama_model_installed(model.get("name", ""))
-            self.update_status(f"Download complete: {model.get('name', target_id)}")
-            return
-        self._set_download_state(
-            target_id, "failed", "Failed", message[:40], model=model
-        )
-        self.update_status(f"Download failed: {message}")
-
     def _mark_ollama_model_installed(self, model_name):
         for item in self.all_results:
             if item.get("source") == "Ollama" and item.get("name") == model_name:
@@ -1073,23 +1736,95 @@ class AIModelViewer(App):
         self.update_status("Detailed metadata loaded.")
 
     @work(thread=True)
-    def run_search_worker(self, query: str, query_key: str, search_id: int) -> None:
-        specs = self.monitor.get_specs()
-        local_models = get_installed_ollama_models() if check_ollama_running() else []
+    def run_search_worker(
+        self,
+        query: str,
+        query_key: str,
+        search_id: int,
+        providers: list[str] | None = None,
+    ) -> None:
+        if providers is None:
+            providers = self._get_search_providers()
 
-        ollama_results, ollama_errors = search_ollama_models(query, specs, local_models)
-        hf_results, hf_errors = search_hf_models(
-            query,
-            specs,
-            self.hf_model_info_cache,
-        )
+        specs = self.monitor.get_specs()
+        ollama_results, ollama_errors = [], []
+        hf_results, hf_errors = [], []
+        ollama_has_more = False
+
+        if "ollama" in providers:
+            self.call_from_thread(self.on_search_progress, search_id, "Checking Ollama runtime...")
+            ollama_running = check_ollama_running()
+            if ollama_running:
+                self.call_from_thread(
+                    self.on_search_progress,
+                    search_id,
+                    "Connecting to Ollama and fetching installed models...",
+                )
+                local_models = get_installed_ollama_models()
+            else:
+                self.call_from_thread(
+                    self.on_search_progress,
+                    search_id,
+                    "Ollama not running; skipping installed model check...",
+                )
+                local_models = []
+
+            self.call_from_thread(self.on_search_progress, search_id, "Fetching Ollama data...")
+            ollama_page_size = config.settings.ollama_search_limit
+            ollama_results, ollama_errors, ollama_has_more = search_ollama_models(
+                query,
+                specs,
+                local_models,
+                page=self.current_page,
+                page_size=ollama_page_size,
+            )
+
+        if "huggingface" in providers:
+            self.call_from_thread(
+                self.on_search_progress, search_id, "Fetching Hugging Face data..."
+            )
+            offset = self.current_page * self.page_size
+            hf_token = config.settings.hf_token
+            hf_results, hf_errors = search_hf_models(
+                query,
+                specs,
+                self.hf_model_info_cache,
+                limit=self.page_size,
+                offset=offset,
+                hf_token=hf_token,
+            )
 
         if search_id != self.active_search_id:
             return
 
+        self.call_from_thread(self.on_search_progress, search_id, "Finalizing search results...")
         self.all_results = ollama_results + hf_results
         self._ensure_download_fields()
         self.last_search_error = " | ".join((ollama_errors + hf_errors)[:2])
+
+        # Determine if there are more pages based on which provider was searched
+        # Note: Ollama doesn't support page-based pagination, only HF does
+        if "huggingface" in providers and len(hf_results) > 0:
+            self.has_more_pages = len(hf_results) == self.page_size
+        elif "ollama" in providers and len(ollama_results) > 0:
+            # Ollama returns all results at once, no pagination possible
+            self.has_more_pages = False
+        else:
+            self.has_more_pages = False
+
+        provider_name = "HF" if "huggingface" in providers else "Ollama"
+        result_count = len(hf_results) if "huggingface" in providers else len(ollama_results)
+        if "ollama" in providers:
+            self.call_from_thread(
+                self.update_status,
+                f"Ollama: {result_count} results (pagination not supported by Ollama.com)",
+            )
+        else:
+            self.call_from_thread(
+                self.update_status,
+                f"HF: {result_count} results, has_more={self.has_more_pages}, page={self.current_page}",
+            )
+
         self._store_cached_search(query_key, self.all_results, self.last_search_error)
         self.call_from_thread(self.on_search_completed, search_id)
 
@@ -1102,29 +1837,34 @@ class AIModelViewer(App):
         self.refresh_table()
 
         if table.row_count > 0:
-            self.update_status(f"{table.row_count} results listed.")
+            total = len(self.all_results)
+            shown = table.row_count
+            page_info = f" (Page {self.current_page + 1})" if self.current_page > 0 else ""
+            self.update_status(f"{shown} results listed{page_info}.")
         elif self.last_search_error:
             self.update_status(self.last_search_error[:120])
         else:
-            self.update_status("No results found.")
+            providers = self._get_search_providers()
+            if providers == ["ollama"]:
+                self.update_status("No Ollama results. Try 'Hugging Face' filter for more models.")
+            else:
+                self.update_status("No results found.")
 
         if table.row_count == 0 and self.last_search_error:
-            table.add_row(
-                "[red]![/red]",
-                "System",
-                "-",
-                "Search error",
-                "-",
-                "-",
-                f"[red]{self.last_search_error[:40]}[/red]",
-                "-",
-                "-",
-                "-",
-                "-",
+            row_data = self._blank_result_row()
+            row_data["inst"] = "[red]![/red]"
+            row_data["source"] = "System"
+            name_width = max(16, self.results_column_widths.get("name", 24))
+            row_data["name"] = self._truncate_cell(
+                f"Search error: {self.last_search_error}",
+                max(10, name_width - 1),
             )
+            table.add_row(*self._row_cells_for_current_layout(row_data))
         table.focus()
+        self._update_pagination_controls()
 
     def refresh_table(self):
+        self._configure_results_table_columns()
         table = self.query_one("#results-table", DataTable)
         prev_cursor_row = table.cursor_row
         prev_scroll_x = table.scroll_x
@@ -1134,12 +1874,9 @@ class AIModelViewer(App):
 
         filtered_results = []
         for result in self.all_results:
-            if self.current_filter != "All" and result["source"] != self.current_filter:
+            if result["source"] != self.current_filter:
                 continue
-            if (
-                self.use_case_filter != "all"
-                and result.get("use_case_key") != self.use_case_filter
-            ):
+            if self.use_case_filter != "all" and result.get("use_case_key") != self.use_case_filter:
                 continue
             if self.hidden_gems_only and not result.get("is_hidden_gem", False):
                 continue
@@ -1157,28 +1894,74 @@ class AIModelViewer(App):
 
         for result in filtered_results:
             display_name = result["name"]
-            if len(display_name) > 30:
-                display_name = display_name[:27] + "..."
+            name_width = max(16, self.results_column_widths.get("name", 24))
+            display_name = self._truncate_cell(display_name, max(10, name_width - 1))
+
+            publisher = self._truncate_plain_cell(
+                result.get("publisher", "-"),
+                max(5, self.results_column_widths.get("publisher", 8) - 1),
+            )
+            use_case = self._truncate_plain_cell(
+                result.get("use_case", "-"),
+                max(4, self.results_column_widths.get("use_case", 5) - 1),
+            )
+            params = self._truncate_plain_cell(
+                result.get("params", "-"),
+                max(4, self.results_column_widths.get("params", 6) - 1),
+            )
+            quant = self._truncate_plain_cell(
+                result.get("quant", "-"),
+                max(4, self.results_column_widths.get("quant", 6) - 1),
+            )
+            mode_plain = self._truncate_plain_cell(
+                result.get("mode", "-"),
+                max(5, self.results_column_widths.get("mode", 8) - 1),
+            )
+            fit_plain = self._truncate_plain_cell(
+                result.get("fit", "-"),
+                max(5, self.results_column_widths.get("fit", 7) - 1),
+            )
+            score = result.get("score", "-")
+            download = self._download_cell_text(result)
+            download_width = max(3, self.results_column_widths.get("download", 4) - 1)
+            mode = self._mode_cell_markup(mode_plain)
+            fit = self._fit_cell_markup(fit_plain)
+            params = self._align_plain_cell(
+                params,
+                max(4, self.results_column_widths.get("params", 6) - 1),
+                "left",
+            )
+            quant = self._align_plain_cell(
+                quant,
+                max(4, self.results_column_widths.get("quant", 6) - 1),
+                "left",
+            )
+            download = self._download_cell_markup(download, download_width)
 
             unique_key = f"{result['source']}:{result.get('id', result['name'])}"
             if unique_key in added:
                 continue
             added.add(unique_key)
 
-            table.add_row(
-                result["inst"],
-                result["source"],
-                result.get("publisher", "-"),
-                display_name,
-                result["params"],
-                result["use_case"],
-                result["score"],
-                result["quant"],
-                result["mode"],
-                result["fit"],
-                self._download_cell_text(result),
-                key=unique_key,
+            row_data = self._blank_result_row()
+            row_data["inst"] = self._installed_cell_markup(result.get("inst", "-"))
+            row_data["source"] = self._source_cell_markup(result.get("source", "-"))
+            row_data["publisher"] = (
+                f"[#7d8bad]{self._align_plain_cell(publisher, max(6, self.results_column_widths.get('publisher', 8) - 1), 'left')}[/#7d8bad]"
             )
+            row_data["name"] = display_name
+            row_data["params"] = params
+            row_data["use_case"] = self._use_case_cell_markup(use_case)
+            row_data["score"] = self._score_cell_markup(score)
+            row_data["quant"] = (
+                f"[#7e90bf]{self._align_plain_cell(quant, max(6, self.results_column_widths.get('quant', 9) - 1), 'left')}[/#7e90bf]"
+            )
+            row_data["mode"] = mode
+            row_data["fit"] = fit
+            row_data["download"] = download
+            table.add_row(*self._row_cells_for_current_layout(row_data), key=unique_key)
+
+        self._update_results_meta(table.row_count)
 
         if table.row_count > 0:
             restored_row = max(0, min(prev_cursor_row, table.row_count - 1))

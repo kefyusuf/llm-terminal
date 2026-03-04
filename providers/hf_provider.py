@@ -2,6 +2,7 @@ import requests
 from huggingface_hub import HfApi
 from huggingface_hub.errors import HfHubHTTPError
 
+import cache_db
 from utils import (
     calculate_fit,
     determine_use_case,
@@ -10,17 +11,22 @@ from utils import (
     extract_params,
     format_likes,
     infer_quant_from_name,
+    parse_retry_after_seconds,
 )
 
 
 def _repo_id_from_model(model):
+    """Return the HuggingFace repository id string from a model object."""
     return getattr(model, "modelId", None) or getattr(model, "id", None)
 
 
 def _select_preferred_gguf(siblings):
-    filenames = [
-        item.rfilename for item in siblings if getattr(item, "rfilename", None)
-    ]
+    """Choose the preferred GGUF file from a list of repo sibling objects.
+
+    Preference order: Q4_K_M → Q4_0 → Q5_K_M → any ``.gguf``.
+    Returns ``None`` if no GGUF file is found.
+    """
+    filenames = [item.rfilename for item in siblings if getattr(item, "rfilename", None)]
     priorities = ["Q4_K_M.gguf", "Q4_0.gguf", "Q5_K_M.gguf"]
 
     for suffix in priorities:
@@ -32,6 +38,15 @@ def _select_preferred_gguf(siblings):
 
 
 def classify_hidden_gem(downloads, likes):
+    """Classify a model as a hidden gem based on its download and like counts.
+
+    A hidden gem has significant downloads but low public visibility (few
+    likes relative to download volume).
+
+    Returns:
+        ``(is_gem: bool, gem_score: float)`` — score is higher for more
+        gem-like models.
+    """
     if downloads < 5000:
         return False, 0.0
     if likes > 200:
@@ -44,6 +59,7 @@ def classify_hidden_gem(downloads, likes):
 
 
 def _get_status_code(exc):
+    """Extract the HTTP status code from a HuggingFace exception, or ``None``."""
     response = getattr(exc, "response", None)
     if response is not None and getattr(response, "status_code", None) is not None:
         return response.status_code
@@ -51,20 +67,16 @@ def _get_status_code(exc):
 
 
 def _get_retry_after_seconds(exc):
+    """Extract the ``Retry-After`` delay in seconds from a HuggingFace exception."""
     response = getattr(exc, "response", None)
     headers = getattr(response, "headers", None)
     if not headers:
         return None
-    retry_after = headers.get("Retry-After")
-    if not retry_after:
-        return None
-    try:
-        return int(retry_after)
-    except (TypeError, ValueError):
-        return None
+    return parse_retry_after_seconds(headers.get("Retry-After"))
 
 
 def _format_hf_http_error(exc):
+    """Return a user-friendly error message for a HuggingFace HTTP error."""
     status = _get_status_code(exc)
     retry_after = _get_retry_after_seconds(exc)
     if status == 429:
@@ -81,21 +93,36 @@ def search_hf_models(
     specs,
     model_info_cache,
     limit=15,
+    offset=0,
+    hf_token=None,
 ):
+    """Search Hugging Face for GGUF models matching *query*.
+
+    Args:
+        query: Free-text search string.
+        specs: Hardware specification dict.
+        model_info_cache: Shared ``{repo_id: HfApi.model_info}`` cache dict.
+        limit: Maximum number of results to return per page.
+        offset: Number of results to skip (for pagination).
+        hf_token: Optional HuggingFace API token for higher rate limits.
+
+    Returns:
+        ``(results: list[dict], errors: list[str], total_count: int)``.
+    """
     results = []
     errors = []
     found_keys = set()
-    _ = model_info_cache
 
     try:
-        api = HfApi()
-        hf_models = api.list_models(
+        api = HfApi(token=hf_token) if hf_token else HfApi()
+        hf_models_iter = api.list_models(
             search=query,
             sort="downloads",
-            limit=limit,
+            limit=limit * 10,
             filter="gguf",
             expand=["likes", "siblings", "downloads"],
         )
+        hf_models = list(hf_models_iter)[offset : offset + limit]
     except HfHubHTTPError as exc:
         return results, [_format_hf_http_error(exc)]
     except (requests.RequestException, ValueError, OSError) as exc:
@@ -121,11 +148,7 @@ def search_hf_models(
             likes = getattr(model, "likes", 0)
             downloads = int(getattr(model, "downloads", 0) or 0)
             is_hidden_gem, gem_score = classify_hidden_gem(downloads, likes)
-            score_str = (
-                f"[red]❤️ {format_likes(likes)}[/red]"
-                if likes > 0
-                else "[grey50]-[/grey50]"
-            )
+            score_str = f"[red]❤️ {format_likes(likes)}[/red]" if likes > 0 else "[grey50]-[/grey50]"
             if is_hidden_gem:
                 score_str = f"{score_str} [yellow]💎[/yellow]"
 
@@ -178,23 +201,50 @@ def search_hf_models(
 
 
 def enrich_hf_model_details(model, specs, model_info_cache):
+    """Enrich a search result *model* dict with exact file size from the HF API.
+
+    Fetches ``model_info`` (with ``files_metadata=True``) to resolve the
+    target GGUF file size and update ``size``, ``fit``, ``mode``, and
+    ``quant`` fields in-place.  Returns the (possibly unchanged) dict.
+    """
     repo_id = model.get("id")
     if not repo_id:
         return model
 
+    target = model.get("target_file")
+
+    cached = cache_db.get_model_cache("huggingface", repo_id)
+    if cached is not None:
+        size = cached.get("size_gb")
+        if size is not None:
+            fit_str, mode_str, _ = calculate_fit(size, specs)
+            model["size"] = f"{size:.1f} GB"
+            model["fit"] = fit_str
+            model["mode"] = mode_str
+            model["size_source"] = "exact"
+        if cached.get("target_file"):
+            target = cached.get("target_file")
+            if target:
+                quant = target.split(".")[-2] if len(target.split(".")) > 2 else "GGUF"
+                if "gguf" in quant.lower():
+                    quant = "GGUF"
+                model["quant"] = quant
+                model["target_file"] = target
+        return model
+
     try:
         api = HfApi()
-        info = model_info_cache.get(repo_id)
-        if info is None:
-            info = api.model_info(repo_id, files_metadata=True)
+        info = api.model_info(repo_id, files_metadata=True)
+        if model_info_cache is not None:
             model_info_cache[repo_id] = info
 
         siblings = info.siblings or []
-        target = model.get("target_file") or _select_preferred_gguf(siblings)
+        target = target or _select_preferred_gguf(siblings)
         if not target:
             return model
 
         metadata = next((item for item in siblings if item.rfilename == target), None)
+        size = None
         if metadata and metadata.size:
             size = metadata.size / (1024**3)
             fit_str, mode_str, _ = calculate_fit(size, specs)
@@ -208,6 +258,12 @@ def enrich_hf_model_details(model, specs, model_info_cache):
             quant = "GGUF"
         model["quant"] = quant
         model["target_file"] = target
+
+        cache_db.set_model_cache(
+            "huggingface",
+            repo_id,
+            {"size_gb": size, "target_file": target},
+        )
     except (HfHubHTTPError, requests.RequestException, OSError, ValueError, TypeError):
         return model
 

@@ -5,6 +5,11 @@ import psutil
 
 
 def get_real_cpu_name():
+    """Return the human-readable CPU model string for the current platform.
+
+    Uses platform-appropriate APIs (Windows registry, ``/proc/cpuinfo``, macOS
+    ``sysctl``) and falls back to :func:`platform.processor` on failure.
+    """
     os_name = platform.system()
     if os_name == "Windows":
         try:
@@ -39,6 +44,11 @@ def get_real_cpu_name():
 
 
 class HardwareMonitor:
+    """Snapshot local hardware capabilities relevant to LLM inference.
+
+    Detects NVIDIA GPU VRAM via ``pynvml`` / ``nvidia_smi`` with graceful
+    fallback when no compatible GPU is present.
+    """
     def __init__(self):
         self.nvidia_available = False
         self.handle = None
@@ -69,6 +79,12 @@ class HardwareMonitor:
                 pass
 
     def get_specs(self):
+        """Return a dict with current CPU, RAM, and VRAM readings.
+
+        Keys: ``cpu_name``, ``cpu_cores``, ``ram_free``, ``ram_total``,
+        ``vram_free``, ``vram_total``, ``gpu_name``, ``has_gpu``.
+        All memory values are in **gigabytes**.
+        """
         ram = psutil.virtual_memory()
         info = {
             "cpu_name": self.cpu_name,
@@ -96,6 +112,7 @@ class HardwareMonitor:
 
 
 def check_ollama_running():
+    """Return ``True`` if an Ollama process is currently running on this machine."""
     for proc in psutil.process_iter(["name"]):
         try:
             if proc.info["name"] and "ollama" in proc.info["name"].lower():

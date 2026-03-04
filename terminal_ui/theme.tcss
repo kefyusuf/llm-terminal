@@ -1,0 +1,334 @@
+/* ═══════════════════════════════════════════════════════
+   OBSIDIAN CONSOLE — Textual CSS Theme
+   A brutally refined terminal workspace
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Global ──────────────────────────────────────────── */
+
+Screen {
+    background: #0a0a0f;
+    color: #b8bfd6;
+}
+
+/* ── Header Bar ─────────────────────────────────────── */
+
+#header-bar {
+    dock: top;
+    height: 3;
+    background: #0e0e16;
+    color: #4a9eff;
+    padding: 0 2;
+    border-bottom: solid #1a1a2e;
+}
+
+#header-bar .title {
+    text-style: bold;
+    color: #4a9eff;
+    width: auto;
+}
+
+#header-bar .subtitle {
+    color: #3d3d5c;
+    margin-left: 1;
+}
+
+/* ── Tab Bar ────────────────────────────────────────── */
+
+#tab-bar {
+    dock: top;
+    height: 1;
+    background: #0e0e16;
+    border-bottom: solid #1a1a2e;
+}
+
+.tab-btn {
+    background: transparent;
+    color: #3d3d5c;
+    padding: 0 2;
+    min-width: 14;
+    height: 1;
+    border: none;
+    text-style: none;
+}
+
+.tab-btn:hover {
+    color: #b8bfd6;
+    background: #12121f;
+}
+
+.tab-btn.active {
+    color: #4a9eff;
+    background: #12121f;
+    text-style: bold;
+    border-bottom: solid #4a9eff;
+}
+
+/* ── Body Layout ────────────────────────────────────── */
+
+#body {
+    layout: horizontal;
+}
+
+/* ── Sidebar ────────────────────────────────────────── */
+
+#sidebar {
+    width: 32;
+    background: #0e0e16;
+    border-right: solid #1a1a2e;
+    padding: 1 0;
+}
+
+#sidebar-title {
+    padding: 0 2;
+    color: #3d3d5c;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.sidebar-item {
+    padding: 0 2;
+    height: 1;
+    color: #5a5a7a;
+    background: transparent;
+    border: none;
+    text-align: left;
+    text-style: none;
+    width: 100%;
+}
+
+.sidebar-item:hover {
+    background: #12121f;
+    color: #b8bfd6;
+}
+
+.sidebar-item.selected {
+    color: #4a9eff;
+    background: #0a0a1a;
+    text-style: bold;
+    border-left: thick #4a9eff;
+}
+
+/* ── Main Content ───────────────────────────────────── */
+
+#main-content {
+    width: 1fr;
+    padding: 1 2;
+}
+
+/* ── Dashboard Grid ─────────────────────────────────── */
+
+#dashboard-grid {
+    layout: grid;
+    grid-size: 2 2;
+    grid-gutter: 1;
+    height: 100%;
+}
+
+/* ── Card Widget ────────────────────────────────────── */
+
+.card {
+    background: #0e0e16;
+    border: round #1a1a2e;
+    padding: 1 2;
+    overflow-y: auto;
+}
+
+.card:focus-within {
+    border: round #4a9eff;
+}
+
+.card-title {
+    color: #4a9eff;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.card-subtitle {
+    color: #3d3d5c;
+    margin-bottom: 1;
+}
+
+/* ── System Monitor Card ────────────────────────────── */
+
+.metric-row {
+    layout: horizontal;
+    height: 1;
+    margin-bottom: 0;
+}
+
+.metric-label {
+    width: 14;
+    color: #5a5a7a;
+}
+
+.metric-value {
+    color: #b8bfd6;
+    width: 8;
+    text-style: bold;
+}
+
+/* ── Progress Bars ──────────────────────────────────── */
+
+Bar {
+    width: 1fr;
+    color: #4a9eff;
+    background: #1a1a2e;
+}
+
+Bar.-warning {
+    color: #e8a838;
+}
+
+Bar.-critical {
+    color: #ff4466;
+}
+
+/* ── Log Panel ──────────────────────────────────────── */
+
+#log-panel {
+    background: #0a0a12;
+    border: round #1a1a2e;
+    padding: 1;
+    height: 100%;
+}
+
+#log-panel RichLog {
+    background: #0a0a12;
+    scrollbar-background: #0a0a12;
+    scrollbar-color: #1a1a2e;
+    scrollbar-color-active: #4a9eff;
+    scrollbar-color-hover: #2a2a4e;
+}
+
+/* ── Command Input ──────────────────────────────────── */
+
+#command-bar {
+    dock: bottom;
+    height: 3;
+    background: #0e0e16;
+    border-top: solid #1a1a2e;
+    padding: 0 1;
+    layout: horizontal;
+}
+
+#command-prompt {
+    width: auto;
+    color: #4a9eff;
+    padding: 1 1;
+    text-style: bold;
+}
+
+#command-input {
+    width: 1fr;
+    background: #0a0a12;
+    color: #b8bfd6;
+    border: none;
+    padding: 1 1;
+}
+
+#command-input:focus {
+    border: none;
+    background: #0e0e18;
+}
+
+/* ── Status Bar ─────────────────────────────────────── */
+
+#status-bar {
+    dock: bottom;
+    height: 1;
+    background: #0a0a0f;
+    color: #3d3d5c;
+    padding: 0 2;
+    layout: horizontal;
+}
+
+.status-item {
+    width: auto;
+    margin-right: 2;
+}
+
+.status-item.accent {
+    color: #4a9eff;
+}
+
+.status-item.warn {
+    color: #e8a838;
+}
+
+.status-item.ok {
+    color: #44cc88;
+}
+
+/* ── Process Table ──────────────────────────────────── */
+
+DataTable {
+    background: #0e0e16;
+    color: #b8bfd6;
+    height: 100%;
+}
+
+DataTable > .datatable--header {
+    background: #12121f;
+    color: #4a9eff;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: #1a1a2e;
+    color: #e8e8ff;
+}
+
+DataTable > .datatable--hover {
+    background: #14142a;
+}
+
+/* ── Scrollbar Styling ──────────────────────────────── */
+
+* {
+    scrollbar-background: #0a0a0f;
+    scrollbar-color: #1a1a2e;
+    scrollbar-color-active: #4a9eff;
+    scrollbar-color-hover: #2a2a4e;
+    scrollbar-size-vertical: 1;
+}
+
+/* ── Quick Actions ──────────────────────────────────── */
+
+.quick-action {
+    background: #12121f;
+    color: #5a5a7a;
+    border: round #1a1a2e;
+    padding: 0 2;
+    min-width: 20;
+    height: 3;
+    margin: 0 1;
+    text-style: none;
+}
+
+.quick-action:hover {
+    background: #1a1a2e;
+    color: #4a9eff;
+    border: round #4a9eff;
+}
+
+.quick-action:focus {
+    background: #1a1a2e;
+    color: #4a9eff;
+    border: round #4a9eff;
+}
+
+/* ── Footer Hints ───────────────────────────────────── */
+
+Footer {
+    background: #0a0a0f;
+    color: #3d3d5c;
+}
+
+Footer > .footer--key {
+    background: #1a1a2e;
+    color: #4a9eff;
+}
+
+Footer > .footer--description {
+    color: #5a5a7a;
+}

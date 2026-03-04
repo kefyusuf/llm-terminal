@@ -1,9 +1,11 @@
 import re
-import time
+import threading
 
 import requests
 from bs4 import BeautifulSoup
 
+import cache_db
+import config
 from utils import (
     calculate_fit,
     determine_use_case,
@@ -11,20 +13,30 @@ from utils import (
     estimate_model_size_gb,
     extract_params,
     infer_quant_from_name,
+    parse_retry_after_seconds,
 )
 
+_ollama_meta_cache_lock = threading.Lock()
 
-OLLAMA_MODEL_META_CACHE = {}
-OLLAMA_MODEL_META_TTL_SECONDS = 900
+
+def _init_ollama_cache():
+    cache_db.init_db()
+
+
+_init_ollama_cache()
 
 
 def get_installed_ollama_models():
+    """Return a list of locally installed Ollama model name prefixes (lowercase).
+
+    Queries the Ollama REST API at ``http://localhost:11434``.
+    Returns an empty list if Ollama is not running or the request fails.
+    """
     try:
-        response = requests.get("http://localhost:11434/api/tags", timeout=1)
+        response = requests.get(f"{config.settings.ollama_api_base}/api/tags", timeout=1)
         if response.status_code == 200:
             return [
-                model["name"].split(":")[0].lower()
-                for model in response.json().get("models", [])
+                model["name"].split(":")[0].lower() for model in response.json().get("models", [])
             ]
     except (requests.RequestException, ValueError):
         return []
@@ -32,16 +44,15 @@ def get_installed_ollama_models():
 
 
 def _retry_after_from_response(response):
-    retry_after = response.headers.get("Retry-After")
-    if not retry_after:
-        return None
-    try:
-        return int(retry_after)
-    except (TypeError, ValueError):
-        return None
+    """Return the ``Retry-After`` delay in seconds from an HTTP response, or ``None``."""
+    return parse_retry_after_seconds(response.headers.get("Retry-After"))
 
 
 def _parse_size_gb(size_text):
+    """Parse a human-readable size string (e.g. ``"4.7GB"`` or ``"780 MB"``) into GB.
+
+    Returns a ``float``, or ``None`` when the string cannot be parsed.
+    """
     text = (size_text or "").strip().upper().replace(" ", "")
     match = re.search(r"(\d+(?:\.\d+)?)(GB|MB)", text)
     if not match:
@@ -56,6 +67,12 @@ def _parse_size_gb(size_text):
 
 
 def _extract_models_table_rows(html_text, model_name=None):
+    """Extract model-variant rows from the Ollama library HTML page.
+
+    Parses table rows first; falls back to card-style anchor links when no
+    suitable table is found.  Returns a list of dicts with keys
+    ``name``, ``size_text``, ``size_gb``.
+    """
     soup = BeautifulSoup(html_text, "html.parser")
     for table in soup.find_all("table"):
         headers = [th.get_text(strip=True).lower() for th in table.find_all("th")]
@@ -110,6 +127,11 @@ def _extract_models_table_rows(html_text, model_name=None):
 
 
 def _select_preferred_model_variant(model_name, rows):
+    """Select the best model variant from *rows*, preferring ``:latest`` tags.
+
+    Returns the first matching row dict with a valid ``size_gb``, or
+    ``None`` when no suitable variant exists.
+    """
     preferred_exact = f"{model_name}:latest"
     for row in rows:
         if row["name"].lower() == preferred_exact.lower() and row.get("size_gb"):
@@ -127,11 +149,17 @@ def _select_preferred_model_variant(model_name, rows):
 
 
 def get_ollama_model_metadata(model_name):
+    """Fetch size and quantisation metadata for *model_name* from ollama.com.
+
+    Results are cached in SQLite for 24 hours.
+    Returns a dict with keys ``size_gb``, ``size_text``, ``variant``,
+    ``quant``, and ``params``, or ``None`` on failure.
+    """
     cache_key = model_name.lower()
-    now = time.time()
-    cached = OLLAMA_MODEL_META_CACHE.get(cache_key)
-    if cached and (now - cached["timestamp"]) <= OLLAMA_MODEL_META_TTL_SECONDS:
-        return cached["value"]
+
+    cached = cache_db.get_model_cache("ollama", cache_key)
+    if cached is not None:
+        return cached
 
     metadata = None
     try:
@@ -139,12 +167,10 @@ def get_ollama_model_metadata(model_name):
         detail_response = requests.get(
             detail_url,
             headers={"User-Agent": "Mozilla/5.0"},
-            timeout=5,
+            timeout=config.settings.ollama_timeout,
         )
         if detail_response.status_code == 200:
-            rows = _extract_models_table_rows(
-                detail_response.text, model_name=model_name
-            )
+            rows = _extract_models_table_rows(detail_response.text, model_name=model_name)
             chosen = _select_preferred_model_variant(model_name, rows)
             if chosen and chosen.get("size_gb"):
                 variant_name = chosen.get("name", model_name)
@@ -158,25 +184,45 @@ def get_ollama_model_metadata(model_name):
     except requests.RequestException:
         metadata = None
 
-    OLLAMA_MODEL_META_CACHE[cache_key] = {"timestamp": now, "value": metadata}
+    if metadata is not None:
+        with _ollama_meta_cache_lock:
+            cache_db.set_model_cache("ollama", cache_key, metadata)
+
     return metadata
 
 
-def search_ollama_models(query, specs, local_models):
+def search_ollama_models(query, specs, local_models, page=0, page_size=15):
+    """Search the Ollama model registry for models matching *query*.
+
+    Scrapes ``ollama.com/search``.  Returns
+    ``(results: list[dict], errors: list[str], has_more_pages: bool)``.
+
+    Note: Ollama uses htmx infinite scroll, not traditional pagination.
+    The page parameter is ignored - we always fetch all results.
+
+    Args:
+        query: Free-text search string.
+        specs: Hardware specification dict.
+        local_models: List of locally installed models.
+        page: Page number (ignored).
+        page_size: Results per page (used for slicing).
+    """
     results = []
     errors = []
     found_keys = set()
+    html_text = ""
 
     try:
+        # Ollama doesn't support page-based pagination via URL
+        # Always fetch from page 1 and get all results
         url = f"https://ollama.com/search?q={query}"
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=config.settings.ollama_timeout)
+
         if response.status_code == 429:
             retry_after = _retry_after_from_response(response)
             if retry_after is not None:
-                errors.append(
-                    f"Ollama registry rate-limited (429). Retry in {retry_after}s."
-                )
+                errors.append(f"Ollama registry rate-limited (429). Retry in {retry_after}s.")
             else:
                 errors.append("Ollama registry rate-limited (429). Retry shortly.")
             return results, errors
@@ -184,12 +230,11 @@ def search_ollama_models(query, specs, local_models):
             errors.append(f"Ollama registry unavailable (HTTP {response.status_code}).")
             return results, errors
         if response.status_code != 200:
-            errors.append(
-                f"Ollama registry request failed (HTTP {response.status_code})."
-            )
+            errors.append(f"Ollama registry request failed (HTTP {response.status_code}).")
             return results, errors
 
-        soup = BeautifulSoup(response.text, "html.parser")
+        html_text = response.text
+        soup = BeautifulSoup(html_text, "html.parser")
         for anchor in soup.find_all("a", href=True):
             href = anchor.get("href")
             if not isinstance(href, str):
@@ -214,14 +259,10 @@ def search_ollama_models(query, specs, local_models):
                         re.IGNORECASE,
                     )
 
-            score_str = (
-                f"[cyan]📥 {pulls.group(1)}[/cyan]" if pulls else "[grey50]-[/grey50]"
-            )
+            score_str = f"[cyan]📥 {pulls.group(1)}[/cyan]" if pulls else "[grey50]-[/grey50]"
             params = extract_params(model_name)
             inst = (
-                "[green]✔[/green]"
-                if model_name.lower() in local_models
-                else "[grey37]-[/grey37]"
+                "[green]✔[/green]" if model_name.lower() in local_models else "[grey37]-[/grey37]"
             )
             use_case = determine_use_case(model_name)
             use_case_key = determine_use_case_key(model_name)
@@ -261,9 +302,7 @@ def search_ollama_models(query, specs, local_models):
                     "mode": mode_str,
                     "fit": fit_str,
                     "size": (
-                        f"{size_gb:.1f} GB"
-                        if size_source == "exact"
-                        else f"~{size_gb:.1f} GB"
+                        f"{size_gb:.1f} GB" if size_source == "exact" else f"~{size_gb:.1f} GB"
                     ),
                 }
             )
@@ -276,4 +315,11 @@ def search_ollama_models(query, specs, local_models):
     except (ValueError, AttributeError) as exc:
         errors.append(f"Ollama parse failed: {exc}")
 
-    return results, errors
+    # Ollama returns all results at once (no pagination support)
+    # Slice to page_size for consistency with HF pagination
+    limited_results = results[:page_size] if len(results) > page_size else results
+
+    # has_more_pages is True if we have more results than page_size
+    has_more_pages = len(results) > page_size
+
+    return limited_results, errors, has_more_pages

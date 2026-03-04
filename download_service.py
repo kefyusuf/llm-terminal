@@ -1,5 +1,5 @@
 import json
-import re
+import os
 import sqlite3
 import subprocess
 import sys
@@ -15,6 +15,7 @@ from download_manager import (
     download_target_id,
     normalize_target_id,
 )
+from utils import extract_download_progress
 
 
 DB_PATH = Path(__file__).resolve().with_name("downloads.db")
@@ -77,9 +78,7 @@ class DownloadStore:
                     update_rows.append((normalized, row_id))
 
             for normalized, row_id in update_rows:
-                conn.execute(
-                    "UPDATE jobs SET target_id = ? WHERE id = ?", (normalized, row_id)
-                )
+                conn.execute("UPDATE jobs SET target_id = ? WHERE id = ?", (normalized, row_id))
 
             for row_id in delete_ids:
                 conn.execute("DELETE FROM jobs WHERE id = ?", (row_id,))
@@ -156,9 +155,7 @@ class DownloadStore:
 
     def get_job_by_target(self, target_id):
         with self.lock, self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM jobs WHERE target_id = ?", (target_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()
         return self._row_to_dict(row)
 
     def upsert_job(self, model):
@@ -214,9 +211,7 @@ class DownloadStore:
                     ),
                 )
 
-            row = conn.execute(
-                "SELECT * FROM jobs WHERE target_id = ?", (target_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()
         return self._row_to_dict(row), True
 
     def mark_cancel_requested(self, target_id):
@@ -226,9 +221,7 @@ class DownloadStore:
                 "UPDATE jobs SET cancel_requested = 1, updated_at = ? WHERE target_id = ?",
                 (now, target_id),
             )
-            row = conn.execute(
-                "SELECT * FROM jobs WHERE target_id = ?", (target_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()
         return self._row_to_dict(row)
 
     def claim_next_queued(self):
@@ -243,14 +236,10 @@ class DownloadStore:
                 "UPDATE jobs SET status = 'running', detail = 'Starting', updated_at = ? WHERE id = ?",
                 (now, row["id"]),
             )
-            updated = conn.execute(
-                "SELECT * FROM jobs WHERE id = ?", (row["id"],)
-            ).fetchone()
+            updated = conn.execute("SELECT * FROM jobs WHERE id = ?", (row["id"],)).fetchone()
         return self._row_to_dict(updated)
 
-    def update_job(
-        self, target_id, status=None, detail=None, progress=None, return_code=None
-    ):
+    def update_job(self, target_id, status=None, detail=None, progress=None, return_code=None):
         now = time.time()
         fields = ["updated_at = ?"]
         values = [now]
@@ -273,9 +262,7 @@ class DownloadStore:
                 f"UPDATE jobs SET {', '.join(fields)} WHERE target_id = ?",
                 tuple(values),
             )
-            row = conn.execute(
-                "SELECT * FROM jobs WHERE target_id = ?", (target_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()
         return self._row_to_dict(row)
 
     def get_command(self, target_id):
@@ -339,16 +326,23 @@ STATE = DownloadServiceState()
 
 
 def _service_popen_kwargs():
+    import config
+
     kwargs = {}
     if sys.platform.startswith("win"):
         kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    # Add HF token to environment if available
+    env = os.environ.copy()
+    hf_token = getattr(config.settings, "hf_token", None)
+    if hf_token:
+        env["HF_TOKEN"] = hf_token
+        env["AIMODEL_HF_TOKEN"] = hf_token
+    kwargs["env"] = env
     return kwargs
 
 
 def _can_terminate_process(process):
-    return hasattr(process, "terminate") and callable(
-        getattr(process, "terminate", None)
-    )
+    return hasattr(process, "terminate") and callable(getattr(process, "terminate", None))
 
 
 def _has_duplicates(values):
@@ -356,13 +350,9 @@ def _has_duplicates(values):
 
 
 def _extract_progress(line):
-    match = re.search(r"(\d{1,3})%", line)
-    if not match:
-        return None
-    value = int(match.group(1))
-    if 0 <= value <= 100:
-        return f"{value}%"
-    return None
+    """Wrap :func:`utils.extract_download_progress` returning a ``"N%"`` string."""
+    value = extract_download_progress(line)
+    return f"{value}%" if value is not None else None
 
 
 def worker_loop():
@@ -380,9 +370,7 @@ def worker_loop():
         target_id = job["target_id"]
         latest = STATE.store.get_job_by_target(target_id)
         if latest and latest.get("cancel_requested"):
-            STATE.store.update_job(
-                target_id, status="cancelled", detail="Canceled", progress=""
-            )
+            STATE.store.update_job(target_id, status="cancelled", detail="Canceled", progress="")
             continue
 
         try:
@@ -438,8 +426,7 @@ def worker_loop():
                                 except OSError:
                                     pass
                             elif (
-                                process.poll() is None
-                                and (time.monotonic() - cancel_sent_at) > 1.5
+                                process.poll() is None and (time.monotonic() - cancel_sent_at) > 1.5
                             ):
                                 try:
                                     process.kill()
@@ -581,9 +568,7 @@ def worker_loop():
                 return_code=127,
             )
         except OSError as exc:
-            STATE.store.update_job(
-                target_id, status="failed", detail=str(exc)[:180], return_code=1
-            )
+            STATE.store.update_job(target_id, status="failed", detail=str(exc)[:180], return_code=1)
         finally:
             STATE.clear_process(target_id)
 
@@ -621,8 +606,7 @@ class Handler(BaseHTTPRequestHandler):
                     "count": len(active_targets),
                     "has_duplicates": _has_duplicates(active_targets),
                     "worker_alive": bool(
-                        STATE.worker_thread is not None
-                        and STATE.worker_thread.is_alive()
+                        STATE.worker_thread is not None and STATE.worker_thread.is_alive()
                     ),
                 },
             )
