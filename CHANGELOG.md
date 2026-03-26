@@ -46,6 +46,7 @@
 - Restored a lightweight single-row "search in progress" placeholder in the results table without per-progress redraw churn.
 - Hardened modal rendering for transient/unknown states (e.g., `canceling`) and missing fields to prevent popup crashes.
 - Added safe-guarded table/debug widget updates so background polling does not crash when modal screens are active.
+- Guarded `update_status()` when `#status-bar` is not available and reordered HF detail status update before opening modal.
 
 ## 1.0.0 - 2026-03-04
 

@@ -890,7 +890,10 @@ class AIModelViewer(App):
 
     def update_status(self, text):
         """Update the status bar at the bottom of the screen with *text*."""
-        self.query_one("#status-bar", Static).update(text)
+        try:
+            self.query_one("#status-bar", Static).update(text)
+        except Exception:
+            return
 
     def update_system_info(self):
         """Compatibility wrapper that triggers an async system-info refresh."""
@@ -1580,8 +1583,8 @@ class AIModelViewer(App):
                     self.all_results[idx] = enriched_model
                     break
             self.refresh_table()
-        self.open_model_detail_modal(enriched_model)
         self.update_status("Detailed metadata loaded.")
+        self.open_model_detail_modal(enriched_model)
 
     @work(thread=True)
     def run_search_worker(
