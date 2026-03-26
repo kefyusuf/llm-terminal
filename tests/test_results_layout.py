@@ -33,6 +33,21 @@ def test_column_keys_for_width_compact_mode_layout():
     ]
 
 
+def test_column_keys_for_width_compact_mode_wide_layout():
+    assert column_keys_for_width(180, compact=True) == [
+        "inst",
+        "source",
+        "name",
+        "params",
+        "score",
+        "quant",
+        "fit",
+        "mode",
+        "use_case",
+        "download",
+    ]
+
+
 def test_compute_column_widths_preserves_minimums():
     keys = ["inst", "source", "name", "score", "download"]
     widths = compute_column_widths(keys, available_width=95)

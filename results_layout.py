@@ -18,7 +18,17 @@ MIN_COLUMN_WIDTHS = {
 }
 
 EXPANDABLE_COLUMNS = ("name", "publisher", "use_case", "download")
-COMPACT_EXPANDABLE_COLUMNS = ("score", "fit", "params", "quant", "use_case", "name")
+COMPACT_EXPANDABLE_COLUMNS = (
+    "score",
+    "fit",
+    "params",
+    "quant",
+    "use_case",
+    "mode",
+    "download",
+    "source",
+    "name",
+)
 
 COMPACT_MAX_COLUMN_WIDTHS = {
     "name": 32,
@@ -33,6 +43,19 @@ COMPACT_MAX_COLUMN_WIDTHS = {
 def column_keys_for_width(available_width: int, *, compact: bool = False) -> list[str]:
     """Return visible column keys based on available table width."""
     if compact:
+        if available_width >= 170:
+            return [
+                "inst",
+                "source",
+                "name",
+                "params",
+                "score",
+                "quant",
+                "fit",
+                "mode",
+                "use_case",
+                "download",
+            ]
         if available_width >= 130:
             return ["inst", "name", "params", "score", "quant", "fit", "use_case"]
         if available_width >= 110:

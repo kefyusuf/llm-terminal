@@ -66,6 +66,8 @@
 - Added compact-mode status hint text on view toggle to preserve discoverability of keyboard controls.
 - Tuned compact column width distribution to cap oversized `Model` growth and prevent large empty middle gaps.
 - Increased fit-column effective width in row rendering to avoid `Partial` values truncating to `Per...`.
+- Added a wider compact breakpoint that includes `Source/Mode/Download` columns to better use horizontal space on large terminals.
+- Expanded compact width-growth order to spread extra width across more columns instead of leaving right-side dead area.
 
 ## 1.0.0 - 2026-03-04
 
