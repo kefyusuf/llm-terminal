@@ -17,6 +17,20 @@ MIN_COLUMN_WIDTHS = {
     "download": 4,
 }
 
+COMPACT_MIN_COLUMN_WIDTHS = {
+    "inst": 4,
+    "source": 6,
+    "publisher": 6,
+    "name": 14,
+    "params": 5,
+    "use_case": 6,
+    "score": 7,
+    "quant": 5,
+    "mode": 6,
+    "fit": 7,
+    "download": 5,
+}
+
 EXPANDABLE_COLUMNS = ("name", "publisher", "use_case", "download")
 COMPACT_EXPANDABLE_COLUMNS = (
     "score",
@@ -31,19 +45,22 @@ COMPACT_EXPANDABLE_COLUMNS = (
 )
 
 COMPACT_MAX_COLUMN_WIDTHS = {
-    "name": 32,
-    "use_case": 14,
-    "score": 10,
-    "params": 8,
-    "quant": 8,
-    "fit": 10,
+    "name": 28,
+    "source": 10,
+    "use_case": 16,
+    "score": 12,
+    "params": 9,
+    "quant": 9,
+    "fit": 11,
+    "mode": 10,
+    "download": 9,
 }
 
 
 def column_keys_for_width(available_width: int, *, compact: bool = False) -> list[str]:
     """Return visible column keys based on available table width."""
     if compact:
-        if available_width >= 170:
+        if available_width >= 160:
             return [
                 "inst",
                 "source",
@@ -56,12 +73,24 @@ def column_keys_for_width(available_width: int, *, compact: bool = False) -> lis
                 "use_case",
                 "download",
             ]
-        if available_width >= 130:
+        if available_width >= 140:
+            return [
+                "inst",
+                "name",
+                "params",
+                "score",
+                "quant",
+                "fit",
+                "use_case",
+                "mode",
+                "download",
+            ]
+        if available_width >= 122:
+            return ["inst", "name", "params", "score", "quant", "fit", "use_case", "download"]
+        if available_width >= 108:
             return ["inst", "name", "params", "score", "quant", "fit", "use_case"]
-        if available_width >= 110:
-            return ["inst", "name", "params", "score", "quant", "fit"]
-        if available_width >= 95:
-            return ["inst", "name", "score", "quant", "fit"]
+        if available_width >= 96:
+            return ["inst", "name", "score", "quant", "fit", "use_case"]
         return ["inst", "name", "score", "fit"]
 
     if available_width >= 140:
@@ -101,7 +130,11 @@ def compute_column_widths(
     """Compute responsive widths for visible result-table columns."""
     separator_budget = len(next_keys) + 2
     target_content_width = max(40, available_width - separator_budget)
-    base_widths = {key: MIN_COLUMN_WIDTHS[key] for key in next_keys}
+    min_widths = dict(MIN_COLUMN_WIDTHS)
+    if compact:
+        min_widths.update(COMPACT_MIN_COLUMN_WIDTHS)
+
+    base_widths = {key: min_widths[key] for key in next_keys}
     min_total = sum(base_widths.values())
     extra = max(0, target_content_width - min_total)
 
@@ -120,5 +153,16 @@ def compute_column_widths(
                 expanded = True
         if not expanded:
             break
+
+    if compact and extra > 0:
+        fill_order = [key for key in next_keys if key != "name"]
+        if not fill_order:
+            fill_order = list(next_keys)
+        while extra > 0:
+            for key in fill_order:
+                if extra <= 0:
+                    break
+                base_widths[key] += 1
+                extra -= 1
 
     return base_widths

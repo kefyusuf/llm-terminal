@@ -30,6 +30,7 @@ def test_column_keys_for_width_compact_mode_layout():
         "score",
         "quant",
         "fit",
+        "use_case",
     ]
 
 
@@ -69,5 +70,14 @@ def test_compute_column_widths_distributes_extra_to_expandables():
 def test_compute_column_widths_compact_caps_name_growth():
     keys = ["inst", "name", "params", "score", "quant", "fit", "use_case"]
     widths = compute_column_widths(keys, available_width=220, compact=True)
-    assert widths["name"] <= 32
+    assert widths["name"] <= 28
     assert widths["fit"] >= 8
+
+
+def test_compute_column_widths_compact_consumes_extra_space():
+    keys = ["inst", "name", "params", "score", "quant", "fit", "use_case"]
+    available_width = 150
+    widths = compute_column_widths(keys, available_width=available_width, compact=True)
+    separator_budget = len(keys) + 2
+    target_content_width = max(40, available_width - separator_budget)
+    assert sum(widths.values()) == target_content_width
