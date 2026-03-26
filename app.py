@@ -1365,7 +1365,10 @@ class AIModelViewer(App):
             self.request_download_history_refresh()
 
     def refresh_download_history_table(self):
-        table = self.query_one("#download-history-table", DataTable)
+        try:
+            table = self.query_one("#download-history-table", DataTable)
+        except Exception:
+            return
         table.clear()
 
         entries = sorted(
@@ -1399,7 +1402,10 @@ class AIModelViewer(App):
         if force or (
             now - self.last_download_history_refresh_at >= self.download_history_refresh_interval
         ):
-            self.refresh_download_history_table()
+            try:
+                self.refresh_download_history_table()
+            except Exception:
+                return
             self.last_download_history_refresh_at = now
             self.download_history_refresh_pending = False
             return
@@ -1529,27 +1535,26 @@ class AIModelViewer(App):
         self.request_download_poll(force=True)
 
     def _render_download_debug(self, debug=None, health=None):
+        try:
+            debug_widget = self.query_one("#downloads-debug", Static)
+        except Exception:
+            return
+
         if debug is not None:
             count = debug.get("count", 0)
             has_duplicates = bool(debug.get("has_duplicates", False))
             worker_alive = bool(debug.get("worker_alive", True))
             dup_text = "yes" if has_duplicates else "no"
             worker_text = "up" if worker_alive else "down"
-            self.query_one("#downloads-debug", Static).update(
-                f"Workers: {count} ({worker_text}) | Duplicates: {dup_text}"
-            )
+            debug_widget.update(f"Workers: {count} ({worker_text}) | Duplicates: {dup_text}")
             return
 
         if health is not None:
             version = health.get("version", "unknown")
-            self.query_one("#downloads-debug", Static).update(
-                f"Workers: legacy service ({version}) | Duplicates: unknown"
-            )
+            debug_widget.update(f"Workers: legacy service ({version}) | Duplicates: unknown")
             return
 
-        self.query_one("#downloads-debug", Static).update(
-            "Workers: unavailable | Duplicates: unknown"
-        )
+        debug_widget.update("Workers: unavailable | Duplicates: unknown")
 
     def _mark_ollama_model_installed(self, model_name):
         for item in self.all_results:
@@ -1717,8 +1722,11 @@ class AIModelViewer(App):
         self._update_pagination_controls()
 
     def refresh_table(self):
-        self._configure_results_table_columns()
-        table = self.query_one("#results-table", DataTable)
+        try:
+            self._configure_results_table_columns()
+            table = self.query_one("#results-table", DataTable)
+        except Exception:
+            return
         prev_cursor_row = table.cursor_row
         prev_scroll_x = table.scroll_x
         prev_scroll_y = table.scroll_y
