@@ -53,7 +53,8 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "download_manager", "download_service", "hardware",
-                     "models", "providers", "service_client", "utils"]
+                     "models", "providers", "service_client", "utils",
+                     "download_status", "search_cache"]
 
 # ---------------------------------------------------------------------------
 # Mypy — static type checking

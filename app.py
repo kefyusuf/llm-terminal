@@ -16,6 +16,7 @@ from download_manager import download_target_id
 from hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
+from search_cache import SearchCache
 from service_client import (
     cancel_job,
     create_job,
@@ -543,11 +544,12 @@ class AIModelViewer(App):
         self.search_counter = 0
         self.active_search_id = 0
         self.hf_model_info_cache = {}
-        self.search_cache = {}
-        self.search_cache_ttl_seconds = config.settings.search_cache_ttl_seconds
-        self.search_cache_max_entries = config.settings.search_cache_max_entries
-        self.search_cache_ram_threshold_gb = config.settings.search_cache_ram_threshold_gb
-        self.search_cache_vram_threshold_gb = config.settings.search_cache_vram_threshold_gb
+        self.search_cache = SearchCache(
+            ttl_seconds=config.settings.search_cache_ttl_seconds,
+            max_entries=config.settings.search_cache_max_entries,
+            ram_threshold_gb=config.settings.search_cache_ram_threshold_gb,
+            vram_threshold_gb=config.settings.search_cache_vram_threshold_gb,
+        )
         self.system_metrics_timer = None
         self.ollama_status_timer = None
         self.download_status_timer = None
@@ -1012,7 +1014,7 @@ class AIModelViewer(App):
         provider_name = "Hugging Face" if providers == ["huggingface"] else "Ollama"
         self.on_search_progress(self.active_search_id, f"Searching {provider_name}: {query}")
 
-        cached = self._get_cached_search(query_key, current_specs)
+        cached = self.search_cache.get(query_key, current_specs)
         if cached:
             self.all_results = [item.copy() for item in cached["results"]]
             self._ensure_download_fields()
@@ -1056,59 +1058,6 @@ class AIModelViewer(App):
             return ["huggingface"]
         else:
             return ["ollama"]
-
-    def _is_cache_compatible(self, current_specs, cached_specs):
-        if not cached_specs:
-            return True
-        if current_specs.get("has_gpu") != cached_specs.get("has_gpu"):
-            return False
-
-        ram_delta = abs(current_specs.get("ram_free", 0.0) - cached_specs.get("ram_free", 0.0))
-        if ram_delta > self.search_cache_ram_threshold_gb:
-            return False
-
-        if current_specs.get("has_gpu"):
-            vram_delta = abs(
-                current_specs.get("vram_free", 0.0) - cached_specs.get("vram_free", 0.0)
-            )
-            if vram_delta > self.search_cache_vram_threshold_gb:
-                return False
-
-        return True
-
-    def _get_cached_search(self, query_key, current_specs):
-        entry = self.search_cache.get(query_key)
-        if not entry:
-            return None
-
-        age = time.monotonic() - entry["timestamp"]
-        if age > self.search_cache_ttl_seconds:
-            self.search_cache.pop(query_key, None)
-            return None
-        if not self._is_cache_compatible(current_specs, entry.get("specs")):
-            self.search_cache.pop(query_key, None)
-            return None
-        return entry
-
-    def _store_cached_search(self, query_key, results, error):
-        specs = self.monitor.get_specs()
-        self.search_cache[query_key] = {
-            "timestamp": time.monotonic(),
-            "results": [item.copy() for item in results],
-            "error": error,
-            "has_more_pages": self.has_more_pages,
-            "specs": {
-                "has_gpu": specs.get("has_gpu", False),
-                "ram_free": specs.get("ram_free", 0.0),
-                "vram_free": specs.get("vram_free", 0.0),
-            },
-        }
-        if len(self.search_cache) > self.search_cache_max_entries:
-            oldest_key = min(
-                self.search_cache,
-                key=lambda key: self.search_cache[key]["timestamp"],
-            )
-            self.search_cache.pop(oldest_key, None)
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         if event.radio_set.id == "use-case-filter":
@@ -1774,7 +1723,13 @@ class AIModelViewer(App):
                 f"HF: {result_count} results, has_more={self.has_more_pages}, page={self.current_page}",
             )
 
-        self._store_cached_search(query_key, self.all_results, self.last_search_error)
+        self.search_cache.set(
+            query_key,
+            results=self.all_results,
+            error=self.last_search_error,
+            has_more_pages=self.has_more_pages,
+            specs=specs,
+        )
         self.call_from_thread(self.on_search_completed, search_id)
 
     def on_search_completed(self, search_id: int) -> None:

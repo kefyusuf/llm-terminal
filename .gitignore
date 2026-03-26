@@ -9,7 +9,6 @@ cache.db
 PAGINATION_*.md
 reset_all.bat
 reset_downloads.py
-cache_db.py
 nul
 models/*.gguf
 models/.cache/
