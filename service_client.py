@@ -55,9 +55,9 @@ def is_service_running():
         return False
 
 
-def get_service_health():
+def get_service_health(timeout=1.0):
     """Return the ``/health`` response dict from the download service."""
-    return _request("GET", "/health", timeout=1.0)
+    return _request("GET", "/health", timeout=timeout)
 
 
 def is_service_compatible(health):
@@ -162,15 +162,15 @@ def ensure_service_running():
     return _wait_for_service(deadline_seconds=6.0)
 
 
-def list_jobs(limit=50):
+def list_jobs(limit=50, timeout=2.0):
     """Return a list of download job dicts from the service (most recent first)."""
-    data = _request("GET", f"/jobs?limit={int(limit)}", timeout=2.0)
+    data = _request("GET", f"/jobs?limit={int(limit)}", timeout=timeout)
     return data.get("jobs", [])
 
 
-def get_active_download_debug():
+def get_active_download_debug(timeout=2.0):
     """Return the ``/debug/active`` diagnostic dict from the service."""
-    return _request("GET", "/debug/active", timeout=2.0)
+    return _request("GET", "/debug/active", timeout=timeout)
 
 
 def create_job(model):

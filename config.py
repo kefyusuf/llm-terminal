@@ -39,14 +39,15 @@ class Settings(BaseSettings):
     download_service_host: str = "127.0.0.1"
     download_service_port: int = 8765
     download_history_limit: int = 50
-    download_history_refresh_interval: float = 0.5
+    download_history_refresh_interval: float = 0.9
+    download_poll_request_timeout: float = 0.35
 
     # Hardware monitoring
     hardware_poll_interval: float = 3.0
-    ollama_status_poll_interval: float = 0.5
+    ollama_status_poll_interval: float = 1.5
 
     # UI settings
-    ui_download_poll_interval: float = 1.0
+    ui_download_poll_interval: float = 1.5
 
 
 settings = Settings()

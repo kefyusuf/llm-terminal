@@ -606,6 +606,7 @@ class AIModelViewer(App):
         self.download_history_refresh_interval = config.settings.download_history_refresh_interval
         self.last_download_history_refresh_at = 0.0
         self.download_history_refresh_pending = False
+        self.download_poll_request_timeout = config.settings.download_poll_request_timeout
         self.results_column_keys = []
         self.results_column_widths = {}
         self.current_page = 0
@@ -1232,7 +1233,10 @@ class AIModelViewer(App):
 
     def sync_download_jobs_from_service(self, force=False):
         try:
-            jobs = list_jobs(limit=self.download_history_limit)
+            jobs = list_jobs(
+                limit=self.download_history_limit,
+                timeout=self.download_poll_request_timeout,
+            )
         except Exception:
             return
 
@@ -1411,7 +1415,7 @@ class AIModelViewer(App):
 
     def refresh_download_debug(self):
         try:
-            debug = get_active_download_debug()
+            debug = get_active_download_debug(timeout=self.download_poll_request_timeout)
             count = debug.get("count", 0)
             has_duplicates = bool(debug.get("has_duplicates", False))
             worker_alive = bool(debug.get("worker_alive", True))
@@ -1422,7 +1426,7 @@ class AIModelViewer(App):
             )
         except Exception:
             try:
-                health = get_service_health()
+                health = get_service_health(timeout=self.download_poll_request_timeout)
                 version = health.get("version", "unknown")
                 self.query_one("#downloads-debug", Static).update(
                     f"Workers: legacy service ({version}) | Duplicates: unknown"

@@ -37,6 +37,8 @@
 - Added generation-guarded resize debounce and reduced unconditional download-history redraws in poll loop.
 - Debounced search dispatch on rapid filter/query changes to prevent stacked worker threads and delayed UI response.
 - Reduced `on_search_progress()` UI churn by throttling duplicate progress updates and skipping expensive table redraws.
+- Added fast-timeout polling settings for download service UI refresh (`download_poll_request_timeout`) and applied them in app polling paths.
+- Relaxed default UI polling intervals (`ollama_status_poll_interval`, `ui_download_poll_interval`, `download_history_refresh_interval`) to reduce main-thread pressure.
 
 ## 1.0.0 - 2026-03-04
 
