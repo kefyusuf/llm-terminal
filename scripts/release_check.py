@@ -8,6 +8,7 @@ if str(ROOT) not in sys.path:
 
 from providers.hf_provider import search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
+from release_check_helpers import unpack_search_output
 
 
 TEST_SPECS = {
@@ -42,15 +43,13 @@ def check_hf_search():
 
 def check_ollama_search():
     local_models = get_installed_ollama_models()
-    search_output = search_ollama_models(
-        query="llama",
-        specs=TEST_SPECS,
-        local_models=local_models,
+    results, errors = unpack_search_output(
+        search_ollama_models(
+            query="llama",
+            specs=TEST_SPECS,
+            local_models=local_models,
+        )
     )
-    if len(search_output) == 3:
-        results, errors, _has_more_pages = search_output
-    else:
-        results, errors = search_output
     if errors:
         raise RuntimeError("; ".join(errors))
     if not results:

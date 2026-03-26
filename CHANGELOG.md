@@ -26,6 +26,8 @@
 - Polished status-bar messaging for provider switches, hidden-gem toggles, external-download actions, and no-results guidance.
 - Standardized model-data delete status text (removed icon-based phrasing and aligned wording).
 - Fixed `scripts/release_check.py` Ollama check to support current `search_ollama_models` return shape.
+- Added `release_check_helpers.unpack_search_output` to normalize provider search outputs in release preflight.
+- Added unit tests for release-check search output normalization.
 
 ## 1.0.0 - 2026-03-04
 
