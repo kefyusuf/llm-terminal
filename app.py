@@ -23,6 +23,15 @@ from hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
 from results_layout import column_keys_for_width, compute_column_widths
+from results_presenter import (
+    download_cell_markup,
+    fit_cell_markup,
+    installed_cell_markup,
+    mode_cell_markup,
+    score_cell_markup,
+    source_cell_markup,
+    use_case_cell_markup,
+)
 from results_view import filter_results_for_view, result_unique_key
 from search_cache import SearchCache
 from search_orchestration import (
@@ -788,108 +797,62 @@ class AIModelViewer(App):
         }
 
     def _fit_cell_markup(self, fit_text):
-        plain = self._truncate_plain_cell(fit_text, 20)
-        width = max(5, self.results_column_widths.get("fit", 7) - 1)
-        plain = self._align_plain_cell(plain, width, "left")
-        lowered = plain.lower()
-        if "perfect" in lowered or lowered == "fit":
-            return f"[bold #4fe08a]{plain}[/bold #4fe08a]"
-        if "partial" in lowered or "slow" in lowered:
-            return f"[bold #f2c46d]{plain}[/bold #f2c46d]"
-        if "no fit" in lowered or "tight" in lowered:
-            return f"[bold #ff7f8f]{plain}[/bold #ff7f8f]"
-        return plain
+        return fit_cell_markup(
+            fit_text,
+            width=max(5, self.results_column_widths.get("fit", 7) - 1),
+            truncate_plain=self._truncate_plain_cell,
+            align_plain=self._align_plain_cell,
+        )
 
     def _mode_cell_markup(self, mode_text):
-        plain = self._truncate_plain_cell(mode_text, 20)
-        width = max(5, self.results_column_widths.get("mode", 8) - 1)
-        plain = self._align_plain_cell(plain, width, "left")
-        lowered = plain.lower()
-        if "gpu+cpu" in lowered:
-            return f"[bold #f2c46d]{plain}[/bold #f2c46d]"
-        if "gpu" in lowered:
-            return f"[bold #4fe08a]{plain}[/bold #4fe08a]"
-        if "cpu" in lowered:
-            return f"[bold #f2c46d]{plain}[/bold #f2c46d]"
-        return f"[#ff7f8f]{plain}[/#ff7f8f]" if plain != "-" else plain
+        return mode_cell_markup(
+            mode_text,
+            width=max(5, self.results_column_widths.get("mode", 8) - 1),
+            truncate_plain=self._truncate_plain_cell,
+            align_plain=self._align_plain_cell,
+        )
 
     def _installed_cell_markup(self, installed_text):
-        plain = self._truncate_plain_cell(installed_text, 8)
-        if "✔" in plain or "installed" in plain.lower():
-            marker = "●"
-        else:
-            marker = "·"
-        width = max(3, self.results_column_widths.get("inst", 7) - 2)
-        return (
-            f"[bold #4fe08a]{self._align_plain_cell(marker, width, 'left')}[/bold #4fe08a]"
-            if marker == "●"
-            else f"[#6b789e]{self._align_plain_cell(marker, width, 'left')}[/#6b789e]"
+        return installed_cell_markup(
+            installed_text,
+            width=max(3, self.results_column_widths.get("inst", 7) - 2),
+            truncate_plain=self._truncate_plain_cell,
+            align_plain=self._align_plain_cell,
         )
 
     def _source_cell_markup(self, source_text):
-        plain = self._truncate_plain_cell(source_text, 20)
-        width = max(10, self.results_column_widths.get("source", 13) - 1)
-        plain = self._align_plain_cell(plain, width, "left")
-        lowered = plain.lower()
-        if "ollama" in lowered:
-            return f"[bold #7edfff]{plain}[/bold #7edfff]"
-        if "hugging" in lowered:
-            return f"[bold #b6a3ff]{plain}[/bold #b6a3ff]"
-        return f"[#9bb1e0]{plain}[/#9bb1e0]"
+        return source_cell_markup(
+            source_text,
+            width=max(10, self.results_column_widths.get("source", 13) - 1),
+            truncate_plain=self._truncate_plain_cell,
+            align_plain=self._align_plain_cell,
+        )
 
     def _score_cell_markup(self, score_text):
-        plain = self._truncate_plain_cell(score_text, 24)
-        match = re.search(r"(\d+(?:\.\d+)?)([KkMm]?)", plain)
-        if not match:
-            return "[#6b789e]-[/#6b789e]"
-
-        value = float(match.group(1))
-        suffix = match.group(2).upper()
-        if suffix == "K":
-            numeric = value * 1000.0
-        elif suffix == "M":
-            numeric = value * 1000000.0
-        else:
-            numeric = value
-
-        if numeric >= 1000000:
-            color = "#4fe08a"
-        elif numeric >= 100000:
-            color = "#7edfff"
-        else:
-            color = "#f2c46d"
-        width = max(5, self.results_column_widths.get("score", 8) - 1)
-        shown = self._align_plain_cell(f"{value:g}{suffix}", width, "left")
-        return f"[bold {color}]{shown}[/bold {color}]"
+        return score_cell_markup(
+            score_text,
+            width=max(5, self.results_column_widths.get("score", 8) - 1),
+            truncate_plain=self._truncate_plain_cell,
+            align_plain=self._align_plain_cell,
+        )
 
     def _use_case_cell_markup(self, use_case_text):
-        plain = self._truncate_plain_cell(use_case_text, 20)
-        width = max(4, self.results_column_widths.get("use_case", 6) - 1)
-        plain = self._align_plain_cell(plain, width, "left")
-        lowered = plain.lower()
-        if "coding" in lowered:
-            return f"[#86a7ff]{plain}[/#86a7ff]"
-        if "chat" in lowered:
-            return f"[#8e97c7]{plain}[/#8e97c7]"
-        if "reason" in lowered:
-            return f"[#b89df3]{plain}[/#b89df3]"
-        if "vision" in lowered:
-            return f"[#9fc6ff]{plain}[/#9fc6ff]"
-        return f"[#8ea3cf]{plain}[/#8ea3cf]"
+        return use_case_cell_markup(
+            use_case_text,
+            width=max(4, self.results_column_widths.get("use_case", 6) - 1),
+            truncate_plain=self._truncate_plain_cell,
+            align_plain=self._align_plain_cell,
+        )
 
     def _download_cell_markup(self, download_text, width=None):
         if width is None:
             width = max(3, self.results_column_widths.get("download", 4) - 1)
-        plain = self._truncate_plain_cell(download_text, 24)
-        aligned = self._align_plain_cell(plain, width, "left")
-        lowered = plain.lower()
-        if "downloading" in lowered or "queued" in lowered:
-            return f"[bold #f2c46d]{aligned}[/bold #f2c46d]"
-        if "done" in lowered or "installed" in lowered:
-            return f"[bold #4fe08a]{aligned}[/bold #4fe08a]"
-        if "failed" in lowered or "error" in lowered:
-            return f"[bold #ff7f8f]{aligned}[/bold #ff7f8f]"
-        return f"[#9bb1e0]{aligned}[/#9bb1e0]"
+        return download_cell_markup(
+            download_text,
+            width=width,
+            truncate_plain=self._truncate_plain_cell,
+            align_plain=self._align_plain_cell,
+        )
 
     def _row_cells_for_current_layout(self, row_data):
         return [row_data.get(key, "-") for key in self.results_column_keys]

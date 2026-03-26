@@ -19,6 +19,8 @@
 - Added tests for result row key generation and result filtering/sorting behavior.
 - Extracted responsive result-column layout rules into `results_layout.py` and reused them from `app.py`.
 - Added unit tests for layout breakpoint key selection and width distribution.
+- Extracted results-cell markup formatting into `results_presenter.py` and delegated `app.py` cell helpers to it.
+- Added unit tests for fit/mode/source/score/use-case/download cell formatting behaviors.
 
 ## 1.0.0 - 2026-03-04
 
