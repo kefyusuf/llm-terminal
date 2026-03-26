@@ -597,6 +597,8 @@ class AIModelViewer(App):
         ("r", "refresh_search", "Refresh"),
         ("p", "cycle_provider", "Providers"),
         ("u", "cycle_use_case", "Use Case"),
+        ("s", "cycle_sort_mode", "Sort"),
+        ("f", "cycle_fit_filter", "Fit"),
         ("v", "toggle_view_mode", "View"),
         ("h", "toggle_hidden_gems", "Hidden Gems"),
         ("tab", "focus_next", "Next"),
@@ -642,6 +644,19 @@ class AIModelViewer(App):
         ("general", "General"),
     ]
 
+    SORT_OPTIONS = [
+        ("score", "Score"),
+        ("downloads", "Downloads"),
+        ("name", "Name"),
+    ]
+
+    FIT_OPTIONS = [
+        ("all", "All"),
+        ("fit", "Fit"),
+        ("partial", "Partial"),
+        ("nofit", "No Fit"),
+    ]
+
     def __init__(self):
         super().__init__()
         self.monitor = HardwareMonitor()
@@ -650,6 +665,8 @@ class AIModelViewer(App):
         self.compact_mode = self.ui_mode == "compact"
         self.current_filter = "Ollama"
         self.use_case_filter = "all"
+        self.sort_mode = "score"
+        self.fit_filter = "all"
         self.hidden_gems_only = False
         self.ollama_running = False
         self.last_search_error = ""
@@ -758,6 +775,18 @@ class AIModelViewer(App):
                 return option_label
         return "Any Use"
 
+    def _sort_label(self, key: str) -> str:
+        for option_key, option_label in self.SORT_OPTIONS:
+            if option_key == key:
+                return option_label
+        return "Score"
+
+    def _fit_label(self, key: str) -> str:
+        for option_key, option_label in self.FIT_OPTIONS:
+            if option_key == key:
+                return option_label
+        return "All"
+
     def _set_use_case_filter(self, key: str) -> None:
         self.use_case_filter = key
         radio_id = f"uc-{key}"
@@ -774,6 +803,22 @@ class AIModelViewer(App):
         self._set_use_case_filter(next_key)
         self.refresh_table()
         self.update_status(f"Use Case filter set to {self._use_case_label(next_key)}.")
+
+    def action_cycle_sort_mode(self) -> None:
+        keys = [key for key, _label in self.SORT_OPTIONS]
+        current_key = self.sort_mode if self.sort_mode in keys else "score"
+        next_key = keys[(keys.index(current_key) + 1) % len(keys)]
+        self.sort_mode = next_key
+        self.refresh_table()
+        self.update_status(f"Sort set to {self._sort_label(next_key)}.")
+
+    def action_cycle_fit_filter(self) -> None:
+        keys = [key for key, _label in self.FIT_OPTIONS]
+        current_key = self.fit_filter if self.fit_filter in keys else "all"
+        next_key = keys[(keys.index(current_key) + 1) % len(keys)]
+        self.fit_filter = next_key
+        self.refresh_table()
+        self.update_status(f"Fit filter set to {self._fit_label(next_key)}.")
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -1036,11 +1081,13 @@ class AIModelViewer(App):
 
         provider_short = "HF" if self.current_filter == "Hugging Face" else "Ollama"
         use_case_label = self._use_case_label(self.use_case_filter)
+        sort_label = self._sort_label(self.sort_mode)
+        fit_label = self._fit_label(self.fit_filter)
         gems_label = "ON" if self.hidden_gems_only else "OFF"
         page_label = f"P{self.current_page + 1}" if self.current_filter == "Hugging Face" else "P1"
         mode_label = "compact"
         compact_chipbar.update(
-            f"Provider:{provider_short} | Use:{use_case_label} | Gems:{gems_label} | {page_label} | View:{mode_label}"
+            f"Provider:{provider_short} | Use:{use_case_label} | Sort:{sort_label} | Fit:{fit_label} | Gems:{gems_label} | {page_label} | View:{mode_label}"
         )
 
     def update_status(self, text):
@@ -1900,6 +1947,8 @@ class AIModelViewer(App):
             current_filter=self.current_filter,
             use_case_filter=self.use_case_filter,
             hidden_gems_only=self.hidden_gems_only,
+            sort_mode=self.sort_mode,
+            fit_filter=self.fit_filter,
         )
 
         for result in filtered_results:

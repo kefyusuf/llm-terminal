@@ -16,3 +16,19 @@ def test_action_cycle_use_case_updates_filter_key():
 
     viewer.action_cycle_use_case()
     assert viewer.use_case_filter == "coding"
+
+
+def test_action_cycle_sort_mode_updates_sort_key():
+    viewer = AIModelViewer()
+    viewer.sort_mode = "score"
+
+    viewer.action_cycle_sort_mode()
+    assert viewer.sort_mode == "downloads"
+
+
+def test_action_cycle_fit_filter_updates_fit_key():
+    viewer = AIModelViewer()
+    viewer.fit_filter = "all"
+
+    viewer.action_cycle_fit_filter()
+    assert viewer.fit_filter == "fit"

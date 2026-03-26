@@ -53,6 +53,8 @@
 - Added runtime `v` key toggle between compact and comfortable views without restarting the app.
 - Added compact filter chip bar (`Provider/Use/Gems/Page/View`) and hid dense filter controls in compact mode.
 - Added `u` keyboard cycle for use-case filter so compact mode keeps full filter control without extra rows.
+- Added compact keyboard controls for `Sort` (`s`) and `Fit` (`f`) with live chip-bar status updates.
+- Extended result filtering/sorting pipeline with explicit sort mode and fit filter handling.
 
 ## 1.0.0 - 2026-03-04
 
