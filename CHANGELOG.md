@@ -31,6 +31,8 @@
 - Extracted common results-table text helpers into `results_text.py` and delegated `app.py` wrappers to it.
 - Added unit tests for truncation, alignment, header formatting, and blank-row payload helpers.
 - Marked `terminal_ui` runtime title and startup banner as legacy to reduce product identity confusion.
+- Debounced resize reflow handling in `app.py` to avoid repeated table rebuilds while dragging window size.
+- Updated column reflow logic to also react when width changes inside the same breakpoint (not only key set changes).
 
 ## 1.0.0 - 2026-03-04
 

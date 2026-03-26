@@ -613,6 +613,7 @@ class AIModelViewer(App):
         self.max_pages = config.settings.hf_search_max_pages
         self.total_results = 0
         self.has_more_pages = True
+        self._resize_reflow_timer = None
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -701,6 +702,15 @@ class AIModelViewer(App):
 
     def on_resize(self, event: events.Resize) -> None:
         _ = event
+        if self._resize_reflow_timer is not None:
+            try:
+                self._resize_reflow_timer.stop()
+            except Exception:
+                pass
+        self._resize_reflow_timer = self.set_timer(0.08, self._apply_resize_reflow)
+
+    def _apply_resize_reflow(self) -> None:
+        self._resize_reflow_timer = None
         self._configure_results_table_columns(refresh_rows=True)
 
     def action_focus_search(self) -> None:
@@ -741,10 +751,14 @@ class AIModelViewer(App):
         table = self.query_one("#results-table", DataTable)
         available_width = max(table.size.width, self.size.width, 80)
         next_keys = column_keys_for_width(available_width)
-
-        if not force and next_keys == self.results_column_keys:
-            return
         base_widths = compute_column_widths(next_keys, available_width)
+
+        if (
+            not force
+            and next_keys == self.results_column_keys
+            and base_widths == self.results_column_widths
+        ):
+            return
 
         table.clear(columns=True)
         for key in next_keys:
