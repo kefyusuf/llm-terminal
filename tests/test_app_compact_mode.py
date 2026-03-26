@@ -32,3 +32,11 @@ def test_action_cycle_fit_filter_updates_fit_key():
 
     viewer.action_cycle_fit_filter()
     assert viewer.fit_filter == "fit"
+
+
+def test_compact_tags_are_shortened_for_toolbar():
+    viewer = AIModelViewer()
+
+    assert viewer._use_case_compact_tag("coding") == "CODE"
+    assert viewer._sort_compact_tag("downloads") == "DL"
+    assert viewer._fit_compact_tag("partial") == "PART"

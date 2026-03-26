@@ -523,6 +523,7 @@ class AIModelViewer(App):
         height: 1;
         margin-bottom: 1;
         color: #8ea3cf;
+        text-style: bold;
     }
     #results-table {
         height: 2fr;
@@ -826,6 +827,36 @@ class AIModelViewer(App):
                 return option_label
         return "All"
 
+    def _use_case_compact_tag(self, key: str) -> str:
+        mapping = {
+            "all": "ALL",
+            "chat": "CHAT",
+            "coding": "CODE",
+            "vision": "VIS",
+            "reasoning": "RSN",
+            "math": "MATH",
+            "embedding": "EMB",
+            "general": "GEN",
+        }
+        return mapping.get(key, "ALL")
+
+    def _sort_compact_tag(self, key: str) -> str:
+        mapping = {
+            "score": "SCORE",
+            "downloads": "DL",
+            "name": "NAME",
+        }
+        return mapping.get(key, "SCORE")
+
+    def _fit_compact_tag(self, key: str) -> str:
+        mapping = {
+            "all": "ALL",
+            "fit": "FIT",
+            "partial": "PART",
+            "nofit": "NO",
+        }
+        return mapping.get(key, "ALL")
+
     def _set_use_case_filter(self, key: str) -> None:
         self.use_case_filter = key
         radio_id = f"uc-{key}"
@@ -1125,15 +1156,22 @@ class AIModelViewer(App):
             compact_chipbar.update("")
             return
 
-        provider_short = "HF" if self.current_filter == "Hugging Face" else "Ollama"
-        use_case_label = self._use_case_label(self.use_case_filter)
-        sort_label = self._sort_label(self.sort_mode)
-        fit_label = self._fit_label(self.fit_filter)
+        provider_short = "HF" if self.current_filter == "Hugging Face" else "OL"
+        use_case_label = self._use_case_compact_tag(self.use_case_filter)
+        sort_label = self._sort_compact_tag(self.sort_mode)
+        fit_label = self._fit_compact_tag(self.fit_filter)
         gems_label = "ON" if self.hidden_gems_only else "OFF"
-        page_label = f"P{self.current_page + 1}" if self.current_filter == "Hugging Face" else "P1"
-        mode_label = "compact"
+        page_label = str(self.current_page + 1) if self.current_filter == "Hugging Face" else "1"
         compact_chipbar.update(
-            f"Models:{shown_count}/{total} | Provider:{provider_short} | Use:{use_case_label} | Sort:{sort_label} | Fit:{fit_label} | Gems:{gems_label} | {page_label} | View:{mode_label}"
+            " "
+            f"M:{shown_count}/{total}  "
+            f"P:{provider_short}  "
+            f"U:{use_case_label}  "
+            f"S:{sort_label}  "
+            f"F:{fit_label}  "
+            f"G:{gems_label}  "
+            f"Pg:{page_label}  "
+            "| / (p)prov (u)use (s)sort (f)fit (h)gems (v)view ([)/(])page"
         )
 
     def update_status(self, text):
