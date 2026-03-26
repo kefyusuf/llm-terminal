@@ -518,6 +518,11 @@ class AIModelViewer(App):
         color: #a9b7dc;
         text-style: bold;
     }
+    #compact-chipbar {
+        height: 1;
+        margin-bottom: 1;
+        color: #8ea3cf;
+    }
     #results-table {
         height: 2fr;
         min-height: 15;
@@ -591,6 +596,7 @@ class AIModelViewer(App):
         ("/", "focus_search", "Search"),
         ("r", "refresh_search", "Refresh"),
         ("p", "cycle_provider", "Providers"),
+        ("u", "cycle_use_case", "Use Case"),
         ("v", "toggle_view_mode", "View"),
         ("h", "toggle_hidden_gems", "Hidden Gems"),
         ("tab", "focus_next", "Next"),
@@ -624,6 +630,17 @@ class AIModelViewer(App):
         "fit": "Fit",
         "download": "D/L",
     }
+
+    USE_CASE_OPTIONS = [
+        ("all", "Any Use"),
+        ("chat", "Chat"),
+        ("coding", "Coding"),
+        ("vision", "Vision"),
+        ("reasoning", "Reason"),
+        ("math", "Math"),
+        ("embedding", "Embed"),
+        ("general", "General"),
+    ]
 
     def __init__(self):
         super().__init__()
@@ -699,19 +716,33 @@ class AIModelViewer(App):
             downloads_label = self.query_one("#downloads-label", Label)
             downloads_debug = self.query_one("#downloads-debug", Static)
             download_table = self.query_one("#download-history-table", DataTable)
+            use_case_filter = self.query_one("#use-case-filter", RadioSet)
+            gem_toggle = self.query_one("#gem-toggle", Checkbox)
+            compact_chipbar = self.query_one("#compact-chipbar", Static)
+            search_input = self.query_one("#search-input", Input)
         except Exception:
             return
 
         if self.compact_mode:
             results_table.styles.height = "3fr"
+            use_case_filter.styles.display = "none"
+            gem_toggle.styles.display = "none"
+            compact_chipbar.styles.display = "block"
             downloads_label.styles.display = "none"
             downloads_debug.styles.display = "none"
             download_table.styles.display = "none"
+            search_input.placeholder = "Press / to search..."
         else:
             results_table.styles.height = "2fr"
+            use_case_filter.styles.display = "block"
+            gem_toggle.styles.display = "block"
+            compact_chipbar.styles.display = "none"
             downloads_label.styles.display = "block"
             downloads_debug.styles.display = "block"
             download_table.styles.display = "block"
+            search_input.placeholder = "Press / to search Ollama models (e.g., qwen, llama)"
+
+        self._update_results_meta(self.query_one("#results-table", DataTable).row_count)
 
     def action_toggle_view_mode(self) -> None:
         self.compact_mode = not self.compact_mode
@@ -720,6 +751,29 @@ class AIModelViewer(App):
         self._configure_results_table_columns(force=True, refresh_rows=True)
         mode_text = "compact" if self.compact_mode else "comfortable"
         self.update_status(f"View mode: {mode_text}")
+
+    def _use_case_label(self, key: str) -> str:
+        for option_key, option_label in self.USE_CASE_OPTIONS:
+            if option_key == key:
+                return option_label
+        return "Any Use"
+
+    def _set_use_case_filter(self, key: str) -> None:
+        self.use_case_filter = key
+        radio_id = f"uc-{key}"
+        try:
+            radio_button = self.query_one(f"#{radio_id}", RadioButton)
+            radio_button.value = True
+        except Exception:
+            pass
+
+    def action_cycle_use_case(self) -> None:
+        keys = [key for key, _label in self.USE_CASE_OPTIONS]
+        current_key = self.use_case_filter if self.use_case_filter in keys else "all"
+        next_key = keys[(keys.index(current_key) + 1) % len(keys)]
+        self._set_use_case_filter(next_key)
+        self.refresh_table()
+        self.update_status(f"Use Case filter set to {self._use_case_label(next_key)}.")
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -743,6 +797,7 @@ class AIModelViewer(App):
             yield RadioButton("Embed", id="uc-embedding")
             yield RadioButton("General", id="uc-general")
         yield Checkbox("Hidden gems only (Hugging Face)", id="gem-toggle")
+        yield Static("", id="compact-chipbar")
         yield Static("Models (0 shown / 0 total)", id="results-meta")
         yield DataTable(id="results-table", cursor_type="row")
         with Horizontal(id="pagination-controls"):
@@ -967,8 +1022,25 @@ class AIModelViewer(App):
 
     def _update_results_meta(self, shown_count):
         total = len(self.all_results)
-        self.query_one("#results-meta", Static).update(
-            f"Models ({shown_count} shown / {total} total)"
+        try:
+            results_meta = self.query_one("#results-meta", Static)
+            compact_chipbar = self.query_one("#compact-chipbar", Static)
+        except Exception:
+            return
+
+        results_meta.update(f"Models ({shown_count} shown / {total} total)")
+
+        if not self.compact_mode:
+            compact_chipbar.update("")
+            return
+
+        provider_short = "HF" if self.current_filter == "Hugging Face" else "Ollama"
+        use_case_label = self._use_case_label(self.use_case_filter)
+        gems_label = "ON" if self.hidden_gems_only else "OFF"
+        page_label = f"P{self.current_page + 1}" if self.current_filter == "Hugging Face" else "P1"
+        mode_label = "compact"
+        compact_chipbar.update(
+            f"Provider:{provider_short} | Use:{use_case_label} | Gems:{gems_label} | {page_label} | View:{mode_label}"
         )
 
     def update_status(self, text):
@@ -1154,7 +1226,7 @@ class AIModelViewer(App):
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         if event.radio_set.id == "use-case-filter":
             pid = event.pressed.id
-            self.use_case_filter = pid.replace("uc-", "") if pid else "all"
+            self._set_use_case_filter(pid.replace("uc-", "") if pid else "all")
             self.refresh_table()
             return
 

@@ -51,6 +51,8 @@
 - Resuming from modals now triggers a forced one-shot system/download snapshot refresh without affecting background download service work.
 - Added a new compact UI mode (`AIMODEL_UI_MODE=compact`) with denser table columns and hidden downloads pane for focus.
 - Added runtime `v` key toggle between compact and comfortable views without restarting the app.
+- Added compact filter chip bar (`Provider/Use/Gems/Page/View`) and hid dense filter controls in compact mode.
+- Added `u` keyboard cycle for use-case filter so compact mode keeps full filter control without extra rows.
 
 ## 1.0.0 - 2026-03-04
 
