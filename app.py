@@ -717,11 +717,10 @@ class AIModelViewer(App):
         current_query = self.query_one("#search-input", Input).value.strip()
         if current_query:
             self.start_search(current_query)
-            provider_name = "Hugging Face" if next_filter == "Hugging Face" else "Ollama"
-            self.update_status(f"Provider: {next_filter}. Searching {provider_name}...")
+            self.update_status(f"Provider switched to {next_filter}. Searching...")
         else:
             self.refresh_table()
-            self.update_status(f"Provider filter: {next_filter}")
+            self.update_status(f"Provider filter set to {next_filter}.")
 
     def action_toggle_hidden_gems(self) -> None:
         checkbox = self.query_one("#gem-toggle", Checkbox)
@@ -729,9 +728,7 @@ class AIModelViewer(App):
         self.hidden_gems_only = bool(checkbox.value)
         self.refresh_table()
         self.update_status(
-            "Hidden gems filter enabled."
-            if self.hidden_gems_only
-            else "Hidden gems filter disabled."
+            "Hidden gems filter: ON." if self.hidden_gems_only else "Hidden gems filter: OFF."
         )
 
     def _configure_results_table_columns(self, force: bool = False, refresh_rows: bool = False):
@@ -1065,7 +1062,7 @@ class AIModelViewer(App):
                 state = entry.get("state", "idle")
 
                 if is_external_entry(entry):
-                    self.update_status("External download - cannot manage through this app")
+                    self.update_status("External download; management unavailable in this app.")
                     return
 
                 if is_active_state(state):
@@ -1080,11 +1077,7 @@ class AIModelViewer(App):
             return
         row_key = str(event.row_key.value)
         selected_model = next(
-            (
-                item
-                for item in self.all_results
-                if f"{item['source']}:{item.get('id', item['name'])}" == row_key
-            ),
+            (item for item in self.all_results if result_unique_key(item) == row_key),
             None,
         )
         if selected_model:
@@ -1144,7 +1137,7 @@ class AIModelViewer(App):
                     timeout=10,
                 )
                 if result.returncode == 0:
-                    self.update_status(f"✅ Deleted model: {model_name}")
+                    self.update_status(f"Deleted model data: {model_name}")
                 else:
                     result2 = subprocess.run(
                         ["ollama", "rm", f"{model_name}:latest"],
@@ -1153,13 +1146,13 @@ class AIModelViewer(App):
                         timeout=10,
                     )
                     if result2.returncode == 0:
-                        self.update_status(f"✅ Deleted model: {model_name}:latest")
+                        self.update_status(f"Deleted model data: {model_name}:latest")
                     else:
-                        self.update_status(f"⚠️ Could not delete: {result2.stderr.strip()}")
+                        self.update_status(f"Could not delete model data: {result2.stderr.strip()}")
             except subprocess.TimeoutExpired:
-                self.update_status(f"⚠️ Timeout deleting model: {model_name}")
+                self.update_status(f"Timeout deleting model data: {model_name}")
             except Exception as e:
-                self.update_status(f"⚠️ Delete error: {str(e)}")
+                self.update_status(f"Delete model data error: {str(e)}")
 
         try:
             delete_job(target_id)
@@ -1564,7 +1557,9 @@ class AIModelViewer(App):
             if providers == ["ollama"]:
                 self.update_status("No Ollama results. Try 'Hugging Face' filter for more models.")
             else:
-                self.update_status("No results found.")
+                self.update_status(
+                    "No results found. Try a different query or disable Hidden gems."
+                )
 
         if table.row_count == 0 and self.last_search_error:
             row_data = self._blank_result_row()

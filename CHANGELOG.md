@@ -23,6 +23,8 @@
 - Added unit tests for fit/mode/source/score/use-case/download cell formatting behaviors.
 - Extracted download lifecycle helpers into `download_lifecycle.py` (error mapping, delete/cancel guards, registry upsert/trim, idle reset).
 - Updated `app.py` download cancel/delete and registry-write paths to reuse the new lifecycle helpers.
+- Polished status-bar messaging for provider switches, hidden-gem toggles, external-download actions, and no-results guidance.
+- Standardized model-data delete status text (removed icon-based phrasing and aligned wording).
 
 ## 1.0.0 - 2026-03-04
 
