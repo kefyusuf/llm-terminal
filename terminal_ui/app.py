@@ -39,10 +39,12 @@ from textual.widgets import (
 
 # ── Helpers ──────────────────────────────────────────────────────
 
+
 def get_cpu_percent() -> float:
     """Get CPU usage without psutil (cross-platform)."""
     try:
         import psutil
+
         return psutil.cpu_percent(interval=0)
     except ImportError:
         pass
@@ -50,8 +52,7 @@ def get_cpu_percent() -> float:
     if platform.system() == "Windows":
         try:
             result = subprocess.run(
-                ["wmic", "cpu", "get", "loadpercentage"],
-                capture_output=True, text=True, timeout=2
+                ["wmic", "cpu", "get", "loadpercentage"], capture_output=True, text=True, timeout=2
             )
             for line in result.stdout.strip().split("\n"):
                 line = line.strip()
@@ -66,6 +67,7 @@ def get_memory_info() -> tuple[float, float, float]:
     """Return (used_gb, total_gb, percent)."""
     try:
         import psutil
+
         mem = psutil.virtual_memory()
         return mem.used / (1024**3), mem.total / (1024**3), mem.percent
     except ImportError:
@@ -74,7 +76,9 @@ def get_memory_info() -> tuple[float, float, float]:
         try:
             result = subprocess.run(
                 ["wmic", "os", "get", "TotalVisibleMemorySize,FreePhysicalMemory"],
-                capture_output=True, text=True, timeout=2
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             lines = [l.strip() for l in result.stdout.strip().split("\n") if l.strip()]
             if len(lines) >= 2:
@@ -124,6 +128,7 @@ def run_shell_command(cmd: str, cwd: str | None = None) -> str:
 
 # ── Horizontal Bar Widget ───────────────────────────────────────
 
+
 class BarGraph(Static):
     """A sleek inline progress bar."""
 
@@ -166,6 +171,7 @@ class BarGraph(Static):
 
 
 # ── System Monitor Card ────────────────────────────────────────
+
 
 class SystemMonitor(Static):
     """Live system resource monitor."""
@@ -229,6 +235,7 @@ class SystemMonitor(Static):
 
 # ── Process Table Card ─────────────────────────────────────────
 
+
 class ProcessCard(Static):
     """A data table showing running Python processes."""
 
@@ -248,6 +255,7 @@ class ProcessCard(Static):
         table.clear()
         try:
             import psutil
+
             for proc in psutil.process_iter(["pid", "name", "cpu_percent", "memory_info"]):
                 try:
                     info = proc.info
@@ -268,7 +276,9 @@ class ProcessCard(Static):
                 try:
                     result = subprocess.run(
                         ["tasklist", "/FI", "IMAGENAME eq python*", "/FO", "CSV", "/NH"],
-                        capture_output=True, text=True, timeout=5,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     )
                     for line in result.stdout.strip().split("\n"):
                         parts = line.strip().strip('"').split('","')
@@ -281,6 +291,7 @@ class ProcessCard(Static):
 
 
 # ── Quick Actions Card ─────────────────────────────────────────
+
 
 class QuickActions(Static):
     """Shortcut buttons for common tasks."""
@@ -298,6 +309,7 @@ class QuickActions(Static):
 
 # ── Clock Widget ───────────────────────────────────────────────
 
+
 class ClockWidget(Static):
     """Displays current time in the header."""
 
@@ -306,18 +318,21 @@ class ClockWidget(Static):
 
     def refresh_time(self) -> None:
         now = datetime.now()
-        self.update(f"[#3d3d5c]{now.strftime('%d %b')}  [#b8bfd6]{now.strftime('%H:%M')}[#3d3d5c]:{now.strftime('%S')}")
+        self.update(
+            f"[#3d3d5c]{now.strftime('%d %b')}  [#b8bfd6]{now.strftime('%H:%M')}[#3d3d5c]:{now.strftime('%S')}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════
 #  MAIN APP
 # ═══════════════════════════════════════════════════════════════
 
+
 class ObsidianConsole(App):
-    """A modern terminal workspace."""
+    """Legacy experimental terminal workspace."""
 
     CSS_PATH = "theme.tcss"
-    TITLE = "Obsidian Console"
+    TITLE = "Obsidian Console (Legacy)"
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit", show=True),
@@ -343,15 +358,25 @@ class ObsidianConsole(App):
     def compose(self) -> ComposeResult:
         # ── Header
         with Horizontal(id="header-bar"):
-            yield Static("[bold #4a9eff]◆ OBSIDIAN[/bold #4a9eff] [#3d3d5c]CONSOLE[/#3d3d5c]", classes="title")
+            yield Static(
+                "[bold #4a9eff]◆ OBSIDIAN[/bold #4a9eff] [#3d3d5c]CONSOLE[/#3d3d5c]",
+                classes="title",
+            )
             yield Static("", classes="subtitle")
             yield ClockWidget()
 
         # ── Status bar (bottom)
         with Horizontal(id="status-bar"):
-            yield Static(f"[#4a9eff]●[/] {platform.node()}", classes="status-item accent", id="st-host")
-            yield Static(f"[#3d3d5c]│[/] [#5a5a7a]py {platform.python_version()}", classes="status-item")
-            yield Static(f"[#3d3d5c]│[/] [#44cc88]●[/] [#5a5a7a]{platform.system()}", classes="status-item ok")
+            yield Static(
+                f"[#4a9eff]●[/] {platform.node()}", classes="status-item accent", id="st-host"
+            )
+            yield Static(
+                f"[#3d3d5c]│[/] [#5a5a7a]py {platform.python_version()}", classes="status-item"
+            )
+            yield Static(
+                f"[#3d3d5c]│[/] [#44cc88]●[/] [#5a5a7a]{platform.system()}",
+                classes="status-item ok",
+            )
             yield Static("", id="st-uptime", classes="status-item")
             yield Static("", id="st-cwd", classes="status-item")
 
@@ -397,13 +422,17 @@ class ObsidianConsole(App):
         """Initialize on startup."""
         self._refresh_sidebar_info()
         log = self.query_one("#app-log", RichLog)
-        log.write("[#4a9eff]◆[/] [bold #b8bfd6]Obsidian Console[/] [#3d3d5c]initialized[/]")
+        log.write(
+            "[#4a9eff]◆[/] [bold #b8bfd6]Obsidian Console (Legacy)[/] [#3d3d5c]initialized[/]"
+        )
         log.write(f"[#3d3d5c]  working directory:[/] [#5a5a7a]{self.working_dir}[/]")
         log.write(f"[#3d3d5c]  python:[/] [#5a5a7a]{sys.executable}[/]")
         log.write(f"[#3d3d5c]  platform:[/] [#5a5a7a]{platform.platform()}[/]")
         log.write("")
         log.write("[#3d3d5c]  Type commands below or use quick actions.[/]")
-        log.write("[#3d3d5c]  Keybinds: [#4a9eff]ctrl+t[/] terminal · [#4a9eff]ctrl+d[/] dashboard · [#4a9eff]ctrl+r[/] refresh[/]")
+        log.write(
+            "[#3d3d5c]  Keybinds: [#4a9eff]ctrl+t[/] terminal · [#4a9eff]ctrl+d[/] dashboard · [#4a9eff]ctrl+r[/] refresh[/]"
+        )
         log.write("")
 
         # Start periodic refresh
@@ -430,7 +459,9 @@ class ObsidianConsole(App):
 
         # Status bar uptime
         uptime_w = self.query_one("#st-uptime", Static)
-        uptime_w.update(f"[#3d3d5c]│[/] [#5a5a7a]up {uptime_h:02d}:{uptime_m:02d}:{uptime_sec:02d}[/]")
+        uptime_w.update(
+            f"[#3d3d5c]│[/] [#5a5a7a]up {uptime_h:02d}:{uptime_m:02d}:{uptime_sec:02d}[/]"
+        )
 
         cwd_w = self.query_one("#st-cwd", Static)
         cwd_w.update(f"[#3d3d5c]│[/] [#5a5a7a]{self.working_dir}[/]")
@@ -539,14 +570,14 @@ class ObsidianConsole(App):
     @on(Button.Pressed, "#act-net")
     def network_info(self) -> None:
         if platform.system() == "Windows":
-            self._log_and_run("ipconfig | findstr /i \"IPv4 Subnet Gateway\"")
+            self._log_and_run('ipconfig | findstr /i "IPv4 Subnet Gateway"')
         else:
             self._log_and_run("ip -brief addr")
 
     @on(Button.Pressed, "#act-env")
     def env_vars(self) -> None:
         if platform.system() == "Windows":
-            self._log_and_run("set | findstr /i \"PATH PYTHON VIRTUAL\"")
+            self._log_and_run('set | findstr /i "PATH PYTHON VIRTUAL"')
         else:
             self._log_and_run("env | grep -iE 'PATH|PYTHON|VIRTUAL' | head -10")
 
@@ -591,6 +622,7 @@ class ObsidianConsole(App):
 
 
 # ── Entry Point ──────────────────────────────────────────────
+
 
 def main() -> None:
     app = ObsidianConsole()
