@@ -55,6 +55,8 @@
 - Added `u` keyboard cycle for use-case filter so compact mode keeps full filter control without extra rows.
 - Added compact keyboard controls for `Sort` (`s`) and `Fit` (`f`) with live chip-bar status updates.
 - Extended result filtering/sorting pipeline with explicit sort mode and fit filter handling.
+- Refined compact layout into a tighter toolbar flow by hiding provider panel, pagination row, and secondary filters while preserving keyboard access.
+- Added compact pagination keybinds (`[` and `]`) and model count display in compact chip bar.
 
 ## 1.0.0 - 2026-03-04
 

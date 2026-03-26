@@ -596,6 +596,8 @@ class AIModelViewer(App):
         ("/", "focus_search", "Search"),
         ("r", "refresh_search", "Refresh"),
         ("p", "cycle_provider", "Providers"),
+        ("[", "prev_page", "Prev Page"),
+        ("]", "next_page", "Next Page"),
         ("u", "cycle_use_case", "Use Case"),
         ("s", "cycle_sort_mode", "Sort"),
         ("f", "cycle_fit_filter", "Fit"),
@@ -737,26 +739,47 @@ class AIModelViewer(App):
             gem_toggle = self.query_one("#gem-toggle", Checkbox)
             compact_chipbar = self.query_one("#compact-chipbar", Static)
             search_input = self.query_one("#search-input", Input)
+            search_row = self.query_one("#search-filters-row", Horizontal)
+            search_panel = self.query_one("#search-panel", Vertical)
+            provider_panel = self.query_one("#provider-panel", Vertical)
+            pagination_controls = self.query_one("#pagination-controls", Horizontal)
+            results_meta = self.query_one("#results-meta", Static)
         except Exception:
             return
 
         if self.compact_mode:
-            results_table.styles.height = "3fr"
+            results_table.styles.height = "4fr"
             use_case_filter.styles.display = "none"
             gem_toggle.styles.display = "none"
             compact_chipbar.styles.display = "block"
+            results_meta.styles.display = "none"
+            pagination_controls.styles.display = "none"
             downloads_label.styles.display = "none"
             downloads_debug.styles.display = "none"
             download_table.styles.display = "none"
+            search_row.styles.height = "2"
+            search_row.styles.margin_bottom = 0
+            search_panel.styles.width = "1fr"
+            search_panel.styles.margin_right = 0
+            provider_panel.styles.display = "none"
+            search_input.styles.height = "2"
             search_input.placeholder = "Press / to search..."
         else:
             results_table.styles.height = "2fr"
             use_case_filter.styles.display = "block"
             gem_toggle.styles.display = "block"
             compact_chipbar.styles.display = "none"
+            results_meta.styles.display = "block"
+            pagination_controls.styles.display = "block"
             downloads_label.styles.display = "block"
             downloads_debug.styles.display = "block"
             download_table.styles.display = "block"
+            search_row.styles.height = "3"
+            search_row.styles.margin_bottom = 1
+            search_panel.styles.width = "42%"
+            search_panel.styles.margin_right = 1
+            provider_panel.styles.display = "block"
+            search_input.styles.height = "3"
             search_input.placeholder = "Press / to search Ollama models (e.g., qwen, llama)"
 
         self._update_results_meta(self.query_one("#results-table", DataTable).row_count)
@@ -937,6 +960,12 @@ class AIModelViewer(App):
             return
         self.start_search(query)
 
+    def action_prev_page(self) -> None:
+        self._go_to_page(self.current_page - 1)
+
+    def action_next_page(self) -> None:
+        self._go_to_page(self.current_page + 1)
+
     def action_cycle_provider(self) -> None:
         cycle = ["Ollama", "Hugging Face"]
         current = self.current_filter if self.current_filter in cycle else "Ollama"
@@ -1087,7 +1116,7 @@ class AIModelViewer(App):
         page_label = f"P{self.current_page + 1}" if self.current_filter == "Hugging Face" else "P1"
         mode_label = "compact"
         compact_chipbar.update(
-            f"Provider:{provider_short} | Use:{use_case_label} | Sort:{sort_label} | Fit:{fit_label} | Gems:{gems_label} | {page_label} | View:{mode_label}"
+            f"Models:{shown_count}/{total} | Provider:{provider_short} | Use:{use_case_label} | Sort:{sort_label} | Fit:{fit_label} | Gems:{gems_label} | {page_label} | View:{mode_label}"
         )
 
     def update_status(self, text):
