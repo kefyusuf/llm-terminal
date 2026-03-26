@@ -20,8 +20,17 @@ MIN_COLUMN_WIDTHS = {
 EXPANDABLE_COLUMNS = ("name", "publisher", "use_case", "download")
 
 
-def column_keys_for_width(available_width: int) -> list[str]:
+def column_keys_for_width(available_width: int, *, compact: bool = False) -> list[str]:
     """Return visible column keys based on available table width."""
+    if compact:
+        if available_width >= 130:
+            return ["inst", "name", "params", "score", "quant", "fit", "use_case"]
+        if available_width >= 110:
+            return ["inst", "name", "params", "score", "quant", "fit"]
+        if available_width >= 95:
+            return ["inst", "name", "score", "quant", "fit"]
+        return ["inst", "name", "score", "fit"]
+
     if available_width >= 140:
         return [
             "inst",

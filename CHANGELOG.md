@@ -49,6 +49,8 @@
 - Guarded `update_status()` when `#status-bar` is not available and reordered HF detail status update before opening modal.
 - Added modal-aware UI polling pause/resume so timer-driven widget refreshes do not race modal transitions.
 - Resuming from modals now triggers a forced one-shot system/download snapshot refresh without affecting background download service work.
+- Added a new compact UI mode (`AIMODEL_UI_MODE=compact`) with denser table columns and hidden downloads pane for focus.
+- Added runtime `v` key toggle between compact and comfortable views without restarting the app.
 
 ## 1.0.0 - 2026-03-04
 

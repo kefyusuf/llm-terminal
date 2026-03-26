@@ -591,12 +591,13 @@ class AIModelViewer(App):
         ("/", "focus_search", "Search"),
         ("r", "refresh_search", "Refresh"),
         ("p", "cycle_provider", "Providers"),
+        ("v", "toggle_view_mode", "View"),
         ("h", "toggle_hidden_gems", "Hidden Gems"),
         ("tab", "focus_next", "Next"),
         ("shift+tab", "focus_previous", "Previous"),
     ]
 
-    RESULTS_COLUMN_LABELS = {
+    RESULTS_COLUMN_LABELS_COMFORTABLE = {
         "inst": "Install",
         "source": "Source",
         "publisher": "Provider",
@@ -610,10 +611,26 @@ class AIModelViewer(App):
         "download": "Download",
     }
 
+    RESULTS_COLUMN_LABELS_COMPACT = {
+        "inst": "In",
+        "source": "Src",
+        "publisher": "Prov",
+        "name": "Model",
+        "params": "Param",
+        "use_case": "Use",
+        "score": "Score",
+        "quant": "Quant",
+        "mode": "Mode",
+        "fit": "Fit",
+        "download": "D/L",
+    }
+
     def __init__(self):
         super().__init__()
         self.monitor = HardwareMonitor()
         self.all_results = []
+        self.ui_mode = config.settings.ui_mode
+        self.compact_mode = self.ui_mode == "compact"
         self.current_filter = "Ollama"
         self.use_case_filter = "all"
         self.hidden_gems_only = False
@@ -671,6 +688,39 @@ class AIModelViewer(App):
             self.request_system_info_refresh(force=True)
             self.request_download_poll(force=True)
 
+    def _column_labels(self):
+        if self.compact_mode:
+            return self.RESULTS_COLUMN_LABELS_COMPACT
+        return self.RESULTS_COLUMN_LABELS_COMFORTABLE
+
+    def _apply_ui_mode(self) -> None:
+        try:
+            results_table = self.query_one("#results-table", DataTable)
+            downloads_label = self.query_one("#downloads-label", Label)
+            downloads_debug = self.query_one("#downloads-debug", Static)
+            download_table = self.query_one("#download-history-table", DataTable)
+        except Exception:
+            return
+
+        if self.compact_mode:
+            results_table.styles.height = "3fr"
+            downloads_label.styles.display = "none"
+            downloads_debug.styles.display = "none"
+            download_table.styles.display = "none"
+        else:
+            results_table.styles.height = "2fr"
+            downloads_label.styles.display = "block"
+            downloads_debug.styles.display = "block"
+            download_table.styles.display = "block"
+
+    def action_toggle_view_mode(self) -> None:
+        self.compact_mode = not self.compact_mode
+        self.ui_mode = "compact" if self.compact_mode else "comfortable"
+        self._apply_ui_mode()
+        self._configure_results_table_columns(force=True, refresh_rows=True)
+        mode_text = "compact" if self.compact_mode else "comfortable"
+        self.update_status(f"View mode: {mode_text}")
+
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
         with Horizontal(id="search-filters-row"):
@@ -708,6 +758,7 @@ class AIModelViewer(App):
     def on_mount(self) -> None:
         """Initialise the UI, start the download service, and set up polling timers."""
         self.title = "AI Model Explorer"
+        self._apply_ui_mode()
         self._configure_results_table_columns(force=True)
         self.query_one("#results-table", DataTable).zebra_stripes = True
         download_table = self.query_one("#download-history-table", DataTable)
@@ -812,8 +863,9 @@ class AIModelViewer(App):
     def _configure_results_table_columns(self, force: bool = False, refresh_rows: bool = False):
         table = self.query_one("#results-table", DataTable)
         available_width = max(table.size.width, self.size.width, 80)
-        next_keys = column_keys_for_width(available_width)
+        next_keys = column_keys_for_width(available_width, compact=self.compact_mode)
         base_widths = compute_column_widths(next_keys, available_width)
+        labels = self._column_labels()
 
         if (
             not force
@@ -826,7 +878,7 @@ class AIModelViewer(App):
         for key in next_keys:
             width = base_widths[key]
             table.add_column(
-                self._format_header_label(self.RESULTS_COLUMN_LABELS[key], width),
+                self._format_header_label(labels[key], width),
                 width=width,
                 key=key,
             )

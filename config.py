@@ -48,6 +48,7 @@ class Settings(BaseSettings):
 
     # UI settings
     ui_download_poll_interval: float = 1.5
+    ui_mode: Literal["comfortable", "compact"] = "compact"
 
 
 settings = Settings()
