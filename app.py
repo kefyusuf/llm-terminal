@@ -1,4 +1,3 @@
-import json
 import re
 import subprocess
 import time
@@ -18,6 +17,16 @@ from download_history import (
     cancel_model_payload,
     fallback_entry_from_target,
     is_external_entry,
+)
+from download_lifecycle import (
+    cancel_error_detail_from_http_error,
+    delete_error_detail_from_http_error,
+    entry_identity_keys,
+    reset_results_download_state,
+    should_cancel_before_delete,
+    should_delete_ollama_data,
+    trim_download_registry,
+    upsert_download_registry_entry,
 )
 from hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
@@ -1102,15 +1111,7 @@ class AIModelViewer(App):
             self.refresh_download_history_table()
             self.refresh_table()  # Also refresh main results table
         except HTTPError as exc:
-            detail = "Failed to cancel download through service."
-            try:
-                payload = json.loads(exc.read().decode("utf-8"))
-                error_text = payload.get("error")
-                if error_text:
-                    detail = f"Cancel failed: {error_text}"
-            except Exception:
-                pass
-            self.update_status(detail)
+            self.update_status(cancel_error_detail_from_http_error(exc))
         except Exception:
             self.update_status("Failed to cancel download through service.")
 
@@ -1126,20 +1127,16 @@ class AIModelViewer(App):
         model_name = entry.get("name", "") if entry else ""
         state = entry.get("state", "idle") if entry else "idle"
 
-        # If deleting data for active download, cancel it first
-        if delete_data and state in {"downloading", "queued", "running"}:
+        if should_cancel_before_delete(delete_data, state):
             try:
-                # Cancel the job through the service
                 cancel_job(target_id)
-                time.sleep(1)  # Wait a moment for cancellation
+                time.sleep(1)
                 self.update_status(f"Download canceled: {model_name}")
             except Exception as e:
                 self.update_status(f"Could not cancel download: {e}")
 
-        # If deleting data, remove the actual model/partial files
-        if delete_data and source == "ollama" and model_name:
+        if should_delete_ollama_data(delete_data, source, model_name):
             try:
-                # Try with :latest tag first, then without
                 result = subprocess.run(
                     ["ollama", "rm", model_name],
                     capture_output=True,
@@ -1149,7 +1146,6 @@ class AIModelViewer(App):
                 if result.returncode == 0:
                     self.update_status(f"✅ Deleted model: {model_name}")
                 else:
-                    # Try with :latest suffix
                     result2 = subprocess.run(
                         ["ollama", "rm", f"{model_name}:latest"],
                         capture_output=True,
@@ -1168,46 +1164,21 @@ class AIModelViewer(App):
         try:
             delete_job(target_id)
         except HTTPError as exc:
-            detail = "Failed to delete download entry."
-            try:
-                payload = json.loads(exc.read().decode("utf-8"))
-                error_text = payload.get("error")
-                if error_text == "cannot delete active job":
-                    detail = "Cannot delete active job. Cancel it first."
-                elif error_text:
-                    detail = f"Delete failed: {error_text}"
-            except Exception:
-                pass
-            self.update_status(detail)
+            self.update_status(delete_error_detail_from_http_error(exc))
             return
         except Exception as exc:
             self.update_status(f"Failed to delete download entry: {exc}")
             return
 
         deleted_entry = self.download_registry.pop(target_id, None)
-        if deleted_entry is not None:
-            source_key = str(deleted_entry.get("source", "")).strip().lower()
-            name_key = str(deleted_entry.get("name", "")).strip().lower()
-        else:
-            source_key = ""
-            name_key = ""
-
-        for item in self.all_results:
-            item_target = download_target_id(item)
-            if item_target == target_id:
-                item["download_state"] = "idle"
-                item["download_label"] = "Idle"
-                item["download_detail"] = ""
-                continue
-            if (
-                source_key
-                and name_key
-                and str(item.get("source", "")).strip().lower() == source_key
-                and str(item.get("name", "")).strip().lower() == name_key
-            ):
-                item["download_state"] = "idle"
-                item["download_label"] = "Idle"
-                item["download_detail"] = ""
+        source_key, name_key = entry_identity_keys(deleted_entry)
+        reset_results_download_state(
+            self.all_results,
+            target_id=target_id,
+            source_key=source_key,
+            name_key=name_key,
+            target_id_for_item=download_target_id,
+        )
 
         self.refresh_table()
         self.refresh_download_history_table()
@@ -1232,39 +1203,19 @@ class AIModelViewer(App):
             self.update_status(f"Failed to queue download: {exc}")
 
     def _record_download_entry(self, target_id, model=None, state=None, label=None, detail=None):
-        existing = self.download_registry.get(target_id, {})
-
-        source = existing.get("source", "-")
-        publisher = existing.get("publisher", "-")
-        name = existing.get("name", target_id)
-
         if model is None:
             model = self._find_model_by_target_id(target_id)
-        if model is not None:
-            source = model.get("source", source)
-            publisher = model.get("publisher", publisher)
-            name = model.get("name", name)
-
-        entry = {
-            "target_id": target_id,
-            "source": source,
-            "publisher": publisher,
-            "name": name,
-            "created_at": existing.get("created_at", time.time()),
-            "state": state if state is not None else existing.get("state", "idle"),
-            "label": label if label is not None else existing.get("label", "Idle"),
-            "detail": detail if detail is not None else existing.get("detail", ""),
-            "updated_at": time.time(),
-        }
-        self.download_registry[target_id] = entry
-
-        if len(self.download_registry) > self.download_history_limit:
-            sorted_keys = sorted(
-                self.download_registry,
-                key=lambda key: self.download_registry[key].get("updated_at", 0),
-            )
-            for key in sorted_keys[: len(self.download_registry) - self.download_history_limit]:
-                self.download_registry.pop(key, None)
+        now = time.time()
+        upsert_download_registry_entry(
+            self.download_registry,
+            target_id=target_id,
+            model=model,
+            state=state,
+            label=label,
+            detail=detail,
+            now=now,
+        )
+        trim_download_registry(self.download_registry, self.download_history_limit)
 
     def sync_download_jobs_from_service(self, force=False):
         try:

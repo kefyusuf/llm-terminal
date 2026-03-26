@@ -21,6 +21,8 @@
 - Added unit tests for layout breakpoint key selection and width distribution.
 - Extracted results-cell markup formatting into `results_presenter.py` and delegated `app.py` cell helpers to it.
 - Added unit tests for fit/mode/source/score/use-case/download cell formatting behaviors.
+- Extracted download lifecycle helpers into `download_lifecycle.py` (error mapping, delete/cancel guards, registry upsert/trim, idle reset).
+- Updated `app.py` download cancel/delete and registry-write paths to reuse the new lifecycle helpers.
 
 ## 1.0.0 - 2026-03-04
 
