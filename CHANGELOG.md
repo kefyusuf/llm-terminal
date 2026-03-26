@@ -15,6 +15,8 @@
 - Added dedicated unit tests for provider selection, query-key generation, page validation, and status message helpers.
 - Extracted download history row-action decisions into `download_history.py` to remove duplicate logic in `app.py`.
 - Added unit tests for fallback history entries, external-entry detection, action labels, and cancel payload shaping.
+- Extracted results-table filtering and hidden-gem ordering into `results_view.py` and reused it in `app.py`.
+- Added tests for result row key generation and result filtering/sorting behavior.
 
 ## 1.0.0 - 2026-03-04
 

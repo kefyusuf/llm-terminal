@@ -22,6 +22,7 @@ from download_history import (
 from hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
+from results_view import filter_results_for_view, result_unique_key
 from search_cache import SearchCache
 from search_orchestration import (
     build_query_key,
@@ -1739,25 +1740,12 @@ class AIModelViewer(App):
         table.clear()
         added = set()
 
-        filtered_results = []
-        for result in self.all_results:
-            if result["source"] != self.current_filter:
-                continue
-            if self.use_case_filter != "all" and result.get("use_case_key") != self.use_case_filter:
-                continue
-            if self.hidden_gems_only and not result.get("is_hidden_gem", False):
-                continue
-            filtered_results.append(result)
-
-        if self.hidden_gems_only:
-            filtered_results.sort(
-                key=lambda item: (
-                    item.get("is_hidden_gem", False),
-                    item.get("gem_score", 0.0),
-                    item.get("downloads", 0),
-                ),
-                reverse=True,
-            )
+        filtered_results = filter_results_for_view(
+            self.all_results,
+            current_filter=self.current_filter,
+            use_case_filter=self.use_case_filter,
+            hidden_gems_only=self.hidden_gems_only,
+        )
 
         for result in filtered_results:
             display_name = result["name"]
@@ -1805,7 +1793,7 @@ class AIModelViewer(App):
             )
             download = self._download_cell_markup(download, download_width)
 
-            unique_key = f"{result['source']}:{result.get('id', result['name'])}"
+            unique_key = result_unique_key(result)
             if unique_key in added:
                 continue
             added.add(unique_key)
