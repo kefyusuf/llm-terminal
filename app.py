@@ -17,6 +17,18 @@ from hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
 from search_cache import SearchCache
+from search_orchestration import (
+    build_query_key,
+    cache_hit_suffix,
+    has_more_pages_for_results,
+    is_hf_provider_selection,
+    page_info_suffix,
+    provider_display_name,
+    provider_result_count,
+    provider_search_status,
+    providers_from_filter,
+    validate_page_request,
+)
 from service_client import (
     cancel_job,
     create_job,
@@ -993,14 +1005,9 @@ class AIModelViewer(App):
         if not query:
             return
         providers = self._get_search_providers()
-        provider_prefix = "hf" if providers == ["huggingface"] else "ollama"
-
-        # Ollama doesn't support pagination, only HF does
-        if providers == ["huggingface"]:
-            query_key = f"{provider_prefix}:{query.lower()}:page{self.current_page}"
-        else:
-            query_key = f"{provider_prefix}:{query.lower()}"
-            self.current_page = 0  # Reset page for Ollama
+        if providers == ["ollama"]:
+            self.current_page = 0
+        query_key = build_query_key(providers, query, self.current_page)
 
         current_specs = self.monitor.get_specs()
         self.last_search_error = ""
@@ -1011,7 +1018,7 @@ class AIModelViewer(App):
         table.loading = False
         self._update_results_meta(0)
 
-        provider_name = "Hugging Face" if providers == ["huggingface"] else "Ollama"
+        provider_name = provider_display_name(providers)
         self.on_search_progress(self.active_search_id, f"Searching {provider_name}: {query}")
 
         cached = self.search_cache.get(query_key, current_specs)
@@ -1022,11 +1029,7 @@ class AIModelViewer(App):
             if "has_more_pages" in cached:
                 self.has_more_pages = cached["has_more_pages"]
             self.on_search_completed(self.active_search_id)
-            cache_msg = (
-                f" (cached page {self.current_page + 1})"
-                if providers == ["huggingface"]
-                else " (cached)"
-            )
+            cache_msg = cache_hit_suffix(providers, self.current_page)
             self.update_status(f"Loaded{cache_msg}")
             return
 
@@ -1054,10 +1057,7 @@ class AIModelViewer(App):
 
     def _get_search_providers(self) -> list[str]:
         """Return list of providers to search based on current_filter."""
-        if self.current_filter == "Hugging Face":
-            return ["huggingface"]
-        else:
-            return ["ollama"]
+        return providers_from_filter(self.current_filter)
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         if event.radio_set.id == "use-case-filter":
@@ -1097,10 +1097,10 @@ class AIModelViewer(App):
             self._go_to_page(self.current_page + 1)
 
     def _go_to_page(self, page_num: int) -> None:
-        if page_num < 0:
-            return
-        if page_num >= self.max_pages:
-            self.update_status(f"Reached page limit ({self.max_pages}).")
+        is_valid, message = validate_page_request(page_num, self.max_pages)
+        if not is_valid:
+            if message:
+                self.update_status(message)
             return
         current_query = self.query_one("#search-input", Input).value.strip()
         if not current_query:
@@ -1118,7 +1118,7 @@ class AIModelViewer(App):
             return
 
         providers = self._get_search_providers()
-        is_hf = providers == ["huggingface"]
+        is_hf = is_hf_provider_selection(providers)
 
         # Only show pagination controls for HuggingFace (Ollama doesn't support it)
         if is_hf:
@@ -1700,28 +1700,27 @@ class AIModelViewer(App):
         self._ensure_download_fields()
         self.last_search_error = " | ".join((ollama_errors + hf_errors)[:2])
 
-        # Determine if there are more pages based on which provider was searched
-        # Note: Ollama doesn't support page-based pagination, only HF does
-        if "huggingface" in providers and len(hf_results) > 0:
-            self.has_more_pages = len(hf_results) == self.page_size
-        elif "ollama" in providers and len(ollama_results) > 0:
-            # Ollama returns all results at once, no pagination possible
-            self.has_more_pages = False
-        else:
-            self.has_more_pages = False
+        self.has_more_pages = has_more_pages_for_results(
+            providers,
+            hf_result_count=len(hf_results),
+            ollama_result_count=len(ollama_results),
+            page_size=self.page_size,
+        )
 
-        provider_name = "HF" if "huggingface" in providers else "Ollama"
-        result_count = len(hf_results) if "huggingface" in providers else len(ollama_results)
-        if "ollama" in providers:
-            self.call_from_thread(
-                self.update_status,
-                f"Ollama: {result_count} results (pagination not supported by Ollama.com)",
-            )
-        else:
-            self.call_from_thread(
-                self.update_status,
-                f"HF: {result_count} results, has_more={self.has_more_pages}, page={self.current_page}",
-            )
+        result_count = provider_result_count(
+            providers,
+            hf_result_count=len(hf_results),
+            ollama_result_count=len(ollama_results),
+        )
+        self.call_from_thread(
+            self.update_status,
+            provider_search_status(
+                providers,
+                result_count=result_count,
+                has_more_pages=self.has_more_pages,
+                current_page=self.current_page,
+            ),
+        )
 
         self.search_cache.set(
             query_key,
@@ -1741,9 +1740,8 @@ class AIModelViewer(App):
         self.refresh_table()
 
         if table.row_count > 0:
-            total = len(self.all_results)
             shown = table.row_count
-            page_info = f" (Page {self.current_page + 1})" if self.current_page > 0 else ""
+            page_info = page_info_suffix(self.current_page)
             self.update_status(f"{shown} results listed{page_info}.")
         elif self.last_search_error:
             self.update_status(self.last_search_error[:120])

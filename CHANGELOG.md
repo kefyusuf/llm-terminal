@@ -11,6 +11,8 @@
 - Refreshed README to align product naming around **AI Model Explorer** and documented `terminal_ui/` as legacy.
 - Refactored `download_service.worker_loop` into focused helper functions for HF API jobs and stream-based jobs.
 - Added helper-level tests for internal HF command detection and parsing in download service debug tests.
+- Extracted search/pagination orchestration rules into `search_orchestration.py` and reused them from `app.py`.
+- Added dedicated unit tests for provider selection, query-key generation, page validation, and status message helpers.
 
 ## 1.0.0 - 2026-03-04
 
