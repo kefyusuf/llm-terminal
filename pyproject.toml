@@ -55,7 +55,7 @@ ignore = [
 known-first-party = ["app", "download_manager", "download_service", "hardware",
                      "models", "providers", "service_client", "utils",
                      "download_status", "download_history", "search_cache",
-                     "search_orchestration", "results_view"]
+                     "search_orchestration", "results_view", "results_layout"]
 
 # ---------------------------------------------------------------------------
 # Mypy — static type checking

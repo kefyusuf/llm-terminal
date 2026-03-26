@@ -22,6 +22,7 @@ from download_history import (
 from hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
+from results_layout import column_keys_for_width, compute_column_widths
 from results_view import filter_results_for_view, result_unique_key
 from search_cache import SearchCache
 from search_orchestration import (
@@ -718,78 +719,11 @@ class AIModelViewer(App):
     def _configure_results_table_columns(self, force: bool = False, refresh_rows: bool = False):
         table = self.query_one("#results-table", DataTable)
         available_width = max(table.size.width, self.size.width, 80)
-
-        if available_width >= 140:
-            next_keys = [
-                "inst",
-                "source",
-                "publisher",
-                "name",
-                "params",
-                "use_case",
-                "score",
-                "quant",
-                "mode",
-                "fit",
-                "download",
-            ]
-        elif available_width >= 120:
-            next_keys = [
-                "inst",
-                "source",
-                "publisher",
-                "name",
-                "params",
-                "score",
-                "quant",
-                "fit",
-                "download",
-            ]
-        elif available_width >= 100:
-            next_keys = [
-                "inst",
-                "source",
-                "name",
-                "params",
-                "score",
-                "fit",
-                "download",
-            ]
-        else:
-            next_keys = ["inst", "source", "name", "score", "download"]
+        next_keys = column_keys_for_width(available_width)
 
         if not force and next_keys == self.results_column_keys:
             return
-
-        min_widths = {
-            "inst": 8,
-            "source": 10,
-            "publisher": 8,
-            "name": 18,
-            "params": 6,
-            "use_case": 5,
-            "score": 8,
-            "quant": 6,
-            "mode": 8,
-            "fit": 7,
-            "download": 4,
-        }
-        separator_budget = len(next_keys) + 2
-        target_content_width = max(40, available_width - separator_budget)
-        base_widths = {key: min_widths[key] for key in next_keys}
-        min_total = sum(base_widths.values())
-        extra = max(0, target_content_width - min_total)
-
-        expandable = ["name", "publisher", "use_case", "download"]
-        while extra > 0:
-            expanded = False
-            for key in expandable:
-                if key in base_widths and extra > 0:
-                    base_widths[key] += 1
-                    extra -= 1
-                    expanded = True
-            if not expanded:
-                break
+        base_widths = compute_column_widths(next_keys, available_width)
 
         table.clear(columns=True)
         for key in next_keys:

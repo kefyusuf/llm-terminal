@@ -17,6 +17,8 @@
 - Added unit tests for fallback history entries, external-entry detection, action labels, and cancel payload shaping.
 - Extracted results-table filtering and hidden-gem ordering into `results_view.py` and reused it in `app.py`.
 - Added tests for result row key generation and result filtering/sorting behavior.
+- Extracted responsive result-column layout rules into `results_layout.py` and reused them from `app.py`.
+- Added unit tests for layout breakpoint key selection and width distribution.
 
 ## 1.0.0 - 2026-03-04
 
