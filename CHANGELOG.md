@@ -35,6 +35,8 @@
 - Updated column reflow logic to also react when width changes inside the same breakpoint (not only key set changes).
 - Removed heavy side-effects from `update_status()` (hardware polling and snapshot writes), reducing UI stalls.
 - Added generation-guarded resize debounce and reduced unconditional download-history redraws in poll loop.
+- Debounced search dispatch on rapid filter/query changes to prevent stacked worker threads and delayed UI response.
+- Reduced `on_search_progress()` UI churn by throttling duplicate progress updates and skipping expensive table redraws.
 
 ## 1.0.0 - 2026-03-04
 

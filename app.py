@@ -615,6 +615,12 @@ class AIModelViewer(App):
         self.has_more_pages = True
         self._resize_reflow_timer = None
         self._resize_reflow_generation = 0
+        self._search_debounce_timer = None
+        self._search_debounce_delay = 0.12
+        self._pending_search_payload = None
+        self._search_inflight_signature = None
+        self._search_inflight_started_at = 0.0
+        self._search_progress_stamp = (0, "", 0.0)
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -904,11 +910,43 @@ class AIModelViewer(App):
         self.start_search(query)
 
     def start_search(self, query: str) -> None:
+        query = query.strip()
         if not query:
             return
         providers = self._get_search_providers()
         if providers == ["ollama"]:
             self.current_page = 0
+        page = self.current_page
+        signature = (tuple(providers), query.lower(), page)
+
+        if (
+            self._search_inflight_signature == signature
+            and (time.monotonic() - self._search_inflight_started_at) < 1.0
+        ):
+            return
+
+        self._pending_search_payload = (query, providers, page, signature)
+        if self._search_debounce_timer is not None:
+            try:
+                self._search_debounce_timer.stop()
+            except Exception:
+                pass
+        self._search_debounce_timer = self.set_timer(
+            self._search_debounce_delay,
+            self._dispatch_debounced_search,
+        )
+
+    def _dispatch_debounced_search(self) -> None:
+        self._search_debounce_timer = None
+        payload = self._pending_search_payload
+        self._pending_search_payload = None
+        if payload is None:
+            return
+
+        query, providers, page, signature = payload
+        self.current_page = page
+        self._search_inflight_signature = signature
+        self._search_inflight_started_at = time.monotonic()
         query_key = build_query_key(providers, query, self.current_page)
 
         current_specs = self.monitor.get_specs()
@@ -940,22 +978,12 @@ class AIModelViewer(App):
     def on_search_progress(self, search_id: int, message: str) -> None:
         if search_id != self.active_search_id:
             return
-
+        now = time.monotonic()
+        last_search_id, last_message, last_ts = self._search_progress_stamp
+        if search_id == last_search_id and message == last_message and (now - last_ts) < 0.2:
+            return
+        self._search_progress_stamp = (search_id, message, now)
         self.update_status(message)
-        table = self.query_one("#results-table", DataTable)
-        self._configure_results_table_columns()
-        table.clear()
-        row_data = self._blank_result_row()
-        row_data["inst"] = "[cyan]...[/cyan]"
-        row_data["source"] = "System"
-        name_width = max(16, self.results_column_widths.get("name", 24))
-        short_message = self._truncate_cell(f"Status: {message}", max(10, name_width - 1))
-        row_data["name"] = short_message
-        row_data["download"] = self._download_cell_markup("Working")
-        table.add_row(*self._row_cells_for_current_layout(row_data), key="search-progress")
-        self._update_results_meta(0)
-        table.move_cursor(row=0, animate=False, scroll=False)
-        table.scroll_to(x=0, y=0, animate=False, immediate=True)
 
     def _get_search_providers(self) -> list[str]:
         """Return list of providers to search based on current_filter."""
@@ -1532,6 +1560,9 @@ class AIModelViewer(App):
     def on_search_completed(self, search_id: int) -> None:
         if search_id != self.active_search_id:
             return
+
+        self._search_inflight_signature = None
+        self._search_inflight_started_at = 0.0
 
         table = self.query_one("#results-table", DataTable)
         table.loading = False
