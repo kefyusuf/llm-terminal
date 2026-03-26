@@ -41,6 +41,8 @@
 - Relaxed default UI polling intervals (`ollama_status_poll_interval`, `ui_download_poll_interval`, `download_history_refresh_interval`) to reduce main-thread pressure.
 - Moved system hardware/ollama polling to an async worker path to avoid blocking the main UI event loop.
 - Replaced synchronous `monitor.get_specs()` usage in search dispatch with cached/fallback specs on the UI thread.
+- Moved periodic download polling (`/jobs`, `/debug/active`, `/health`) to an async worker path to avoid UI-thread network stalls.
+- Updated timer-driven download refresh to apply fetched snapshots on the main thread only after background polling completes.
 
 ## 1.0.0 - 2026-03-04
 

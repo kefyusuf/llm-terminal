@@ -602,6 +602,7 @@ class AIModelViewer(App):
         self.download_spinner_index = 0
         self.download_spinner_frames = ["-", "\\", "|", "/"]
         self.download_registry = {}
+        self._download_poll_running = False
         self.download_history_limit = config.settings.download_history_limit
         self.download_history_refresh_interval = config.settings.download_history_refresh_interval
         self.last_download_history_refresh_at = 0.0
@@ -704,7 +705,8 @@ class AIModelViewer(App):
             self.request_system_info_refresh,
         )
         self.download_status_timer = self.set_interval(
-            config.settings.ui_download_poll_interval, self.refresh_download_progress
+            config.settings.ui_download_poll_interval,
+            self.request_download_poll,
         )
 
     def on_resize(self, event: events.Resize) -> None:
@@ -1271,14 +1273,15 @@ class AIModelViewer(App):
         )
         trim_download_registry(self.download_registry, self.download_history_limit)
 
-    def sync_download_jobs_from_service(self, force=False):
-        try:
-            jobs = list_jobs(
-                limit=self.download_history_limit,
-                timeout=self.download_poll_request_timeout,
-            )
-        except Exception:
-            return
+    def sync_download_jobs_from_service(self, force=False, jobs=None):
+        if jobs is None:
+            try:
+                jobs = list_jobs(
+                    limit=self.download_history_limit,
+                    timeout=self.download_poll_request_timeout,
+                )
+            except Exception:
+                return
 
         running_targets = set()
         for job in jobs:
@@ -1441,8 +1444,46 @@ class AIModelViewer(App):
         return changed
 
     def refresh_download_progress(self):
-        self.sync_download_jobs_from_service(force=False)
-        self.refresh_download_debug()
+        self.request_download_poll()
+
+    def request_download_poll(self, force=False):
+        if self._download_poll_running and not force:
+            return
+        if self._download_poll_running:
+            return
+        self._download_poll_running = True
+        self._run_download_poll_worker()
+
+    @work(thread=True)
+    def _run_download_poll_worker(self):
+        jobs = None
+        debug = None
+        health = None
+
+        try:
+            jobs = list_jobs(
+                limit=self.download_history_limit,
+                timeout=self.download_poll_request_timeout,
+            )
+        except Exception:
+            jobs = None
+
+        try:
+            debug = get_active_download_debug(timeout=self.download_poll_request_timeout)
+        except Exception:
+            try:
+                health = get_service_health(timeout=self.download_poll_request_timeout)
+            except Exception:
+                health = None
+
+        self.call_from_thread(self._apply_download_poll_snapshot, jobs, debug, health)
+
+    def _apply_download_poll_snapshot(self, jobs, debug, health):
+        self._download_poll_running = False
+        if jobs is not None:
+            self.sync_download_jobs_from_service(force=False, jobs=jobs)
+        self._render_download_debug(debug, health)
+
         if not self.active_downloads:
             if self.download_history_refresh_pending:
                 self.request_download_history_refresh()
@@ -1454,8 +1495,10 @@ class AIModelViewer(App):
             self.request_download_history_refresh()
 
     def refresh_download_debug(self):
-        try:
-            debug = get_active_download_debug(timeout=self.download_poll_request_timeout)
+        self.request_download_poll(force=True)
+
+    def _render_download_debug(self, debug=None, health=None):
+        if debug is not None:
             count = debug.get("count", 0)
             has_duplicates = bool(debug.get("has_duplicates", False))
             worker_alive = bool(debug.get("worker_alive", True))
@@ -1464,17 +1507,18 @@ class AIModelViewer(App):
             self.query_one("#downloads-debug", Static).update(
                 f"Workers: {count} ({worker_text}) | Duplicates: {dup_text}"
             )
-        except Exception:
-            try:
-                health = get_service_health(timeout=self.download_poll_request_timeout)
-                version = health.get("version", "unknown")
-                self.query_one("#downloads-debug", Static).update(
-                    f"Workers: legacy service ({version}) | Duplicates: unknown"
-                )
-            except Exception:
-                self.query_one("#downloads-debug", Static).update(
-                    "Workers: unavailable | Duplicates: unknown"
-                )
+            return
+
+        if health is not None:
+            version = health.get("version", "unknown")
+            self.query_one("#downloads-debug", Static).update(
+                f"Workers: legacy service ({version}) | Duplicates: unknown"
+            )
+            return
+
+        self.query_one("#downloads-debug", Static).update(
+            "Workers: unavailable | Duplicates: unknown"
+        )
 
     def _mark_ollama_model_installed(self, model_name):
         for item in self.all_results:
