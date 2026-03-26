@@ -29,11 +29,16 @@ def test_live_hugging_face_search_returns_models():
 @pytest.mark.live
 def test_live_ollama_search_returns_models():
     local_models = get_installed_ollama_models()
-    results, errors = search_ollama_models(
+    search_output = search_ollama_models(
         query="llama",
         specs=TEST_SPECS,
         local_models=local_models,
     )
+
+    if len(search_output) == 3:
+        results, errors, _has_more_pages = search_output
+    else:
+        results, errors = search_output
 
     assert not errors, f"Ollama live search returned errors: {errors}"
     assert results, "Ollama live search returned no models"
