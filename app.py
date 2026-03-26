@@ -13,6 +13,12 @@ from download_status import (
     state_markup_from_state_and_label,
 )
 from download_manager import download_target_id
+from download_history import (
+    action_label_for_entry,
+    cancel_model_payload,
+    fallback_entry_from_target,
+    is_external_entry,
+)
 from hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
@@ -1144,49 +1150,22 @@ class AIModelViewer(App):
             target_id = str(event.row_key.value)
             entry = self.download_registry.get(target_id)
 
-            # If no entry found, still try to show modal with basic info
             if not entry:
-                # Try to create entry from row data
-                entry = {
-                    "target_id": target_id,
-                    "source": target_id.split(":")[0] if ":" in target_id else "unknown",
-                    "name": target_id.split(":")[1] if ":" in target_id else target_id,
-                    "state": "idle",
-                    "detail": "External download",
-                }
+                entry = fallback_entry_from_target(target_id)
 
-            # Check if action column was clicked (column index 5)
             cursor_column = data_table.cursor_column
-            if cursor_column == 5:  # Action column
+            if cursor_column == 5:
                 state = entry.get("state", "idle")
 
-                # Check if this is external/unkown
-                is_external = state == "idle" and not any(
-                    x in str(entry.get("detail", "")).lower()
-                    for x in ["download", "pull", "queue", "completed", "failed", "cancel"]
-                )
-
-                if is_external:
-                    # External download - can't manage through our system
+                if is_external_entry(entry):
                     self.update_status("External download - cannot manage through this app")
                     return
 
-                if state in {"downloading", "queued", "running"}:
-                    # Cancel download
-                    self.cancel_model_download(
-                        {
-                            "source": entry.get("source", "-"),
-                            "name": entry.get("name", "-"),
-                            "id": target_id.split(":", maxsplit=1)[1]
-                            if ":" in target_id
-                            else target_id,
-                        }
-                    )
+                if is_active_state(state):
+                    self.cancel_model_download(cancel_model_payload(target_id, entry))
                 else:
-                    # Delete entry (just history, keeps data for resume)
                     self.delete_download_entry(target_id, delete_data=False)
             else:
-                # Show detail modal
                 self.push_screen(DownloadJobModal(entry))
             return
 
@@ -1458,22 +1437,8 @@ class AIModelViewer(App):
         )
 
         for entry in entries[: self.download_history_limit]:
-            state = entry.get("state", "idle")
             target_id = entry.get("target_id", "-")
-
-            # Check if this is an external download (not tracked by our system)
-            is_external = state == "idle" and not any(
-                x in str(entry.get("detail", "")).lower()
-                for x in ["download", "pull", "queue", "completed", "failed", "cancel"]
-            )
-
-            # Create action button based on state
-            if is_external:
-                action_btn = "External"
-            elif is_active_state(state):
-                action_btn = "Cancel"
-            else:
-                action_btn = "Delete"
+            action_btn = action_label_for_entry(entry)
 
             table.add_row(
                 entry.get("source", "-"),

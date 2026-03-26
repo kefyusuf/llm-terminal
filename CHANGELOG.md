@@ -13,6 +13,8 @@
 - Added helper-level tests for internal HF command detection and parsing in download service debug tests.
 - Extracted search/pagination orchestration rules into `search_orchestration.py` and reused them from `app.py`.
 - Added dedicated unit tests for provider selection, query-key generation, page validation, and status message helpers.
+- Extracted download history row-action decisions into `download_history.py` to remove duplicate logic in `app.py`.
+- Added unit tests for fallback history entries, external-entry detection, action labels, and cancel payload shaping.
 
 ## 1.0.0 - 2026-03-04
 
