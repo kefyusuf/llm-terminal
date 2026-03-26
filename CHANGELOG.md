@@ -28,6 +28,8 @@
 - Fixed `scripts/release_check.py` Ollama check to support current `search_ollama_models` return shape.
 - Added `release_check_helpers.unpack_search_output` to normalize provider search outputs in release preflight.
 - Added unit tests for release-check search output normalization.
+- Extracted common results-table text helpers into `results_text.py` and delegated `app.py` wrappers to it.
+- Added unit tests for truncation, alignment, header formatting, and blank-row payload helpers.
 
 ## 1.0.0 - 2026-03-04
 

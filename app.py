@@ -1,4 +1,3 @@
-import re
 import subprocess
 import time
 from urllib.error import HTTPError
@@ -40,6 +39,13 @@ from results_presenter import (
     score_cell_markup,
     source_cell_markup,
     use_case_cell_markup,
+)
+from results_text import (
+    align_plain_cell,
+    blank_result_row,
+    format_header_label,
+    truncate_cell,
+    truncate_plain_cell,
 )
 from results_view import filter_results_for_view, result_unique_key
 from search_cache import SearchCache
@@ -756,51 +762,19 @@ class AIModelViewer(App):
             self.refresh_table()
 
     def _truncate_cell(self, value, max_len):
-        text = str(value or "-")
-        if len(text) <= max_len:
-            return text
-        if max_len <= 3:
-            return text[:max_len]
-        return text[: max_len - 3] + "..."
+        return truncate_cell(value, max_len)
 
     def _truncate_plain_cell(self, value, max_len):
-        text = re.sub(r"\[[^\]]+\]", "", str(value or "-")).strip()
-        if not text:
-            text = "-"
-        return self._truncate_cell(text, max_len)
+        return truncate_plain_cell(value, max_len)
 
     def _format_header_label(self, label, width):
-        if width <= 0:
-            return str(label)
-        text = self._truncate_plain_cell(label, width)
-        return text.ljust(width)
+        return format_header_label(label, width)
 
     def _align_plain_cell(self, value, width, align="left"):
-        text = str(value or "-")
-        if width <= 0:
-            return text
-        if len(text) > width:
-            text = self._truncate_cell(text, width)
-        if align == "center":
-            return text.center(width)
-        if align == "right":
-            return text.rjust(width)
-        return text.ljust(width)
+        return align_plain_cell(value, width, align)
 
     def _blank_result_row(self):
-        return {
-            "inst": "-",
-            "source": "-",
-            "publisher": "-",
-            "name": "-",
-            "params": "-",
-            "use_case": "-",
-            "score": "-",
-            "quant": "-",
-            "mode": "-",
-            "fit": "-",
-            "download": "-",
-        }
+        return blank_result_row()
 
     def _fit_cell_markup(self, fit_text):
         return fit_cell_markup(

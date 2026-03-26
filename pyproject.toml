@@ -56,7 +56,7 @@ known-first-party = ["app", "download_manager", "download_service", "hardware",
                      "models", "providers", "service_client", "utils",
                      "download_status", "download_history", "download_lifecycle", "search_cache",
                      "search_orchestration", "results_view", "results_layout",
-                     "results_presenter", "release_check_helpers"]
+                     "results_presenter", "results_text", "release_check_helpers"]
 
 # ---------------------------------------------------------------------------
 # Mypy — static type checking
