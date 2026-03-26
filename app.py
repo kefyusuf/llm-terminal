@@ -138,6 +138,16 @@ class ModelDetailModal(ModalScreen):
         super().__init__()
         self.data = data
 
+    def on_mount(self) -> None:
+        set_pause = getattr(self.app, "_set_modal_poll_pause", None)
+        if callable(set_pause):
+            set_pause(True)
+
+    def on_unmount(self) -> None:
+        set_pause = getattr(self.app, "_set_modal_poll_pause", None)
+        if callable(set_pause):
+            set_pause(False)
+
     def compose(self) -> ComposeResult:
         if self.data["source"] == "Ollama":
             cmd_text = f"ollama run {self.data['name']}"
@@ -339,6 +349,16 @@ class DownloadJobModal(ModalScreen):
     def __init__(self, entry):
         super().__init__()
         self.entry = entry
+
+    def on_mount(self) -> None:
+        set_pause = getattr(self.app, "_set_modal_poll_pause", None)
+        if callable(set_pause):
+            set_pause(True)
+
+    def on_unmount(self) -> None:
+        set_pause = getattr(self.app, "_set_modal_poll_pause", None)
+        if callable(set_pause):
+            set_pause(False)
 
     def compose(self) -> ComposeResult:
         state = (self.entry.get("state") or self.entry.get("status") or "idle").lower()
@@ -617,6 +637,7 @@ class AIModelViewer(App):
         self.download_spinner_frames = ["-", "\\", "|", "/"]
         self.download_registry = {}
         self._download_poll_running = False
+        self._modal_poll_pause_count = 0
         self.download_history_limit = config.settings.download_history_limit
         self.download_history_refresh_interval = config.settings.download_history_refresh_interval
         self.last_download_history_refresh_at = 0.0
@@ -639,6 +660,16 @@ class AIModelViewer(App):
         self._search_inflight_started_at = 0.0
         self._search_progress_stamp = (0, "", 0.0)
         self._search_progress_visible = False
+
+    def _set_modal_poll_pause(self, enabled: bool) -> None:
+        if enabled:
+            self._modal_poll_pause_count += 1
+            return
+
+        self._modal_poll_pause_count = max(0, self._modal_poll_pause_count - 1)
+        if self._modal_poll_pause_count == 0:
+            self.request_system_info_refresh(force=True)
+            self.request_download_poll(force=True)
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -900,6 +931,8 @@ class AIModelViewer(App):
         self.request_system_info_refresh(force=True)
 
     def request_system_info_refresh(self, force=False):
+        if self._modal_poll_pause_count > 0 and not force:
+            return
         if self._system_info_refresh_running and not force:
             return
         if self._system_info_refresh_running:
@@ -1487,6 +1520,8 @@ class AIModelViewer(App):
         self.request_download_poll()
 
     def request_download_poll(self, force=False):
+        if self._modal_poll_pause_count > 0 and not force:
+            return
         if self._download_poll_running and not force:
             return
         if self._download_poll_running:

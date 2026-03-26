@@ -47,6 +47,8 @@
 - Hardened modal rendering for transient/unknown states (e.g., `canceling`) and missing fields to prevent popup crashes.
 - Added safe-guarded table/debug widget updates so background polling does not crash when modal screens are active.
 - Guarded `update_status()` when `#status-bar` is not available and reordered HF detail status update before opening modal.
+- Added modal-aware UI polling pause/resume so timer-driven widget refreshes do not race modal transitions.
+- Resuming from modals now triggers a forced one-shot system/download snapshot refresh without affecting background download service work.
 
 ## 1.0.0 - 2026-03-04
 
