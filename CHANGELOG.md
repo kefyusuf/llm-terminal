@@ -62,6 +62,8 @@
 - Shortened compact chip labels (OL/HF, CODE, DL, PART) and added inline key hints for faster keyboard-first operation.
 - Added color-segmented compact chip rendering for faster glanceability and extracted it into a dedicated helper method.
 - Synced provider cycle action with radio-button selection state to keep top-row controls visually consistent.
+- Simplified compact chip text to pure status metrics and hid Footer in compact mode to reclaim one extra content row.
+- Added compact-mode status hint text on view toggle to preserve discoverability of keyboard controls.
 
 ## 1.0.0 - 2026-03-04
 

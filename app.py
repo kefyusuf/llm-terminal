@@ -747,6 +747,7 @@ class AIModelViewer(App):
             use_case_panel = self.query_one("#use-case-panel", Vertical)
             pagination_controls = self.query_one("#pagination-controls", Horizontal)
             results_meta = self.query_one("#results-meta", Static)
+            footer = self.query_one(Footer)
         except Exception:
             return
 
@@ -760,6 +761,7 @@ class AIModelViewer(App):
             downloads_label.styles.display = "none"
             downloads_debug.styles.display = "none"
             download_table.styles.display = "none"
+            footer.styles.display = "none"
             search_row.styles.height = "3"
             search_row.styles.margin_bottom = 1
             search_panel.styles.width = "30%"
@@ -784,6 +786,7 @@ class AIModelViewer(App):
             downloads_label.styles.display = "block"
             downloads_debug.styles.display = "block"
             download_table.styles.display = "block"
+            footer.styles.display = "block"
             search_row.styles.height = "3"
             search_row.styles.margin_bottom = 1
             search_panel.styles.width = "34%"
@@ -806,8 +809,12 @@ class AIModelViewer(App):
         self.ui_mode = "compact" if self.compact_mode else "comfortable"
         self._apply_ui_mode()
         self._configure_results_table_columns(force=True, refresh_rows=True)
-        mode_text = "compact" if self.compact_mode else "comfortable"
-        self.update_status(f"View mode: {mode_text}")
+        if self.compact_mode:
+            self.update_status(
+                "View mode: compact. Keys: p provider, u use, s sort, f fit, h gems, [/] page."
+            )
+        else:
+            self.update_status("View mode: comfortable")
 
     def _use_case_label(self, key: str) -> str:
         for option_key, option_label in self.USE_CASE_OPTIONS:
@@ -872,12 +879,7 @@ class AIModelViewer(App):
             f"[#8ea3cf]S:[/#8ea3cf][#7edfff]{sort_label}[/#7edfff]  "
             f"[#8ea3cf]F:[/#8ea3cf][#f2c46d]{fit_label}[/#f2c46d]  "
             f"[#8ea3cf]G:[/#8ea3cf][#4fe08a]{gems_label}[/#4fe08a]  "
-            f"[#8ea3cf]Pg:[/#8ea3cf][#dbe7ff]{page_label}[/#dbe7ff]  "
-            "[#5f6f97]|[/#5f6f97] [#7489b8]/[/#7489b8] "
-            "[#8ea3cf](p)[/#8ea3cf]prov [#8ea3cf](u)[/#8ea3cf]use "
-            "[#8ea3cf](s)[/#8ea3cf]sort [#8ea3cf](f)[/#8ea3cf]fit "
-            "[#8ea3cf](h)[/#8ea3cf]gems [#8ea3cf](v)[/#8ea3cf]view "
-            "[#8ea3cf]([)/(])[/#8ea3cf]page"
+            f"[#8ea3cf]Pg:[/#8ea3cf][#dbe7ff]{page_label}[/#dbe7ff]"
         )
 
     def _set_use_case_filter(self, key: str) -> None:
