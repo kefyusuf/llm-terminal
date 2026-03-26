@@ -748,7 +748,7 @@ class AIModelViewer(App):
             return
 
         if self.compact_mode:
-            results_table.styles.height = "4fr"
+            results_table.styles.height = "3fr"
             use_case_filter.styles.display = "none"
             gem_toggle.styles.display = "none"
             compact_chipbar.styles.display = "block"
@@ -757,12 +757,15 @@ class AIModelViewer(App):
             downloads_label.styles.display = "none"
             downloads_debug.styles.display = "none"
             download_table.styles.display = "none"
-            search_row.styles.height = "2"
-            search_row.styles.margin_bottom = 0
+            search_row.styles.height = "3"
+            search_row.styles.margin_bottom = 1
             search_panel.styles.width = "1fr"
-            search_panel.styles.margin_right = 0
-            provider_panel.styles.display = "none"
-            search_input.styles.height = "2"
+            search_panel.styles.margin_right = 1
+            search_panel.styles.height = "3"
+            provider_panel.styles.display = "block"
+            provider_panel.styles.width = "24"
+            provider_panel.styles.height = "3"
+            search_input.styles.height = "3"
             search_input.placeholder = "Press / to search..."
         else:
             results_table.styles.height = "2fr"
@@ -778,7 +781,10 @@ class AIModelViewer(App):
             search_row.styles.margin_bottom = 1
             search_panel.styles.width = "42%"
             search_panel.styles.margin_right = 1
+            search_panel.styles.height = "3"
             provider_panel.styles.display = "block"
+            provider_panel.styles.width = "1fr"
+            provider_panel.styles.height = "3"
             search_input.styles.height = "3"
             search_input.placeholder = "Press / to search Ollama models (e.g., qwen, llama)"
 

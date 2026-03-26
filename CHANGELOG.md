@@ -57,6 +57,7 @@
 - Extended result filtering/sorting pipeline with explicit sort mode and fit filter handling.
 - Refined compact layout into a tighter toolbar flow by hiding provider panel, pagination row, and secondary filters while preserving keyboard access.
 - Added compact pagination keybinds (`[` and `]`) and model count display in compact chip bar.
+- Restored always-visible search/provider row sizing in compact mode to prevent hidden input and ensure search remains accessible.
 
 ## 1.0.0 - 2026-03-04
 
