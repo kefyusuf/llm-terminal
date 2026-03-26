@@ -43,6 +43,8 @@
 - Replaced synchronous `monitor.get_specs()` usage in search dispatch with cached/fallback specs on the UI thread.
 - Moved periodic download polling (`/jobs`, `/debug/active`, `/health`) to an async worker path to avoid UI-thread network stalls.
 - Updated timer-driven download refresh to apply fetched snapshots on the main thread only after background polling completes.
+- Restored a lightweight single-row "search in progress" placeholder in the results table without per-progress redraw churn.
+- Hardened modal rendering for transient/unknown states (e.g., `canceling`) and missing fields to prevent popup crashes.
 
 ## 1.0.0 - 2026-03-04
 

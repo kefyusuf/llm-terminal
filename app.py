@@ -169,20 +169,32 @@ class ModelDetailModal(ModalScreen):
             yield Label(
                 f"[#718096]Source:[/#718096] [#e2e8f0]{self.data['source']} / {self.data.get('publisher', '-')}[/#e2e8f0]"
             )
-            yield Label(f"[#718096]Provider:[/#718096] [#e2e8f0]{self.data['provider']}[/#e2e8f0]")
-            yield Label(f"[#718096]Use Case:[/#718096] [#e2e8f0]{self.data['use_case']}[/#e2e8f0]")
-            yield Label(f"[#718096]Scale:[/#718096] [#e2e8f0]{self.data['params']}[/#e2e8f0]")
+            yield Label(
+                f"[#718096]Provider:[/#718096] [#e2e8f0]{self.data.get('provider', '-')}[/#e2e8f0]"
+            )
+            yield Label(
+                f"[#718096]Use Case:[/#718096] [#e2e8f0]{self.data.get('use_case', '-')}[/#e2e8f0]"
+            )
+            yield Label(
+                f"[#718096]Scale:[/#718096] [#e2e8f0]{self.data.get('params', '-')}[/#e2e8f0]"
+            )
 
             # Technical Specs
             yield Label("")
             yield Label("[bold #63b3ed]⚙️ Technical Specifications[/bold #63b3ed]")
-            yield Label(f"[#718096]Format:[/#718096] [#e2e8f0]{self.data['quant']}[/#e2e8f0]")
-            yield Label(f"[#718096]Score:[/#718096] [#4299e1]{self.data['score']}[/#4299e1]")
             yield Label(
-                f"[#718096]Size:[/#718096] [#e2e8f0]{self.data['size']} {confidence_label}[/#e2e8f0]"
+                f"[#718096]Format:[/#718096] [#e2e8f0]{self.data.get('quant', '-')}[/#e2e8f0]"
             )
-            yield Label(f"[#718096]Fit:[/#718096] [{fit_class}]{self.data['fit']}[/{fit_class}]")
-            yield Label(f"[#718096]Mode:[/#718096] [#48bb78]{self.data['mode']}[/#48bb78]")
+            yield Label(
+                f"[#718096]Score:[/#718096] [#4299e1]{self.data.get('score', '-')}[/#4299e1]"
+            )
+            yield Label(
+                f"[#718096]Size:[/#718096] [#e2e8f0]{self.data.get('size', '-')} {confidence_label}[/#e2e8f0]"
+            )
+            yield Label(
+                f"[#718096]Fit:[/#718096] [{fit_class}]{self.data.get('fit', '-')}[/{fit_class}]"
+            )
+            yield Label(f"[#718096]Mode:[/#718096] [#48bb78]{self.data.get('mode', '-')}[/#48bb78]")
 
             # Command
             yield Label("")
@@ -339,10 +351,12 @@ class DownloadJobModal(ModalScreen):
             "completed": "job-status-completed",
             "failed": "job-status-failed",
             "cancelled": "job-status-cancelled",
+            "canceling": "job-status-cancelled",
         }.get(state, "")
+        status_markup = f"[{status_class}]{state}[/{status_class}]" if status_class else state
 
         # Check if this is an active download
-        is_active = state in {"queued", "downloading", "running"}
+        is_active = state in {"queued", "downloading", "running", "canceling"}
 
         with Vertical(id="job-modal"):
             # Header
@@ -355,7 +369,7 @@ class DownloadJobModal(ModalScreen):
             yield Label(
                 f"[#718096]Publisher:[/#718096] [#e2e8f0]{self.entry.get('publisher', '-')}[/#e2e8f0]"
             )
-            yield Label(f"[#718096]Status:[/#718096] [{status_class}]{state}[/{status_class}]")
+            yield Label(f"[#718096]Status:[/#718096] {status_markup}")
             yield Label(f"[#718096]Progress:[/#718096] [#e2e8f0]{progress}[/#e2e8f0]")
 
             # Buttons
@@ -624,6 +638,7 @@ class AIModelViewer(App):
         self._search_inflight_signature = None
         self._search_inflight_started_at = 0.0
         self._search_progress_stamp = (0, "", 0.0)
+        self._search_progress_visible = False
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -998,7 +1013,8 @@ class AIModelViewer(App):
         self.active_search_id = self.search_counter
         table = self.query_one("#results-table", DataTable)
         table.clear()
-        table.loading = False
+        table.loading = True
+        self._search_progress_visible = False
         self._update_results_meta(0)
 
         provider_name = provider_display_name(providers)
@@ -1027,6 +1043,21 @@ class AIModelViewer(App):
             return
         self._search_progress_stamp = (search_id, message, now)
         self.update_status(message)
+        if self._search_progress_visible:
+            return
+
+        table = self.query_one("#results-table", DataTable)
+        self._configure_results_table_columns()
+        table.clear()
+        row_data = self._blank_result_row()
+        row_data["inst"] = "[cyan]...[/cyan]"
+        row_data["source"] = "System"
+        name_width = max(16, self.results_column_widths.get("name", 24))
+        row_data["name"] = self._truncate_cell(f"Status: {message}", max(10, name_width - 1))
+        row_data["download"] = self._download_cell_markup("Working")
+        table.add_row(*self._row_cells_for_current_layout(row_data), key="search-progress")
+        self._update_results_meta(0)
+        self._search_progress_visible = True
 
     def _get_search_providers(self) -> list[str]:
         """Return list of providers to search based on current_filter."""
@@ -1651,6 +1682,7 @@ class AIModelViewer(App):
 
         self._search_inflight_signature = None
         self._search_inflight_started_at = 0.0
+        self._search_progress_visible = False
 
         table = self.query_one("#results-table", DataTable)
         table.loading = False
