@@ -614,6 +614,7 @@ class AIModelViewer(App):
         self.total_results = 0
         self.has_more_pages = True
         self._resize_reflow_timer = None
+        self._resize_reflow_generation = 0
 
     def compose(self) -> ComposeResult:
         yield SystemInfoWidget(id="header")
@@ -702,14 +703,21 @@ class AIModelViewer(App):
 
     def on_resize(self, event: events.Resize) -> None:
         _ = event
+        self._resize_reflow_generation += 1
+        generation = self._resize_reflow_generation
         if self._resize_reflow_timer is not None:
             try:
                 self._resize_reflow_timer.stop()
             except Exception:
                 pass
-        self._resize_reflow_timer = self.set_timer(0.08, self._apply_resize_reflow)
+        self._resize_reflow_timer = self.set_timer(
+            0.16,
+            lambda: self._apply_resize_reflow(generation),
+        )
 
-    def _apply_resize_reflow(self) -> None:
+    def _apply_resize_reflow(self, generation: int) -> None:
+        if generation != self._resize_reflow_generation:
+            return
         self._resize_reflow_timer = None
         self._configure_results_table_columns(refresh_rows=True)
 
@@ -860,10 +868,6 @@ class AIModelViewer(App):
     def update_status(self, text):
         """Update the status bar at the bottom of the screen with *text*."""
         self.query_one("#status-bar", Static).update(text)
-        specs = self.monitor.get_specs()
-        self.latest_specs = specs
-        cache_db.set_hardware_snapshot(specs)
-        self.poll_ollama_status(refresh_only=True)
 
     def update_system_info(self):
         """Update the system info header widget with current hardware specs."""
@@ -1252,6 +1256,7 @@ class AIModelViewer(App):
             self.refresh_download_history_table()
         elif state_changed:
             self.refresh_table()
+            self.request_download_history_refresh()
 
     def refresh_download_history_table(self):
         table = self.query_one("#download-history-table", DataTable)
@@ -1366,8 +1371,6 @@ class AIModelViewer(App):
     def refresh_download_progress(self):
         self.sync_download_jobs_from_service(force=False)
         self.refresh_download_debug()
-        # Always refresh history table to catch state changes
-        self.refresh_download_history_table()
         if not self.active_downloads:
             if self.download_history_refresh_pending:
                 self.request_download_history_refresh()

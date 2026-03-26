@@ -33,6 +33,8 @@
 - Marked `terminal_ui` runtime title and startup banner as legacy to reduce product identity confusion.
 - Debounced resize reflow handling in `app.py` to avoid repeated table rebuilds while dragging window size.
 - Updated column reflow logic to also react when width changes inside the same breakpoint (not only key set changes).
+- Removed heavy side-effects from `update_status()` (hardware polling and snapshot writes), reducing UI stalls.
+- Added generation-guarded resize debounce and reduced unconditional download-history redraws in poll loop.
 
 ## 1.0.0 - 2026-03-04
 
