@@ -487,8 +487,9 @@ class AIModelViewer(App):
         border: round #3a4666;
     }
     #search-filters-row { height: 3; margin-bottom: 1; }
-    #search-panel { width: 42%; min-width: 38; margin-right: 1; height: 3; }
-    #provider-panel { width: 1fr; height: 3; }
+    #search-panel { width: 34%; min-width: 28; margin-right: 1; height: 3; }
+    #provider-panel { width: 22; margin-right: 1; height: 3; }
+    #use-case-panel { width: 1fr; height: 3; }
     #search-input { height: 3; }
     RadioSet {
         layout: horizontal;
@@ -503,7 +504,7 @@ class AIModelViewer(App):
     RadioButton { color: #9fb2df; }
     RadioButton.-selected { color: #4fe08a; text-style: bold; }
     #filter-set { margin-bottom: 0; }
-    #use-case-filter { height: 3; }
+    #use-case-filter { height: 3; margin-bottom: 0; }
     #gem-toggle {
         margin-top: 1;
         margin-bottom: 1;
@@ -742,6 +743,7 @@ class AIModelViewer(App):
             search_row = self.query_one("#search-filters-row", Horizontal)
             search_panel = self.query_one("#search-panel", Vertical)
             provider_panel = self.query_one("#provider-panel", Vertical)
+            use_case_panel = self.query_one("#use-case-panel", Vertical)
             pagination_controls = self.query_one("#pagination-controls", Horizontal)
             results_meta = self.query_one("#results-meta", Static)
         except Exception:
@@ -749,7 +751,7 @@ class AIModelViewer(App):
 
         if self.compact_mode:
             results_table.styles.height = "3fr"
-            use_case_filter.styles.display = "none"
+            use_case_filter.styles.display = "block"
             gem_toggle.styles.display = "none"
             compact_chipbar.styles.display = "block"
             results_meta.styles.display = "none"
@@ -759,12 +761,16 @@ class AIModelViewer(App):
             download_table.styles.display = "none"
             search_row.styles.height = "3"
             search_row.styles.margin_bottom = 1
-            search_panel.styles.width = "1fr"
+            search_panel.styles.width = "30%"
             search_panel.styles.margin_right = 1
             search_panel.styles.height = "3"
             provider_panel.styles.display = "block"
-            provider_panel.styles.width = "24"
+            provider_panel.styles.width = "22"
             provider_panel.styles.height = "3"
+            provider_panel.styles.margin_right = 1
+            use_case_panel.styles.display = "block"
+            use_case_panel.styles.width = "1fr"
+            use_case_panel.styles.height = "3"
             search_input.styles.height = "3"
             search_input.placeholder = "Press / to search..."
         else:
@@ -779,12 +785,16 @@ class AIModelViewer(App):
             download_table.styles.display = "block"
             search_row.styles.height = "3"
             search_row.styles.margin_bottom = 1
-            search_panel.styles.width = "42%"
+            search_panel.styles.width = "34%"
             search_panel.styles.margin_right = 1
             search_panel.styles.height = "3"
             provider_panel.styles.display = "block"
-            provider_panel.styles.width = "1fr"
+            provider_panel.styles.width = "22"
             provider_panel.styles.height = "3"
+            provider_panel.styles.margin_right = 1
+            use_case_panel.styles.display = "block"
+            use_case_panel.styles.width = "1fr"
+            use_case_panel.styles.height = "3"
             search_input.styles.height = "3"
             search_input.placeholder = "Press / to search Ollama models (e.g., qwen, llama)"
 
@@ -861,15 +871,16 @@ class AIModelViewer(App):
                 with RadioSet(id="filter-set"):
                     yield RadioButton("Ollama", value=True, id="filter-ollama")
                     yield RadioButton("Hugging Face", id="filter-hf")
-        with RadioSet(id="use-case-filter"):
-            yield RadioButton("Any Use", value=True, id="uc-all")
-            yield RadioButton("Chat", id="uc-chat")
-            yield RadioButton("Coding", id="uc-coding")
-            yield RadioButton("Vision", id="uc-vision")
-            yield RadioButton("Reason", id="uc-reasoning")
-            yield RadioButton("Math", id="uc-math")
-            yield RadioButton("Embed", id="uc-embedding")
-            yield RadioButton("General", id="uc-general")
+            with Vertical(id="use-case-panel"):
+                with RadioSet(id="use-case-filter"):
+                    yield RadioButton("Any Use", value=True, id="uc-all")
+                    yield RadioButton("Chat", id="uc-chat")
+                    yield RadioButton("Coding", id="uc-coding")
+                    yield RadioButton("Vision", id="uc-vision")
+                    yield RadioButton("Reason", id="uc-reasoning")
+                    yield RadioButton("Math", id="uc-math")
+                    yield RadioButton("Embed", id="uc-embedding")
+                    yield RadioButton("General", id="uc-general")
         yield Checkbox("Hidden gems only (Hugging Face)", id="gem-toggle")
         yield Static("", id="compact-chipbar")
         yield Static("Models (0 shown / 0 total)", id="results-meta")
