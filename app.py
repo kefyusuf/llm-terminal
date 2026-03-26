@@ -614,6 +614,7 @@ class AIModelViewer(App):
         self.max_pages = config.settings.hf_search_max_pages
         self.total_results = 0
         self.has_more_pages = True
+        self._system_info_refresh_running = False
         self._resize_reflow_timer = None
         self._resize_reflow_generation = 0
         self._search_debounce_timer = None
@@ -693,16 +694,14 @@ class AIModelViewer(App):
         self.update_status(
             "Ready. Search defaults to Ollama. Select 'Hugging Face' filter for HF models."
         )
-        self.update_system_info()
+        self.request_system_info_refresh(force=True)
         if not self.ollama_running:
             self.update_status(
                 "Ready. Ollama is not running; local install/runtime features disabled. Search HF for more models."
             )
         self.system_metrics_timer = self.set_interval(
-            config.settings.hardware_poll_interval, self.update_system_info
-        )
-        self.ollama_status_timer = self.set_interval(
-            config.settings.ollama_status_poll_interval, self.poll_ollama_status
+            config.settings.hardware_poll_interval,
+            self.request_system_info_refresh,
         )
         self.download_status_timer = self.set_interval(
             config.settings.ui_download_poll_interval, self.refresh_download_progress
@@ -877,12 +876,47 @@ class AIModelViewer(App):
         self.query_one("#status-bar", Static).update(text)
 
     def update_system_info(self):
-        """Update the system info header widget with current hardware specs."""
-        specs = self.monitor.get_specs()
-        self.latest_specs = specs
-        cache_db.set_hardware_snapshot(specs)
-        running_now = check_ollama_running()
-        self.query_one(SystemInfoWidget).update_info(specs, running_now)
+        """Compatibility wrapper that triggers an async system-info refresh."""
+        self.request_system_info_refresh(force=True)
+
+    def request_system_info_refresh(self, force=False):
+        if self._system_info_refresh_running and not force:
+            return
+        if self._system_info_refresh_running:
+            return
+        self._system_info_refresh_running = True
+        self._run_system_info_refresh_worker()
+
+    @work(thread=True)
+    def _run_system_info_refresh_worker(self):
+        specs = None
+        running_now = self.ollama_running
+        try:
+            specs = self.monitor.get_specs()
+            running_now = check_ollama_running()
+            cache_db.set_hardware_snapshot(specs)
+        except Exception:
+            pass
+        self.call_from_thread(self._apply_system_info_refresh, specs, running_now)
+
+    def _apply_system_info_refresh(self, specs, running_now):
+        self._system_info_refresh_running = False
+        if specs is not None:
+            self.latest_specs = specs
+        specs_to_render = self.latest_specs
+        if specs_to_render is not None:
+            try:
+                self.query_one(SystemInfoWidget).update_info(specs_to_render, running_now)
+            except Exception:
+                pass
+
+        state_changed = running_now != self.ollama_running
+        self.ollama_running = running_now
+        if state_changed:
+            if running_now:
+                self.update_status("Ollama started. Local runtime features enabled.")
+            else:
+                self.update_status("Ollama stopped. Local runtime features disabled.")
 
     def _find_model_by_target_id(self, target_id):
         """Find a model in all_results by its target_id."""
@@ -892,19 +926,25 @@ class AIModelViewer(App):
         return None
 
     def poll_ollama_status(self, refresh_only=False):
-        running_now = check_ollama_running()
-        state_changed = running_now != self.ollama_running
-        self.ollama_running = running_now
+        self.request_system_info_refresh(force=not refresh_only)
 
-        specs = self.latest_specs if self.latest_specs is not None else self.monitor.get_specs()
-        self.query_one(SystemInfoWidget).update_info(specs, running_now)
-
-        if refresh_only or not state_changed:
-            return
-        if running_now:
-            self.update_status("Ollama started. Local runtime features enabled.")
-        else:
-            self.update_status("Ollama stopped. Local runtime features disabled.")
+    def _current_specs_for_search_ui(self):
+        if self.latest_specs is not None:
+            return self.latest_specs
+        cached = cache_db.get_hardware_snapshot()
+        if cached is not None:
+            self.latest_specs = cached
+            return cached
+        return {
+            "cpu_name": self.monitor.cpu_name,
+            "cpu_cores": self.monitor.cpu_cores,
+            "ram_free": 0.0,
+            "ram_total": 0.0,
+            "vram_free": 0.0,
+            "vram_total": 0.0,
+            "gpu_name": self.monitor.gpu_name,
+            "has_gpu": self.monitor.nvidia_available,
+        }
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         query = event.value.strip()
@@ -950,7 +990,7 @@ class AIModelViewer(App):
         self._search_inflight_started_at = time.monotonic()
         query_key = build_query_key(providers, query, self.current_page)
 
-        current_specs = self.monitor.get_specs()
+        current_specs = self._current_specs_for_search_ui()
         self.last_search_error = ""
         self.search_counter += 1
         self.active_search_id = self.search_counter

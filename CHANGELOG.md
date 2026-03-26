@@ -39,6 +39,8 @@
 - Reduced `on_search_progress()` UI churn by throttling duplicate progress updates and skipping expensive table redraws.
 - Added fast-timeout polling settings for download service UI refresh (`download_poll_request_timeout`) and applied them in app polling paths.
 - Relaxed default UI polling intervals (`ollama_status_poll_interval`, `ui_download_poll_interval`, `download_history_refresh_interval`) to reduce main-thread pressure.
+- Moved system hardware/ollama polling to an async worker path to avoid blocking the main UI event loop.
+- Replaced synchronous `monitor.get_specs()` usage in search dispatch with cached/fallback specs on the UI thread.
 
 ## 1.0.0 - 2026-03-04
 
