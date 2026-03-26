@@ -2,6 +2,15 @@
 
 ## 1.0.1 - 2026-03-26
 
+### Release Notes
+
+- This release focuses on **stability + responsiveness + compact UI** for `AI Model Explorer`.
+- Core performance work moved heavy polling and service requests off the UI thread, reducing freezes during resize, filter changes, and modal interactions.
+- Modal safety was hardened (`NoMatches`/transition races), and background UI updates are now guarded while modal screens are active.
+- The app now ships a keyboard-first **compact mode** (`AIMODEL_UI_MODE=compact`, toggle with `v`) with top-row controls, chip status bar, and compact filter/sort/fit cycles (`u`, `s`, `f`, `p`, `[`, `]`).
+- Results-table layout logic was rebalanced across breakpoints to reduce dead space and improve column readability (`Model`, `Fit`, and compact width distribution).
+- Refactor work extracted major logic from `app.py` into focused modules (`search_cache`, `search_orchestration`, `download_history`, `download_lifecycle`, `results_layout`, `results_view`, `results_presenter`, `results_text`) with expanded test coverage.
+
 - Fixed package entry-point mismatch by adding `main()` in `main.py` for `ai-model-explorer` script execution.
 - Fixed cache cleanup query in `cache_db.py` by using `rowid` ranking (the table has no `id` column).
 - Switched new Hugging Face jobs to internal `hf_api_download` command payloads and kept worker-side API download path.
