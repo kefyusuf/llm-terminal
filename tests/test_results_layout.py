@@ -49,3 +49,10 @@ def test_compute_column_widths_distributes_extra_to_expandables():
     assert widths["name"] > 18
     assert widths["publisher"] > 8
     assert widths["download"] > 4
+
+
+def test_compute_column_widths_compact_caps_name_growth():
+    keys = ["inst", "name", "params", "score", "quant", "fit", "use_case"]
+    widths = compute_column_widths(keys, available_width=220, compact=True)
+    assert widths["name"] <= 32
+    assert widths["fit"] >= 8

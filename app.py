@@ -1071,7 +1071,11 @@ class AIModelViewer(App):
         table = self.query_one("#results-table", DataTable)
         available_width = max(table.size.width, self.size.width, 80)
         next_keys = column_keys_for_width(available_width, compact=self.compact_mode)
-        base_widths = compute_column_widths(next_keys, available_width)
+        base_widths = compute_column_widths(
+            next_keys,
+            available_width,
+            compact=self.compact_mode,
+        )
         labels = self._column_labels()
 
         if (
@@ -1114,7 +1118,7 @@ class AIModelViewer(App):
     def _fit_cell_markup(self, fit_text):
         return fit_cell_markup(
             fit_text,
-            width=max(5, self.results_column_widths.get("fit", 7) - 1),
+            width=max(7, self.results_column_widths.get("fit", 8)),
             truncate_plain=self._truncate_plain_cell,
             align_plain=self._align_plain_cell,
         )
@@ -2076,7 +2080,7 @@ class AIModelViewer(App):
             )
             fit_plain = self._truncate_plain_cell(
                 result.get("fit", "-"),
-                max(5, self.results_column_widths.get("fit", 7) - 1),
+                max(7, self.results_column_widths.get("fit", 8)),
             )
             score = result.get("score", "-")
             download = self._download_cell_text(result)

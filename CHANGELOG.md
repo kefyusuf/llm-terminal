@@ -64,6 +64,8 @@
 - Synced provider cycle action with radio-button selection state to keep top-row controls visually consistent.
 - Simplified compact chip text to pure status metrics and hid Footer in compact mode to reclaim one extra content row.
 - Added compact-mode status hint text on view toggle to preserve discoverability of keyboard controls.
+- Tuned compact column width distribution to cap oversized `Model` growth and prevent large empty middle gaps.
+- Increased fit-column effective width in row rendering to avoid `Partial` values truncating to `Per...`.
 
 ## 1.0.0 - 2026-03-04
 
