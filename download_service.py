@@ -355,6 +355,207 @@ def _extract_progress(line):
     return f"{value}%" if value is not None else None
 
 
+def _is_hf_api_command(command):
+    """Return ``True`` when *command* is an internal HF API download payload."""
+    return isinstance(command, list) and len(command) > 0 and command[0] == "hf_api_download"
+
+
+def _repo_id_from_hf_command(command):
+    """Extract repository id from an internal HF API command payload."""
+    if not _is_hf_api_command(command):
+        return ""
+    return command[1] if len(command) > 1 else ""
+
+
+def _cancel_requested(target_id):
+    latest = STATE.store.get_job_by_target(target_id)
+    return bool(latest and latest.get("cancel_requested"))
+
+
+def _run_hf_api_download_job(target_id, command):
+    repo_id = _repo_id_from_hf_command(command)
+    if not repo_id:
+        STATE.store.update_job(
+            target_id,
+            status="failed",
+            detail="missing Hugging Face repository id",
+            return_code=1,
+        )
+        return
+
+    STATE.store.update_job(
+        target_id,
+        status="running",
+        detail="Downloading",
+        progress="",
+    )
+    hf_script = (
+        "from huggingface_hub import snapshot_download; "
+        "import sys; "
+        "snapshot_download("
+        "repo_id=sys.argv[1], "
+        "allow_patterns=['*.gguf'], "
+        "local_dir='models', "
+        "local_dir_use_symlinks=False"
+        ")"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", hf_script, repo_id],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        **_service_popen_kwargs(),
+    )
+    STATE.set_process(target_id, process)
+    cancel_sent_at = None
+
+    try:
+        while True:
+            if _cancel_requested(target_id):
+                if cancel_sent_at is None:
+                    cancel_sent_at = time.monotonic()
+                    try:
+                        process.terminate()
+                    except OSError:
+                        pass
+                elif process.poll() is None and (time.monotonic() - cancel_sent_at) > 1.5:
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
+
+            return_code = process.poll()
+            if return_code is not None:
+                break
+            time.sleep(0.25)
+
+        if _cancel_requested(target_id):
+            STATE.store.update_job(
+                target_id,
+                status="cancelled",
+                detail="Canceled",
+                progress="",
+                return_code=return_code,
+            )
+        elif return_code == 0:
+            STATE.store.update_job(
+                target_id,
+                status="completed",
+                detail="Completed",
+                progress="",
+                return_code=0,
+            )
+        else:
+            failure_detail = "hugging face download failed"
+            if process.stderr is not None:
+                err_text = process.stderr.read().strip()
+                if err_text:
+                    failure_detail = err_text.splitlines()[-1][:180]
+            STATE.store.update_job(
+                target_id,
+                status="failed",
+                detail=failure_detail,
+                progress="",
+                return_code=return_code,
+            )
+    except Exception as exc:
+        detail = str(exc).strip() or "hugging face download failed"
+        STATE.store.update_job(
+            target_id,
+            status="failed",
+            detail=detail[:180],
+            progress="",
+            return_code=1,
+        )
+    finally:
+        STATE.clear_process(target_id)
+
+
+def _run_stream_download_job(target_id, command):
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+        **_service_popen_kwargs(),
+    )
+    STATE.set_process(target_id, process)
+    start = time.monotonic()
+    last_update = start
+    last_line = ""
+
+    try:
+        if process.stdout is not None:
+            for raw_line in process.stdout:
+                line = raw_line.strip()
+                if line:
+                    last_line = line
+
+                if _cancel_requested(target_id):
+                    try:
+                        process.terminate()
+                    except OSError:
+                        pass
+
+                progress = _extract_progress(line)
+                now = time.monotonic()
+                if progress is not None:
+                    STATE.store.update_job(
+                        target_id,
+                        status="running",
+                        detail="Downloading",
+                        progress=progress,
+                    )
+                    last_update = now
+                    continue
+
+                if now - last_update >= 1.0:
+                    elapsed = int(now - start)
+                    STATE.store.update_job(
+                        target_id,
+                        status="running",
+                        detail="Downloading",
+                        progress=f"{elapsed}s",
+                    )
+                    last_update = now
+
+        return_code = process.wait()
+        if _cancel_requested(target_id):
+            STATE.store.update_job(
+                target_id,
+                status="cancelled",
+                detail="Canceled",
+                progress="",
+                return_code=return_code,
+            )
+        elif return_code == 0:
+            STATE.store.update_job(
+                target_id,
+                status="completed",
+                detail="Completed",
+                progress="",
+                return_code=0,
+            )
+        else:
+            failure_detail = "download command exited with non-zero status"
+            if last_line:
+                failure_detail = last_line[:180]
+            STATE.store.update_job(
+                target_id,
+                status="failed",
+                detail=failure_detail,
+                progress="",
+                return_code=return_code,
+            )
+    finally:
+        STATE.clear_process(target_id)
+
+
 def worker_loop():
     while not STATE.stop_event.is_set():
         try:
@@ -381,190 +582,11 @@ def worker_loop():
                 )
                 continue
 
-            if cmd[0] == "hf_api_download":
-                repo_id = cmd[1] if len(cmd) > 1 else ""
-                if not repo_id:
-                    STATE.store.update_job(
-                        target_id,
-                        status="failed",
-                        detail="missing Hugging Face repository id",
-                        return_code=1,
-                    )
-                    continue
-
-                STATE.store.update_job(
-                    target_id,
-                    status="running",
-                    detail="Downloading",
-                    progress="",
-                )
-                hf_script = (
-                    "from huggingface_hub import snapshot_download; "
-                    "import sys; "
-                    "snapshot_download("
-                    "repo_id=sys.argv[1], "
-                    "allow_patterns=['*.gguf'], "
-                    "local_dir='models', "
-                    "local_dir_use_symlinks=False"
-                    ")"
-                )
-                process = subprocess.Popen(
-                    [sys.executable, "-c", hf_script, repo_id],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    **_service_popen_kwargs(),
-                )
-                STATE.set_process(target_id, process)
-                cancel_sent_at = None
-
-                try:
-                    while True:
-                        latest = STATE.store.get_job_by_target(target_id)
-                        if latest and latest.get("cancel_requested"):
-                            if cancel_sent_at is None:
-                                cancel_sent_at = time.monotonic()
-                                try:
-                                    process.terminate()
-                                except OSError:
-                                    pass
-                            elif (
-                                process.poll() is None and (time.monotonic() - cancel_sent_at) > 1.5
-                            ):
-                                try:
-                                    process.kill()
-                                except OSError:
-                                    pass
-
-                        return_code = process.poll()
-                        if return_code is not None:
-                            break
-                        time.sleep(0.25)
-
-                    latest = STATE.store.get_job_by_target(target_id)
-                    if latest and latest.get("cancel_requested"):
-                        STATE.store.update_job(
-                            target_id,
-                            status="cancelled",
-                            detail="Canceled",
-                            progress="",
-                            return_code=return_code,
-                        )
-                    elif return_code == 0:
-                        STATE.store.update_job(
-                            target_id,
-                            status="completed",
-                            detail="Completed",
-                            progress="",
-                            return_code=0,
-                        )
-                    else:
-                        failure_detail = "hugging face download failed"
-                        if process.stderr is not None:
-                            err_text = process.stderr.read().strip()
-                            if err_text:
-                                failure_detail = err_text.splitlines()[-1][:180]
-                        STATE.store.update_job(
-                            target_id,
-                            status="failed",
-                            detail=failure_detail,
-                            progress="",
-                            return_code=return_code,
-                        )
-                except Exception as exc:
-                    detail = str(exc).strip() or "hugging face download failed"
-                    STATE.store.update_job(
-                        target_id,
-                        status="failed",
-                        detail=detail[:180],
-                        progress="",
-                        return_code=1,
-                    )
-                finally:
-                    STATE.clear_process(target_id)
+            if _is_hf_api_command(cmd):
+                _run_hf_api_download_job(target_id, cmd)
                 continue
 
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                bufsize=1,
-                **_service_popen_kwargs(),
-            )
-            STATE.set_process(target_id, process)
-            start = time.monotonic()
-            last_update = start
-            last_line = ""
-
-            if process.stdout is not None:
-                for raw_line in process.stdout:
-                    line = raw_line.strip()
-                    if line:
-                        last_line = line
-
-                    latest = STATE.store.get_job_by_target(target_id)
-                    if latest and latest.get("cancel_requested"):
-                        try:
-                            process.terminate()
-                        except OSError:
-                            pass
-
-                    progress = _extract_progress(line)
-                    now = time.monotonic()
-                    if progress is not None:
-                        STATE.store.update_job(
-                            target_id,
-                            status="running",
-                            detail="Downloading",
-                            progress=progress,
-                        )
-                        last_update = now
-                        continue
-
-                    if now - last_update >= 1.0:
-                        elapsed = int(now - start)
-                        STATE.store.update_job(
-                            target_id,
-                            status="running",
-                            detail="Downloading",
-                            progress=f"{elapsed}s",
-                        )
-                        last_update = now
-
-            return_code = process.wait()
-            latest = STATE.store.get_job_by_target(target_id)
-            if latest and latest.get("cancel_requested"):
-                STATE.store.update_job(
-                    target_id,
-                    status="cancelled",
-                    detail="Canceled",
-                    progress="",
-                    return_code=return_code,
-                )
-            elif return_code == 0:
-                STATE.store.update_job(
-                    target_id,
-                    status="completed",
-                    detail="Completed",
-                    progress="",
-                    return_code=0,
-                )
-            else:
-                failure_detail = "download command exited with non-zero status"
-                if last_line:
-                    failure_detail = last_line[:180]
-                STATE.store.update_job(
-                    target_id,
-                    status="failed",
-                    detail=failure_detail,
-                    progress="",
-                    return_code=return_code,
-                )
+            _run_stream_download_job(target_id, cmd)
         except FileNotFoundError:
             STATE.store.update_job(
                 target_id,

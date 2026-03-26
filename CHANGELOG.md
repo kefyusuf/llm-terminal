@@ -9,6 +9,8 @@
 - Centralized download-state mapping/markup logic in `download_status.py` and wired `app.py` to use it.
 - Added Hugging Face page-limit guard in `_go_to_page()` to enforce configured `hf_search_max_pages`.
 - Refreshed README to align product naming around **AI Model Explorer** and documented `terminal_ui/` as legacy.
+- Refactored `download_service.worker_loop` into focused helper functions for HF API jobs and stream-based jobs.
+- Added helper-level tests for internal HF command detection and parsing in download service debug tests.
 
 ## 1.0.0 - 2026-03-04
 
