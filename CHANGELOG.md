@@ -25,6 +25,7 @@
 - Updated `app.py` download cancel/delete and registry-write paths to reuse the new lifecycle helpers.
 - Polished status-bar messaging for provider switches, hidden-gem toggles, external-download actions, and no-results guidance.
 - Standardized model-data delete status text (removed icon-based phrasing and aligned wording).
+- Fixed `scripts/release_check.py` Ollama check to support current `search_ollama_models` return shape.
 
 ## 1.0.0 - 2026-03-04
 
