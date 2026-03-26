@@ -40,3 +40,22 @@ def test_compact_tags_are_shortened_for_toolbar():
     assert viewer._use_case_compact_tag("coding") == "CODE"
     assert viewer._sort_compact_tag("downloads") == "DL"
     assert viewer._fit_compact_tag("partial") == "PART"
+
+
+def test_compact_chip_text_contains_key_segments():
+    viewer = AIModelViewer()
+    viewer.current_filter = "Hugging Face"
+    viewer.use_case_filter = "coding"
+    viewer.sort_mode = "downloads"
+    viewer.fit_filter = "partial"
+    viewer.hidden_gems_only = True
+    viewer.current_page = 2
+
+    chip_text = viewer._compact_chip_text(12, 50)
+
+    assert "M:" in chip_text
+    assert "HF" in chip_text
+    assert "CODE" in chip_text
+    assert "DL" in chip_text
+    assert "PART" in chip_text
+    assert "ON" in chip_text

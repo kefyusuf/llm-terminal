@@ -60,6 +60,8 @@
 - Restored always-visible search/provider row sizing in compact mode to prevent hidden input and ensure search remains accessible.
 - Merged provider and use-case controls into the same top row as search, with a narrower search panel for denser compact workflows.
 - Shortened compact chip labels (OL/HF, CODE, DL, PART) and added inline key hints for faster keyboard-first operation.
+- Added color-segmented compact chip rendering for faster glanceability and extracted it into a dedicated helper method.
+- Synced provider cycle action with radio-button selection state to keep top-row controls visually consistent.
 
 ## 1.0.0 - 2026-03-04
 

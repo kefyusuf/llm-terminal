@@ -857,6 +857,29 @@ class AIModelViewer(App):
         }
         return mapping.get(key, "ALL")
 
+    def _compact_chip_text(self, shown_count: int, total: int) -> str:
+        provider_short = "HF" if self.current_filter == "Hugging Face" else "OL"
+        use_case_label = self._use_case_compact_tag(self.use_case_filter)
+        sort_label = self._sort_compact_tag(self.sort_mode)
+        fit_label = self._fit_compact_tag(self.fit_filter)
+        gems_label = "ON" if self.hidden_gems_only else "OFF"
+        page_label = str(self.current_page + 1) if self.current_filter == "Hugging Face" else "1"
+
+        return (
+            f"[#8ea3cf]M:[/#8ea3cf][#dbe7ff]{shown_count}/{total}[/#dbe7ff]  "
+            f"[#8ea3cf]P:[/#8ea3cf][#9fe8ff]{provider_short}[/#9fe8ff]  "
+            f"[#8ea3cf]U:[/#8ea3cf][#d1b3ff]{use_case_label}[/#d1b3ff]  "
+            f"[#8ea3cf]S:[/#8ea3cf][#7edfff]{sort_label}[/#7edfff]  "
+            f"[#8ea3cf]F:[/#8ea3cf][#f2c46d]{fit_label}[/#f2c46d]  "
+            f"[#8ea3cf]G:[/#8ea3cf][#4fe08a]{gems_label}[/#4fe08a]  "
+            f"[#8ea3cf]Pg:[/#8ea3cf][#dbe7ff]{page_label}[/#dbe7ff]  "
+            "[#5f6f97]|[/#5f6f97] [#7489b8]/[/#7489b8] "
+            "[#8ea3cf](p)[/#8ea3cf]prov [#8ea3cf](u)[/#8ea3cf]use "
+            "[#8ea3cf](s)[/#8ea3cf]sort [#8ea3cf](f)[/#8ea3cf]fit "
+            "[#8ea3cf](h)[/#8ea3cf]gems [#8ea3cf](v)[/#8ea3cf]view "
+            "[#8ea3cf]([)/(])[/#8ea3cf]page"
+        )
+
     def _set_use_case_filter(self, key: str) -> None:
         self.use_case_filter = key
         radio_id = f"uc-{key}"
@@ -1019,6 +1042,11 @@ class AIModelViewer(App):
         current = self.current_filter if self.current_filter in cycle else "Ollama"
         next_filter = cycle[(cycle.index(current) + 1) % len(cycle)]
         self.current_filter = next_filter
+        try:
+            radio_id = "#filter-hf" if next_filter == "Hugging Face" else "#filter-ollama"
+            self.query_one(radio_id, RadioButton).value = True
+        except Exception:
+            pass
 
         current_query = self.query_one("#search-input", Input).value.strip()
         if current_query:
@@ -1156,23 +1184,7 @@ class AIModelViewer(App):
             compact_chipbar.update("")
             return
 
-        provider_short = "HF" if self.current_filter == "Hugging Face" else "OL"
-        use_case_label = self._use_case_compact_tag(self.use_case_filter)
-        sort_label = self._sort_compact_tag(self.sort_mode)
-        fit_label = self._fit_compact_tag(self.fit_filter)
-        gems_label = "ON" if self.hidden_gems_only else "OFF"
-        page_label = str(self.current_page + 1) if self.current_filter == "Hugging Face" else "1"
-        compact_chipbar.update(
-            " "
-            f"M:{shown_count}/{total}  "
-            f"P:{provider_short}  "
-            f"U:{use_case_label}  "
-            f"S:{sort_label}  "
-            f"F:{fit_label}  "
-            f"G:{gems_label}  "
-            f"Pg:{page_label}  "
-            "| / (p)prov (u)use (s)sort (f)fit (h)gems (v)view ([)/(])page"
-        )
+        compact_chipbar.update(self._compact_chip_text(shown_count, total))
 
     def update_status(self, text):
         """Update the status bar at the bottom of the screen with *text*."""
