@@ -1,4 +1,4 @@
-"""Obsidian Console — terminal_ui package."""
+"""Legacy experimental terminal UI package."""
 
 from .app import ObsidianConsole, main
 

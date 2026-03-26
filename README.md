@@ -1,137 +1,79 @@
-# LLM Terminal
+# AI Model Explorer
 
-A modern terminal user interface for discovering, browsing, and downloading AI language models from Ollama and HuggingFace.
-
-![Python Version](https://img.shields.io/badge/python-3.10+-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-
-## About
-
-LLM Terminal is a Textual-based TUI that helps you find local-LLM models from Ollama and Hugging Face, then quickly estimate whether a model will fit your current hardware.
+AI Model Explorer is a Textual-based terminal application for discovering GGUF models, checking hardware fit, and managing downloads from Ollama and Hugging Face.
 
 ## Features
 
-- 🔍 **Search Models** - Search across Ollama and HuggingFace GGUF models
-- 💻 **Hardware Fit** - See if models fit your GPU/RAM before downloading (Perfect / Partial / Slow / No Fit)
-- ⬇️ **Download Manager** - Download models with progress tracking
-- 🔄 **Progress Tracking** - Real-time download progress and status in table
-- 🎨 **Modern UI** - Clean, colorful terminal interface with Textual
-- 📊 **Model Details** - View parameters, quantization, size, use case, and more
-- 🔐 **HuggingFace Token** - Optional token for faster downloads and higher rate limits
-- 🖥️ **Local Detection** - Detects installed Ollama models
+- Search Ollama registry and Hugging Face GGUF repositories
+- Estimate hardware fit based on live RAM/VRAM availability
+- Queue, monitor, cancel, and delete downloads through a background service
+- Track recent download history with status and details
+- Filter by provider, use case, and hidden-gem models
 
 ## Requirements
 
 - Python 3.10+
-- 4GB RAM minimum (8GB recommended)
-- GPU recommended for large models
-- Internet access for HuggingFace/Ollama registry search
-- Ollama (optional, for local model detection and runtime)
-
-> **Note:** The app UI runs without local Ollama. Only `ollama run` commands require Ollama running locally.
+- Internet access for provider searches
+- Ollama (optional; required only for local runtime and `ollama pull/run`)
 
 ## Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/kefyusuf/llm-terminal
 cd llm-terminal
 
-# Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# OR
-venv\Scripts\activate  # Windows
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # Linux/macOS
 
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-## Running the App
+## Run
 
 ```bash
-python app.py
+python main.py
 ```
 
-## Optional: HuggingFace Token
-
-For faster downloads and higher rate limits:
+Or with the installed script entrypoint:
 
 ```bash
-# Set token as environment variable
-export HF_TOKEN=your_token_here
-# Or add to .env file
-echo "AIMODEL_HF_TOKEN=your_token" > .env
+ai-model-explorer
 ```
 
-Get your token from: https://huggingface.co/settings/tokens
+## Optional Hugging Face token
 
-## Usage
-
-### Search Models
-- Press `/` to focus search
-- Type model name (e.g., "llama", "qwen", "mistral")
-- Press Enter to search
-
-### Filter Providers
-- Press `p` to cycle between Ollama and HuggingFace
-- Or use the radio buttons in the UI
-
-### Download Models
-- Double-click or press Enter on a model row to open details
-- Click "Download" to start downloading
-- Click "Cancel" to stop an active download
-- Click "Delete All" to remove model data completely
-
-### Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `/` | Focus search |
-| `p` | Cycle providers |
-| `r` | Refresh search |
-| `h` | Toggle hidden gems filter |
-| `q` | Quit |
-
-## Configuration
-
-Create a `.env` file for custom settings:
+Use a read-only token for higher rate limits:
 
 ```env
-# HuggingFace settings
-AIMODEL_HF_TOKEN=your_token_here
-AIMODEL_HF_SEARCH_LIMIT=15
-
-# Cache settings  
-AIMODEL_SEARCH_CACHE_TTL_SECONDS=90
-
-# Ollama settings
-AIMODEL_OLLAMA_API_BASE=http://localhost:11434
+AIMODEL_HF_TOKEN=hf_your_token_here
 ```
 
-## Project Structure
+## Keyboard shortcuts
 
-```
+| Key | Action |
+| --- | --- |
+| `/` | Focus search |
+| `p` | Cycle provider filter |
+| `r` | Refresh current search |
+| `h` | Toggle hidden gems |
+| `q` | Quit |
+
+## Project structure
+
+```text
 llm-terminal/
-├── app.py                  # Main Textual application
-├── main.py               # Entry point
-├── config.py             # Configuration management
-├── providers/           # Ollama and HuggingFace API integrations
-│   ├── ollama_provider.py
-│   └── hf_provider.py
-├── download_service.py   # Background download service
-├── download_manager.py  # Download command builder
-├── hardware.py         # System hardware detection
-├── utils.py           # Utility functions
-├── cache_db.py        # SQLite cache
-├── requirements.txt   # Python dependencies
-└── README.md        # This file
+  app.py                # Main Textual app
+  main.py               # Entry point
+  cli.py                # Utility CLI commands
+  download_service.py   # Background download service
+  download_manager.py   # Download command builder
+  providers/            # Provider integrations
+  tests/                # Test suite
 ```
 
-## License
+## Notes
 
-MIT License - see LICENSE file.
-
----
-
-Made with ❤️ for AI enthusiasts
+- `terminal_ui/` is kept as a legacy experimental package and is not the primary product path.
+- Download service data is stored in `downloads.db`.
+- Metadata cache is stored in `cache.db`.

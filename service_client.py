@@ -12,7 +12,7 @@ import psutil
 SERVICE_HOST = "127.0.0.1"
 SERVICE_PORT = 8765
 SERVICE_BASE_URL = f"http://{SERVICE_HOST}:{SERVICE_PORT}"
-MIN_SERVICE_VERSION = "1.6"
+MIN_SERVICE_VERSION = "1.7"
 
 
 def _parse_version(version_str):
@@ -180,9 +180,7 @@ def create_job(model):
 
 def cancel_job(target_id):
     """Request cancellation of the running or queued job identified by *target_id*."""
-    return _request(
-        "POST", "/jobs/cancel", payload={"target_id": target_id}, timeout=2.0
-    )
+    return _request("POST", "/jobs/cancel", payload={"target_id": target_id}, timeout=2.0)
 
 
 def delete_job(target_id, _retry=True):
@@ -192,9 +190,7 @@ def delete_job(target_id, _retry=True):
     initial request returns 404.
     """
     try:
-        return _request(
-            "POST", "/jobs/delete", payload={"target_id": target_id}, timeout=2.0
-        )
+        return _request("POST", "/jobs/delete", payload={"target_id": target_id}, timeout=2.0)
     except HTTPError as exc:
         if exc.code == 404 and _retry and ensure_service_running():
             return delete_job(target_id, _retry=False)

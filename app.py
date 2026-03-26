@@ -6,6 +6,12 @@ from urllib.error import HTTPError
 
 import cache_db
 import config
+from download_status import (
+    is_active_state,
+    label_for_state,
+    map_service_job_status,
+    state_markup_from_state_and_label,
+)
 from download_manager import download_target_id
 from hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
@@ -444,7 +450,7 @@ class AIModelViewer(App):
     #results-table .datatable--header {
         overflow-x: hidden;
     }
-    #results-table .datatable--header:first-child {
+    #results-table .datatable--header:first-of-type {
         min-width: 8;
         padding-left: 1;
     }
@@ -1015,9 +1021,9 @@ class AIModelViewer(App):
                 self.has_more_pages = cached["has_more_pages"]
             self.on_search_completed(self.active_search_id)
             cache_msg = (
-                " (cached)"
+                f" (cached page {self.current_page + 1})"
                 if providers == ["huggingface"]
-                else f" (cached page {self.current_page + 1})"
+                else " (cached)"
             )
             self.update_status(f"Loaded{cache_msg}")
             return
@@ -1143,6 +1149,9 @@ class AIModelViewer(App):
 
     def _go_to_page(self, page_num: int) -> None:
         if page_num < 0:
+            return
+        if page_num >= self.max_pages:
+            self.update_status(f"Reached page limit ({self.max_pages}).")
             return
         current_query = self.query_one("#search-input", Input).value.strip()
         if not current_query:
@@ -1448,32 +1457,12 @@ class AIModelViewer(App):
                     "id": target_id.split(":", maxsplit=1)[1] if ":" in target_id else target_id,
                 }
             )
-            raw_status = job.get("status", "idle")
-            mapped_status = {
-                "running": "downloading",
-                "queued": "queued",
-                "completed": "completed",
-                "failed": "failed",
-                "cancelled": "cancelled",
-            }.get(raw_status, "idle")
-            if raw_status == "running" and (
-                bool(job.get("cancel_requested"))
-                or str(job.get("detail", "")).lower().startswith("cancel")
-            ):
-                mapped_status = "downloading"
-            label = {
-                "downloading": "Downloading",
-                "queued": "Queued",
-                "completed": "Completed",
-                "failed": "Failed",
-                "cancelled": "Canceled",
-                "idle": "Idle",
-            }[mapped_status]
-            if raw_status == "running" and (
-                bool(job.get("cancel_requested"))
-                or str(job.get("detail", "")).lower().startswith("cancel")
-            ):
-                label = "Canceling"
+            mapped_status = map_service_job_status(
+                job.get("status", "idle"),
+                cancel_requested=bool(job.get("cancel_requested")),
+                detail=job.get("detail", ""),
+            )
+            label = label_for_state(mapped_status)
 
             detail = job.get("progress") or job.get("detail") or ""
             self._record_download_entry(
@@ -1495,7 +1484,7 @@ class AIModelViewer(App):
                 "updated_at",
                 self.download_registry[target_id].get("updated_at", time.time()),
             )
-            if mapped_status in {"queued", "downloading"}:
+            if is_active_state(mapped_status):
                 running_targets.add(target_id)
 
         self.active_downloads = running_targets
@@ -1531,8 +1520,8 @@ class AIModelViewer(App):
 
             # Create action button based on state
             if is_external:
-                action_btn = "⚠️ External"
-            elif state in {"downloading", "queued", "running"}:
+                action_btn = "External"
+            elif is_active_state(state):
                 action_btn = "Cancel"
             else:
                 action_btn = "Delete"
@@ -1562,40 +1551,11 @@ class AIModelViewer(App):
         self.download_history_refresh_pending = True
 
     def _download_status_text_from_state(self, state, label=None):
-        # Normalize state
-        state = str(state).lower().strip() if state else "idle"
-        label = str(label).lower().strip() if label else ""
-
-        # Check based on state value first
-        if state == "completed":
-            return "[green]Completed[/green]"
-        if state == "failed":
-            return "[red]Failed[/red]"
-        if state == "cancelled" or state == "canceled":
-            return "[yellow]Canceled[/yellow]"
-        if state == "downloading":
-            return "[yellow]Downloading[/yellow]"
-        if state == "queued":
-            return "[cyan]Queued[/cyan]"
-        if state == "running":
-            return "[yellow]Running[/yellow]"
-        if state == "canceling":
-            return "[orange]Canceling[/orange]"
-
-        # Fallback: check label for status hints
-        if "completed" in label or "done" in label:
-            return "[green]Completed[/green]"
-        if "failed" in label or "error" in label:
-            return "[red]Failed[/red]"
-        if "cancel" in label:
-            return "[yellow]Canceled[/yellow]"
-        if "download" in label or "pull" in label:
-            return "[yellow]Downloading[/yellow]"
-        if "queue" in label:
-            return "[cyan]Queued[/cyan]"
-
-        # External/unknown download - not from our system
-        return "[red]![/red] External"
+        return state_markup_from_state_and_label(
+            state,
+            label,
+            unknown_is_external=True,
+        )
 
     def _set_download_state(
         self,
@@ -1623,18 +1583,7 @@ class AIModelViewer(App):
 
     def _download_cell_text(self, model):
         state = model.get("download_state", "idle")
-
-        if state == "completed":
-            return "[green]Completed[/green]"
-        if state == "failed":
-            return "[red]Failed[/red]"
-        if state == "cancelled":
-            return "[yellow]Canceled[/yellow]"
-        if state == "downloading":
-            return "[yellow]Downloading[/yellow]"
-        if state == "queued":
-            return "[cyan]Queued[/cyan]"
-        return "[grey50]Idle[/grey50]"
+        return state_markup_from_state_and_label(state, model.get("download_label"))
 
     def _ensure_download_fields(self):
         changed = False
@@ -1680,7 +1629,7 @@ class AIModelViewer(App):
                 self.request_download_history_refresh()
             return
         if any(
-            self.download_registry.get(target_id, {}).get("state") == "downloading"
+            is_active_state(self.download_registry.get(target_id, {}).get("state"))
             for target_id in self.active_downloads
         ):
             self.request_download_history_refresh()

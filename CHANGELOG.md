@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.1 - 2026-03-26
+
+- Fixed package entry-point mismatch by adding `main()` in `main.py` for `ai-model-explorer` script execution.
+- Fixed cache cleanup query in `cache_db.py` by using `rowid` ranking (the table has no `id` column).
+- Switched new Hugging Face jobs to internal `hf_api_download` command payloads and kept worker-side API download path.
+- Simplified `hf_downloader.py` into a single deterministic flow (removed duplicated legacy blocks).
+- Centralized download-state mapping/markup logic in `download_status.py` and wired `app.py` to use it.
+- Added Hugging Face page-limit guard in `_go_to_page()` to enforce configured `hf_search_max_pages`.
+- Refreshed README to align product naming around **AI Model Explorer** and documented `terminal_ui/` as legacy.
+
 ## 1.0.0 - 2026-03-04
 
 - Updated Hugging Face model search to use `list_models(..., expand=["likes", "siblings"])`.

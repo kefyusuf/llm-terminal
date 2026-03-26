@@ -21,7 +21,7 @@ from utils import extract_download_progress
 DB_PATH = Path(__file__).resolve().with_name("downloads.db")
 HOST = "127.0.0.1"
 PORT = 8765
-SERVICE_VERSION = "1.6"
+SERVICE_VERSION = "1.7"
 
 
 class DownloadStore:
@@ -401,7 +401,12 @@ def worker_loop():
                 hf_script = (
                     "from huggingface_hub import snapshot_download; "
                     "import sys; "
-                    "snapshot_download(repo_id=sys.argv[1], allow_patterns=['*.gguf'])"
+                    "snapshot_download("
+                    "repo_id=sys.argv[1], "
+                    "allow_patterns=['*.gguf'], "
+                    "local_dir='models', "
+                    "local_dir_use_symlinks=False"
+                    ")"
                 )
                 process = subprocess.Popen(
                     [sys.executable, "-c", hf_script, repo_id],

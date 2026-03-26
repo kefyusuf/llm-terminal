@@ -23,8 +23,7 @@ def build_download_command(model):
         repo_id = model.get("id") or model.get("name")
         if not repo_id:
             raise ValueError("missing Hugging Face repository id")
-        # Use Python script with huggingface_hub
-        return ["python", "hf_downloader.py", repo_id]
+        return ["hf_api_download", repo_id]
 
     if source == "Ollama":
         model_name = model.get("name")
