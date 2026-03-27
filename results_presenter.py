@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Callable
-
+from collections.abc import Callable
 
 _TruncatePlain = Callable[[object, int], str]
 _AlignPlain = Callable[[object, int, str], str]
@@ -148,3 +147,95 @@ def download_cell_markup(
     if "failed" in lowered or "error" in lowered:
         return f"[bold #ff7f8f]{aligned}[/bold #ff7f8f]"
     return f"[#9bb1e0]{aligned}[/#9bb1e0]"
+
+
+def _score_color(score: int) -> str:
+    """Return Rich color tag for a 0-100 score value."""
+    if score >= 75:
+        return "#4fe08a"  # green
+    if score >= 50:
+        return "#7edfff"  # blue
+    if score >= 30:
+        return "#f2c46d"  # yellow
+    return "#ff7f8f"  # red
+
+
+def score_bar_cell_markup(
+    result: dict,
+    *,
+    width: int,
+    truncate_plain: _TruncatePlain,
+    align_plain: _AlignPlain,
+) -> str:
+    """Render compact 4-dimension score bar: Q72 S45 F88 C60.
+
+    Each dimension is color-coded by its value. Returns a Rich-markup string.
+    """
+    q = result.get("score_quality", 0)
+    s = result.get("score_speed", 0)
+    f = result.get("score_fit", 0)
+    c = result.get("score_context", 0)
+
+    parts = [
+        f"[{_score_color(q)}]Q{q}[/{_score_color(q)}]",
+        f"[{_score_color(s)}]S{s}[/{_score_color(s)}]",
+        f"[{_score_color(f)}]F{f}[/{_score_color(f)}]",
+        f"[{_score_color(c)}]C{c}[/{_score_color(c)}]",
+    ]
+    return " ".join(parts)
+
+
+def composite_score_cell_markup(
+    result: dict,
+    *,
+    width: int,
+    truncate_plain: _TruncatePlain,
+    align_plain: _AlignPlain,
+) -> str:
+    """Render the composite score as a single color-coded number."""
+    composite = result.get("score_composite", 0)
+    color = _score_color(composite)
+    text = align_plain(str(composite), width, "center")
+    return f"[bold {color}]{text}[/bold {color}]"
+
+
+def tok_s_cell_markup(
+    result: dict,
+    *,
+    width: int,
+    truncate_plain: _TruncatePlain,
+    align_plain: _AlignPlain,
+) -> str:
+    """Render estimated tok/s as a compact string."""
+    tok_s = result.get("estimated_tok_s", 0.0)
+    if tok_s <= 0:
+        plain = "-"
+        color = "#6b789e"
+    elif tok_s >= 100:
+        plain = f"{tok_s:.0f} t/s"
+        color = "#4fe08a"
+    elif tok_s >= 30:
+        plain = f"{tok_s:.0f} t/s"
+        color = "#7edfff"
+    else:
+        plain = f"{tok_s:.0f} t/s"
+        color = "#f2c46d"
+    aligned = align_plain(plain, width, "right")
+    return f"[{color}]{aligned}[/{color}]"
+
+
+def moe_cell_markup(
+    result: dict,
+    *,
+    width: int,
+    truncate_plain: _TruncatePlain,
+    align_plain: _AlignPlain,
+) -> str:
+    """Render MoE indicator if model is Mixture-of-Experts."""
+    if not result.get("is_moe", False):
+        return align_plain("-", width, "center")
+    total = result.get("total_experts", 0)
+    active = result.get("active_experts", 0)
+    plain = f"MoE {active}/{total}" if total and active else "MoE"
+    aligned = align_plain(plain, width, "center")
+    return f"[bold #b89df3]{aligned}[/bold #b89df3]"

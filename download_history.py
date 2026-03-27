@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from download_status import is_active_state, normalize_state
-
 
 _MANAGED_DETAIL_TOKENS = (
     "download",

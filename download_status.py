@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 STATE_LABELS = {
     "idle": "Idle",
     "queued": "Queued",

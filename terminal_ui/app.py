@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
 import platform
 import shutil
@@ -32,7 +31,6 @@ from textual.widgets import (
     DataTable,
     Footer,
     Input,
-    Label,
     RichLog,
     Static,
 )
@@ -452,7 +450,7 @@ class ObsidianConsole(App):
             f"  [#3d3d5c]Date[/]  [#5a5a7a]{now.strftime('%d %b %Y')}[/]",
             f"  [#3d3d5c]Up[/]    [#5a5a7a]{uptime_h:02d}:{uptime_m:02d}:{uptime_sec:02d}[/]",
             "",
-            f"  [#3d3d5c]CWD[/]",
+            "  [#3d3d5c]CWD[/]",
             f"  [#5a5a7a]{Path(self.working_dir).name}/[/]",
         ]
         info_widget.update("\n".join(lines))

@@ -2,15 +2,24 @@ import subprocess
 import time
 from urllib.error import HTTPError
 
+from textual import events, on, work
+from textual.app import App, ComposeResult
+from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen
+from textual.widgets import (
+    Button,
+    Checkbox,
+    DataTable,
+    Footer,
+    Input,
+    Label,
+    RadioButton,
+    RadioSet,
+    Static,
+)
+
 import cache_db
 import config
-from download_status import (
-    is_active_state,
-    label_for_state,
-    map_service_job_status,
-    state_markup_from_state_and_label,
-)
-from download_manager import download_target_id
 from download_history import (
     action_label_for_entry,
     cancel_model_payload,
@@ -26,6 +35,13 @@ from download_lifecycle import (
     should_delete_ollama_data,
     trim_download_registry,
     upsert_download_registry_entry,
+)
+from download_manager import download_target_id
+from download_status import (
+    is_active_state,
+    label_for_state,
+    map_service_job_status,
+    state_markup_from_state_and_label,
 )
 from hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
@@ -69,21 +85,6 @@ from service_client import (
     get_active_download_debug,
     get_service_health,
     list_jobs,
-)
-from textual import events, on, work
-from textual.app import App, ComposeResult
-from textual.containers import Grid, Horizontal, Vertical
-from textual.screen import ModalScreen
-from textual.widgets import (
-    Button,
-    Checkbox,
-    DataTable,
-    Footer,
-    Input,
-    Label,
-    RadioButton,
-    RadioSet,
-    Static,
 )
 
 
@@ -460,6 +461,214 @@ class DownloadJobModal(ModalScreen):
         self.dismiss()
 
 
+class PlanModeModal(ModalScreen):
+    """Modal showing hardware requirements analysis for a model."""
+
+    CSS = """
+    PlanModeModal {
+        align: center middle;
+        background: $background;
+    }
+    #plan-container {
+        width: 70;
+        height: auto;
+        max-height: 35;
+        background: #0f141f;
+        border: round #4a5568;
+        padding: 1 2;
+    }
+    #plan-header {
+        background: #2d4a6f;
+        padding: 0 2;
+        margin: -1 -2 1 -2;
+        height: 3;
+    }
+    #plan-title {
+        text-style: bold;
+        color: #e2e8f0;
+        text-align: center;
+    }
+    #plan-scrollable {
+        height: auto;
+        max-height: 25;
+        overflow-y: auto;
+    }
+    #plan-close-btn {
+        background: #718096;
+        color: white;
+        margin-top: 1;
+    }
+    """
+
+    def __init__(self, model_name: str, plans: list[dict]):
+        super().__init__()
+        self.model_name = model_name
+        self.plans = plans
+
+    def on_mount(self) -> None:
+        set_pause = getattr(self.app, "_set_modal_poll_pause", None)
+        if callable(set_pause):
+            set_pause(True)
+
+    def on_unmount(self) -> None:
+        set_pause = getattr(self.app, "_set_modal_poll_pause", None)
+        if callable(set_pause):
+            set_pause(False)
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="plan-container"):
+            yield Label(
+                f"[bold #63b3ed]Hardware Plan: {self.model_name}[/bold #63b3ed]", id="plan-title"
+            )
+
+            with Vertical(id="plan-scrollable"):
+                yield Label("")
+                yield Label(
+                    "[bold #a0aec0]Quant    Size      VRAM    Mode       Min GPU[/bold #a0aec0]"
+                )
+                yield Label("[#4a5568]" + "-" * 62 + "[/#4a5568]")
+
+                for p in self.plans:
+                    quant = p["quant"]
+                    size = f"{p['size_gb']:.1f}GB"
+                    vram = f"{p['vram_needed']:.1f}GB"
+                    mode = p["mode"]
+                    gpu_class = p["min_gpu_class"]
+
+                    # Color by quality rank
+                    rank = p.get("quality_rank", 5)
+                    if rank >= 8:
+                        color = "#4fe08a"
+                    elif rank >= 5:
+                        color = "#7edfff"
+                    elif rank >= 3:
+                        color = "#f2c46d"
+                    else:
+                        color = "#ff7f8f"
+
+                    line = f"[{color}]{quant:<8}[/{color}][#e2e8f0]{size:<10}{vram:<8}{mode:<11}{gpu_class}[/#e2e8f0]"
+                    yield Label(line)
+
+            yield Button("Close", id="plan-close-btn")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss()
+
+
+class ComparisonModal(ModalScreen):
+    """Modal showing side-by-side comparison of up to 4 selected models."""
+
+    CSS = """
+    ComparisonModal {
+        align: center middle;
+        background: $background;
+    }
+    #comparison-container {
+        width: 85;
+        height: auto;
+        max-height: 40;
+        background: #0f141f;
+        border: round #4a5568;
+        padding: 1 2;
+    }
+    #comparison-header {
+        background: #2d4a6f;
+        padding: 0 2;
+        margin: -1 -2 1 -2;
+        height: 3;
+    }
+    #comparison-title {
+        text-style: bold;
+        color: #e2e8f0;
+        text-align: center;
+    }
+    #comparison-scrollable {
+        height: auto;
+        max-height: 30;
+        overflow-y: auto;
+    }
+    #comparison-close-btn {
+        background: #718096;
+        color: white;
+        margin-top: 1;
+    }
+    """
+
+    def __init__(self, models: list[dict]):
+        super().__init__()
+        self.models = models
+
+    def on_mount(self) -> None:
+        set_pause = getattr(self.app, "_set_modal_poll_pause", None)
+        if callable(set_pause):
+            set_pause(True)
+
+    def on_unmount(self) -> None:
+        set_pause = getattr(self.app, "_set_modal_poll_pause", None)
+        if callable(set_pause):
+            set_pause(False)
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="comparison-container"):
+            yield Label(
+                f"[bold #63b3ed]Model Comparison ({len(self.models)} models)[/bold #63b3ed]",
+                id="comparison-title",
+            )
+
+            with Vertical(id="comparison-scrollable"):
+                # Header row with model names
+                names = " | ".join(m.get("name", "-")[:18] for m in self.models)
+                yield Label("")
+                yield Label(f"[bold #e2e8f0]{names}[/bold #e2e8f0]")
+                yield Label("[#4a5568]" + "-" * 78 + "[/#4a5568]")
+
+                # Comparison rows
+                rows = [
+                    ("Source", lambda m: m.get("source", "-")),
+                    ("Params", lambda m: m.get("params", "-")),
+                    ("Quant", lambda m: m.get("quant", "-")),
+                    ("Size", lambda m: m.get("size", "-")),
+                    ("Fit", lambda m: self._strip_markup(m.get("fit", "-"))),
+                    ("Mode", lambda m: self._strip_markup(m.get("mode", "-"))),
+                    ("Quality", lambda m: str(m.get("score_quality", "-"))),
+                    ("Speed", lambda m: str(m.get("score_speed", "-"))),
+                    ("Fit Score", lambda m: str(m.get("score_fit", "-"))),
+                    ("Context", lambda m: str(m.get("score_context", "-"))),
+                    ("Composite", lambda m: str(m.get("score_composite", "-"))),
+                    (
+                        "Est. tok/s",
+                        lambda m: (
+                            f"{m.get('estimated_tok_s', 0):.0f}"
+                            if m.get("estimated_tok_s")
+                            else "-"
+                        ),
+                    ),
+                    (
+                        "MoE",
+                        lambda m: (
+                            f"MoE {m.get('active_experts', '?')}/{m.get('total_experts', '?')}"
+                            if m.get("is_moe")
+                            else "Dense"
+                        ),
+                    ),
+                ]
+
+                for label, getter in rows:
+                    vals = " | ".join(getter(m)[:18].ljust(18) for m in self.models)
+                    yield Label(f"[#718096]{label:<12}[/#718096][#e2e8f0]{vals}[/#e2e8f0]")
+
+            yield Button("Close", id="comparison-close-btn")
+
+    @staticmethod
+    def _strip_markup(text: str) -> str:
+        import re
+
+        return re.sub(r"\[[^\]]+\]", "", text).strip() or "-"
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss()
+
+
 class AIModelViewer(App):
     """Main TUI application for discovering, comparing, and downloading local LLM models.
 
@@ -598,6 +807,9 @@ class AIModelViewer(App):
         ("/", "focus_search", "Search"),
         ("r", "refresh_search", "Refresh"),
         ("p", "cycle_provider", "Providers"),
+        ("P", "open_plan_mode", "Plan"),
+        ("c", "toggle_comparison", "Compare"),
+        ("C", "show_comparison", "View Cmp"),
         ("[", "prev_page", "Prev Page"),
         ("]", "next_page", "Next Page"),
         ("u", "cycle_use_case", "Use Case"),
@@ -605,6 +817,7 @@ class AIModelViewer(App):
         ("f", "cycle_fit_filter", "Fit"),
         ("v", "toggle_view_mode", "View"),
         ("h", "toggle_hidden_gems", "Hidden Gems"),
+        ("t", "cycle_theme", "Theme"),
         ("tab", "focus_next", "Next"),
         ("shift+tab", "focus_previous", "Previous"),
     ]
@@ -672,6 +885,8 @@ class AIModelViewer(App):
         self.sort_mode = "score"
         self.fit_filter = "all"
         self.hidden_gems_only = False
+        self.comparison_set: list[dict] = []  # Models selected for comparison (max 4)
+        self._color_theme = config.settings.theme
         self.ollama_running = False
         self.last_search_error = ""
         self.search_counter = 0
@@ -917,20 +1132,18 @@ class AIModelViewer(App):
                     placeholder="Press / to search Ollama models (e.g., qwen, llama)",
                     id="search-input",
                 )
-            with Vertical(id="provider-panel"):
-                with RadioSet(id="filter-set"):
-                    yield RadioButton("Ollama", value=True, id="filter-ollama")
-                    yield RadioButton("Hugging Face", id="filter-hf")
-            with Vertical(id="use-case-panel"):
-                with RadioSet(id="use-case-filter"):
-                    yield RadioButton("Any Use", value=True, id="uc-all")
-                    yield RadioButton("Chat", id="uc-chat")
-                    yield RadioButton("Coding", id="uc-coding")
-                    yield RadioButton("Vision", id="uc-vision")
-                    yield RadioButton("Reason", id="uc-reasoning")
-                    yield RadioButton("Math", id="uc-math")
-                    yield RadioButton("Embed", id="uc-embedding")
-                    yield RadioButton("General", id="uc-general")
+            with Vertical(id="provider-panel"), RadioSet(id="filter-set"):
+                yield RadioButton("Ollama", value=True, id="filter-ollama")
+                yield RadioButton("Hugging Face", id="filter-hf")
+            with Vertical(id="use-case-panel"), RadioSet(id="use-case-filter"):
+                yield RadioButton("Any Use", value=True, id="uc-all")
+                yield RadioButton("Chat", id="uc-chat")
+                yield RadioButton("Coding", id="uc-coding")
+                yield RadioButton("Vision", id="uc-vision")
+                yield RadioButton("Reason", id="uc-reasoning")
+                yield RadioButton("Math", id="uc-math")
+                yield RadioButton("Embed", id="uc-embedding")
+                yield RadioButton("General", id="uc-general")
         yield Checkbox("Hidden gems only (Hugging Face)", id="gem-toggle")
         yield Static("", id="compact-chipbar")
         yield Static("Models (0 shown / 0 total)", id="results-meta")
@@ -1034,15 +1247,12 @@ class AIModelViewer(App):
         self._go_to_page(self.current_page + 1)
 
     def action_cycle_provider(self) -> None:
-        cycle = ["Ollama", "Hugging Face"]
-        current = self.current_filter if self.current_filter in cycle else "Ollama"
+        from providers import get_provider_filter_labels
+
+        cycle = get_provider_filter_labels()
+        current = self.current_filter if self.current_filter in cycle else cycle[0]
         next_filter = cycle[(cycle.index(current) + 1) % len(cycle)]
         self.current_filter = next_filter
-        try:
-            radio_id = "#filter-hf" if next_filter == "Hugging Face" else "#filter-ollama"
-            self.query_one(radio_id, RadioButton).value = True
-        except Exception:
-            pass
 
         current_query = self.query_one("#search-input", Input).value.strip()
         if current_query:
@@ -1060,6 +1270,92 @@ class AIModelViewer(App):
         self.update_status(
             "Hidden gems filter: ON." if self.hidden_gems_only else "Hidden gems filter: OFF."
         )
+
+    def action_cycle_theme(self) -> None:
+        """Cycle to the next color theme."""
+        from themes import THEMES, next_theme, theme_css
+
+        self._color_theme = next_theme(self._color_theme)
+        theme = THEMES[self._color_theme]
+        # Inject theme CSS
+        try:
+            self.stylesheet.add_source(theme_css(theme))
+        except Exception:
+            pass
+        self.update_status(f"Theme: {self._color_theme}")
+
+    def action_open_plan_mode(self) -> None:
+        """Open plan mode to analyze hardware requirements for the selected model."""
+        model = self._get_selected_model()
+        if not model:
+            self.update_status("No model selected for plan analysis.")
+            return
+
+        model_name = model.get("name", "")
+
+        try:
+            from model_intelligence import plan_hardware_for_model
+
+            plans = plan_hardware_for_model(model_name)
+            self.push_screen(PlanModeModal(model_name, plans))
+        except Exception as exc:
+            self.update_status(f"Plan analysis failed: {exc}")
+
+    def _get_selected_model(self) -> dict | None:
+        """Get the model dict at the current cursor position."""
+        table = self.query_one("#results-table", DataTable)
+        cursor_row = table.cursor_row
+        if cursor_row < 0 or cursor_row >= table.row_count:
+            return None
+        try:
+            row_key = table.get_row_at(cursor_row)
+            if not row_key:
+                return None
+            row_key_str = str(row_key[0])
+            return next(
+                (item for item in self.all_results if result_unique_key(item) == row_key_str),
+                None,
+            )
+        except Exception:
+            return None
+
+    def action_toggle_comparison(self) -> None:
+        """Toggle the selected model in/out of the comparison set (max 4)."""
+        model = self._get_selected_model()
+        if not model:
+            self.update_status("No model selected for comparison.")
+            return
+
+        model_key = result_unique_key(model)
+
+        # Check if already in comparison set
+        for i, m in enumerate(self.comparison_set):
+            if result_unique_key(m) == model_key:
+                self.comparison_set.pop(i)
+                count = len(self.comparison_set)
+                self.update_status(f"Removed from comparison. ({count}/4 models)")
+                return
+
+        # Add to comparison set
+        if len(self.comparison_set) >= 4:
+            self.update_status(
+                "Comparison set full (max 4). Press C to view or remove a model first."
+            )
+            return
+
+        self.comparison_set.append(model)
+        count = len(self.comparison_set)
+        self.update_status(f"Added to comparison. ({count}/4 models) Press C to view.")
+
+    def action_show_comparison(self) -> None:
+        """Show the comparison modal for selected models."""
+        if len(self.comparison_set) < 2:
+            self.update_status(
+                f"Need at least 2 models for comparison. ({len(self.comparison_set)}/4 selected)"
+            )
+            return
+
+        self.push_screen(ComparisonModal(self.comparison_set))
 
     def _configure_results_table_columns(self, force: bool = False, refresh_rows: bool = False):
         table = self.query_one("#results-table", DataTable)
@@ -1549,7 +1845,7 @@ class AIModelViewer(App):
             except subprocess.TimeoutExpired:
                 self.update_status(f"Timeout deleting model data: {model_name}")
             except Exception as e:
-                self.update_status(f"Delete model data error: {str(e)}")
+                self.update_status(f"Delete model data error: {e!s}")
 
         try:
             delete_job(target_id)
@@ -1902,8 +2198,7 @@ class AIModelViewer(App):
         specs = self.monitor.get_specs()
         ollama_results, ollama_errors = [], []
         hf_results, hf_errors = [], []
-        ollama_has_more = False
-
+        extra_results, extra_errors = [], []
         if "ollama" in providers:
             self.call_from_thread(self.on_search_progress, search_id, "Checking Ollama runtime...")
             ollama_running = check_ollama_running()
@@ -1924,7 +2219,7 @@ class AIModelViewer(App):
 
             self.call_from_thread(self.on_search_progress, search_id, "Fetching Ollama data...")
             ollama_page_size = config.settings.ollama_search_limit
-            ollama_results, ollama_errors, ollama_has_more = search_ollama_models(
+            ollama_results, ollama_errors, _ollama_has_more = search_ollama_models(
                 query,
                 specs,
                 local_models,
@@ -1950,10 +2245,35 @@ class AIModelViewer(App):
         if search_id != self.active_search_id:
             return
 
+        # New providers: LM Studio, Docker, MLX
+        from providers import get_all_provider_classes
+
+        for provider_cls in get_all_provider_classes():
+            slug = provider_cls.slug
+            if slug not in providers:
+                continue
+            if slug in ("ollama", "huggingface"):
+                continue  # Already handled above
+
+            self.call_from_thread(
+                self.on_search_progress, search_id, f"Fetching {provider_cls.display_name} data..."
+            )
+            try:
+                instance = provider_cls()
+                if instance.detect():
+                    p_results, p_errors = instance.search(query, specs, limit=self.page_size)
+                    extra_results.extend(p_results)
+                    extra_errors.extend(p_errors)
+            except Exception:
+                pass
+
+        if search_id != self.active_search_id:
+            return
+
         self.call_from_thread(self.on_search_progress, search_id, "Finalizing search results...")
-        self.all_results = ollama_results + hf_results
+        self.all_results = ollama_results + hf_results + extra_results
         self._ensure_download_fields()
-        self.last_search_error = " | ".join((ollama_errors + hf_errors)[:2])
+        self.last_search_error = " | ".join((ollama_errors + hf_errors + extra_errors)[:2])
 
         self.has_more_pages = has_more_pages_for_results(
             providers,

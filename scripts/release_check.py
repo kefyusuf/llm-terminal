@@ -1,15 +1,13 @@
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from providers.hf_provider import search_hf_models
-from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
-from release_check_helpers import unpack_search_output
-
+from providers.hf_provider import search_hf_models  # noqa: E402
+from providers.ollama_provider import get_installed_ollama_models, search_ollama_models  # noqa: E402
+from release_check_helpers import unpack_search_output  # noqa: E402
 
 TEST_SPECS = {
     "has_gpu": False,

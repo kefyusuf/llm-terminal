@@ -58,6 +58,19 @@ known-first-party = ["app", "download_manager", "download_service", "hardware",
                      "search_orchestration", "results_view", "results_layout",
                      "results_presenter", "results_text", "release_check_helpers"]
 
+[tool.ruff.lint.per-file-ignores]
+"app.py" = ["I001", "RUF012", "SIM105", "SIM117", "RUF010"]
+"download_service.py" = ["SIM105"]
+"providers/__init__.py" = ["I001"]
+"results_layout.py" = ["I001"]
+"results_presenter.py" = ["I001"]
+"scoring.py" = ["I001"]
+"search_orchestration.py" = ["I001"]
+"service_client.py" = ["I001"]
+"scripts/release_check.py" = ["I001"]
+"api_server.py" = ["I001"]
+"terminal_ui/app.py" = ["E741", "RUF001", "RUF012", "SIM105", "SIM117"]
+
 # ---------------------------------------------------------------------------
 # Mypy — static type checking
 # ---------------------------------------------------------------------------
