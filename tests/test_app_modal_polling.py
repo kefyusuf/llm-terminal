@@ -1,8 +1,32 @@
-from app import AIModelViewer
+import app as app_module
+
+
+def _make_viewer(monkeypatch):
+    class _DummyMonitor:
+        def __init__(self):
+            self.cpu_name = "Test CPU"
+            self.cpu_cores = 8
+            self.gpu_name = "No GPU"
+            self.nvidia_available = False
+
+        def get_specs(self):
+            return {
+                "cpu_name": self.cpu_name,
+                "cpu_cores": self.cpu_cores,
+                "ram_free": 8.0,
+                "ram_total": 16.0,
+                "vram_free": 0.0,
+                "vram_total": 0.0,
+                "gpu_name": self.gpu_name,
+                "has_gpu": self.nvidia_available,
+            }
+
+    monkeypatch.setattr(app_module, "HardwareMonitor", _DummyMonitor)
+    return app_module.AIModelViewer()
 
 
 def test_modal_pause_blocks_non_forced_poll_requests(monkeypatch):
-    viewer = AIModelViewer()
+    viewer = _make_viewer(monkeypatch)
     viewer._modal_poll_pause_count = 1
 
     called = {"system": 0, "download": 0}
@@ -26,7 +50,7 @@ def test_modal_pause_blocks_non_forced_poll_requests(monkeypatch):
 
 
 def test_modal_resume_triggers_forced_refresh(monkeypatch):
-    viewer = AIModelViewer()
+    viewer = _make_viewer(monkeypatch)
     viewer._modal_poll_pause_count = 1
 
     forced_calls = {"system": 0, "download": 0}
