@@ -136,7 +136,8 @@ class HardwareMonitor:
             self.nvidia_available = True
             self.gpu_count = nvidia_smi.nvmlDeviceGetCount()
             return
-        except (ImportError, OSError, RuntimeError):
+        except Exception:
+            # Covers missing NVML library on CI runners (e.g., NVMLError_LibraryNotFound)
             pass
 
         try:
@@ -149,7 +150,8 @@ class HardwareMonitor:
                 self.gpu_name = self.gpu_name.decode("utf-8")
             self.nvidia_available = True
             self.gpu_count = pynvml.nvmlDeviceGetCount()
-        except (ImportError, OSError, RuntimeError):
+        except Exception:
+            # Covers missing NVML library on CI runners (e.g., NVMLError_LibraryNotFound)
             pass
 
     def _detect_amd(self):
