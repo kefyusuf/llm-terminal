@@ -9,6 +9,7 @@ AI Model Explorer is a Textual-based terminal application for discovering GGUF m
 - Queue, monitor, cancel, and delete downloads through a background service
 - Track recent download history with status and details
 - Filter by provider, use case, and hidden-gem models
+- Compact and comfortable UI modes with keyboard-first filtering and sorting
 
 ## Requirements
 
@@ -54,10 +55,28 @@ AIMODEL_HF_TOKEN=hf_your_token_here
 | Key | Action |
 | --- | --- |
 | `/` | Focus search |
+| `[` | Previous page (HF) |
+| `]` | Next page (HF) |
 | `p` | Cycle provider filter |
+| `u` | Cycle use-case filter |
+| `s` | Cycle sort mode |
+| `f` | Cycle fit filter |
+| `v` | Toggle compact/comfortable view |
 | `r` | Refresh current search |
 | `h` | Toggle hidden gems |
 | `q` | Quit |
+
+## UI mode configuration
+
+Set the default UI density with an environment variable:
+
+```env
+AIMODEL_UI_MODE=compact
+# or
+AIMODEL_UI_MODE=comfortable
+```
+
+You can switch modes at runtime with `v`.
 
 ## Project structure
 

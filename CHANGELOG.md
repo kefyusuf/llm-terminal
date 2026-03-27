@@ -79,6 +79,7 @@
 - Expanded compact width-growth order to spread extra width across more columns instead of leaving right-side dead area.
 - Rebalanced compact breakpoints and minimum widths so medium screens include more useful columns without over-expanding `Model`.
 - Added compact fallback width distribution to consume remaining horizontal space and reduce left-heavy table appearance.
+- Updated README with compact-mode configuration and expanded keyboard shortcut documentation.
 
 ## 1.0.0 - 2026-03-04
 
