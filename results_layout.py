@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 MIN_COLUMN_WIDTHS = {
     "inst": 8,
     "source": 10,

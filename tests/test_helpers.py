@@ -48,6 +48,6 @@ def test_calculate_fit_no_fit_when_memory_low():
         "vram_free": 0.0,
         "ram_free": 2.0,
     }
-    fit, mode, resource = utils.calculate_fit(8.0, specs)
+    fit, _mode, resource = utils.calculate_fit(8.0, specs)
     assert "No Fit" in fit
     assert resource == "Insufficient"

@@ -1,6 +1,5 @@
 import re
 
-
 USE_CASE_LABELS = {
     "coding": "[bold blue]Coding[/bold blue]",
     "vision": "[bold magenta]Vision[/bold magenta]",

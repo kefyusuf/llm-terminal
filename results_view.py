@@ -43,6 +43,31 @@ def filter_results_for_view(
             ),
             reverse=True,
         )
+    elif sort_mode == "composite":
+        filtered_results.sort(
+            key=lambda item: (
+                int(item.get("score_composite", 0) or 0),
+                int(item.get("score_quality", 0) or 0),
+                str(item.get("name", "")).lower(),
+            ),
+            reverse=True,
+        )
+    elif sort_mode == "speed":
+        filtered_results.sort(
+            key=lambda item: (
+                int(item.get("score_speed", 0) or 0),
+                float(item.get("estimated_tok_s", 0) or 0),
+            ),
+            reverse=True,
+        )
+    elif sort_mode == "quality":
+        filtered_results.sort(
+            key=lambda item: (
+                int(item.get("score_quality", 0) or 0),
+                int(item.get("score_composite", 0) or 0),
+            ),
+            reverse=True,
+        )
     elif hidden_gems_only:
         filtered_results.sort(
             key=lambda item: (

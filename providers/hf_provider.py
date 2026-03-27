@@ -3,6 +3,7 @@ from huggingface_hub import HfApi
 from huggingface_hub.errors import HfHubHTTPError
 
 import cache_db
+from scoring import enrich_result_with_scores
 from utils import (
     calculate_fit,
     determine_use_case,
@@ -163,30 +164,31 @@ def search_hf_models(
                     quant = "GGUF"
 
             fit_str, mode_str, _ = calculate_fit(size, specs)
-            results.append(
-                {
-                    "inst": "[grey37]-[/grey37]",
-                    "source": "Hugging Face",
-                    "provider": provider,
-                    "publisher": publisher,
-                    "id": repo_id,
-                    "name": name,
-                    "params": params,
-                    "use_case": use_case,
-                    "use_case_key": use_case_key,
-                    "score": score_str,
-                    "likes": likes,
-                    "downloads": downloads,
-                    "is_hidden_gem": is_hidden_gem,
-                    "gem_score": gem_score,
-                    "quant": quant,
-                    "target_file": target,
-                    "size_source": "estimated",
-                    "mode": mode_str,
-                    "fit": fit_str,
-                    "size": f"~{size:.1f} GB",
-                }
-            )
+            result_dict = {
+                "inst": "[grey37]-[/grey37]",
+                "source": "Hugging Face",
+                "provider": provider,
+                "publisher": publisher,
+                "id": repo_id,
+                "name": name,
+                "params": params,
+                "use_case": use_case,
+                "use_case_key": use_case_key,
+                "score": score_str,
+                "likes": likes,
+                "downloads": downloads,
+                "is_hidden_gem": is_hidden_gem,
+                "gem_score": gem_score,
+                "quant": quant,
+                "target_file": target,
+                "size_source": "estimated",
+                "mode": mode_str,
+                "fit": fit_str,
+                "size": f"~{size:.1f} GB",
+                "_size_gb": size,
+            }
+            enrich_result_with_scores(result_dict, specs)
+            results.append(result_dict)
         except (
             AttributeError,
             TypeError,

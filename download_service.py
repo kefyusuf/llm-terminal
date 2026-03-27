@@ -5,9 +5,9 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from download_manager import (
@@ -16,7 +16,6 @@ from download_manager import (
     normalize_target_id,
 )
 from utils import extract_download_progress
-
 
 DB_PATH = Path(__file__).resolve().with_name("downloads.db")
 HOST = "127.0.0.1"

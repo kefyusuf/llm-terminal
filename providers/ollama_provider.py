@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 import cache_db
 import config
+from scoring import enrich_result_with_scores
 from utils import (
     calculate_fit,
     determine_use_case,
@@ -281,31 +282,30 @@ def search_ollama_models(query, specs, local_models, page=0, page_size=15):
 
             fit_str, mode_str, _ = calculate_fit(size_gb, specs)
 
-            results.append(
-                {
-                    "inst": inst,
-                    "source": "Ollama",
-                    "provider": "Ollama Registry",
-                    "publisher": "ollama",
-                    "id": model_name,
-                    "name": model_name,
-                    "params": params,
-                    "use_case": use_case,
-                    "use_case_key": use_case_key,
-                    "score": score_str,
-                    "likes": 0,
-                    "downloads": 0,
-                    "is_hidden_gem": False,
-                    "gem_score": 0.0,
-                    "quant": quant,
-                    "size_source": size_source,
-                    "mode": mode_str,
-                    "fit": fit_str,
-                    "size": (
-                        f"{size_gb:.1f} GB" if size_source == "exact" else f"~{size_gb:.1f} GB"
-                    ),
-                }
-            )
+            result_dict = {
+                "inst": inst,
+                "source": "Ollama",
+                "provider": "Ollama Registry",
+                "publisher": "ollama",
+                "id": model_name,
+                "name": model_name,
+                "params": params,
+                "use_case": use_case,
+                "use_case_key": use_case_key,
+                "score": score_str,
+                "likes": 0,
+                "downloads": 0,
+                "is_hidden_gem": False,
+                "gem_score": 0.0,
+                "quant": quant,
+                "size_source": size_source,
+                "mode": mode_str,
+                "fit": fit_str,
+                "size": (f"{size_gb:.1f} GB" if size_source == "exact" else f"~{size_gb:.1f} GB"),
+                "_size_gb": size_gb,
+            }
+            enrich_result_with_scores(result_dict, specs)
+            results.append(result_dict)
     except requests.Timeout:
         errors.append("Ollama registry request timed out.")
     except requests.ConnectionError:

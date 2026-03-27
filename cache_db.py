@@ -24,10 +24,9 @@ def _connect():
 
 
 def init_db():
-    with _init_lock:
-        with _connect() as conn:
-            conn.execute(
-                """
+    with _init_lock, _connect() as conn:
+        conn.execute(
+            """
                 CREATE TABLE IF NOT EXISTS model_cache (
                     source TEXT NOT NULL,
                     model_id TEXT NOT NULL,
@@ -36,16 +35,16 @@ def init_db():
                     PRIMARY KEY (source, model_id)
                 )
                 """
-            )
-            conn.execute(
-                """
+        )
+        conn.execute(
+            """
                 CREATE TABLE IF NOT EXISTS hardware_snapshot (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     specs_json TEXT NOT NULL,
                     cached_at REAL NOT NULL
                 )
                 """
-            )
+        )
 
 
 def get_model_cache(source: str, model_id: str) -> dict | None:
