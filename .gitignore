@@ -6,6 +6,7 @@ __pycache__/
 downloads.db
 cache.db
 .env
+.opencode/
 PAGINATION_*.md
 reset_all.bat
 reset_downloads.py
