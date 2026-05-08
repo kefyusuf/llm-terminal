@@ -11,6 +11,7 @@ from pathlib import Path
 
 SUPPORTED_PYTHON_MIN = (3, 10)
 SUPPORTED_PYTHON_MAX = (3, 14)
+LOCK_PYTHON = (3, 12)
 
 
 def project_root() -> Path:
@@ -142,10 +143,18 @@ def compile_lock(source_file: Path, output_file: Path, cwd: Path) -> None:
 
 
 def normalize_lock_text(text: str) -> str:
-    header_separator = "\n\n"
-    if header_separator in text:
-        return text.split(header_separator, 1)[1].strip()
-    return text.strip()
+    lines = text.splitlines()
+    start_index = 0
+
+    for index, line in enumerate(lines):
+        if not line or line.startswith("#"):
+            continue
+        start_index = index
+        break
+    else:
+        return ""
+
+    return "\n".join(lines[start_index:]).strip()
 
 
 def check_lock_targets(root: Path, system_name: str | None = None) -> None:
@@ -159,6 +168,10 @@ def check_lock_targets(root: Path, system_name: str | None = None) -> None:
             temp_root = Path(temp_dir)
             for input_name, _output_name in select_lock_targets(system_name):
                 shutil.copy2(root / input_name, temp_root / input_name)
+            for _input_name, existing_output_name in select_lock_targets(system_name):
+                committed_output = root / existing_output_name
+                if committed_output.exists():
+                    shutil.copy2(committed_output, temp_root / existing_output_name)
 
             generated_file = temp_root / output_name
             compile_lock(temp_root / source_name, generated_file, temp_root)
@@ -173,6 +186,17 @@ def lock(*, check: bool = False) -> int:
     ensure_supported_python()
     root = project_root()
     system_name = platform.system()
+    current_version = tuple(sys.version_info[:2])
+
+    if current_version != LOCK_PYTHON:
+        current_label = f"{current_version[0]}.{current_version[1]}"
+        lock_label = f"{LOCK_PYTHON[0]}.{LOCK_PYTHON[1]}"
+        if check:
+            print(
+                f"[lock] skipping freshness check on Python {current_label}; canonical lock runtime is Python {lock_label}"
+            )
+            return 0
+        raise SystemExit(f"[lock] regenerate committed lock files with Python {lock_label}")
 
     if check:
         check_lock_targets(root, system_name)

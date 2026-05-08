@@ -69,7 +69,8 @@ project virtualenv instead of a random global `python` on your `PATH`.
 
 `scripts/dev.py bootstrap` creates or reuses `.venv` and installs from the committed
 platform-specific development lock file. Edit `requirements.in` and `requirements-dev.in`
-for dependency intent; bootstrap does not resolve or regenerate locks.
+for dependency intent; bootstrap does not resolve or regenerate locks. Canonical lock
+maintenance stays on Python 3.12 even though the runtime support window is 3.10-3.14.
 
 `scripts/dev.py verify` runs the required local checks in order: `pytest -q`, import smoke,
 and `ruff check .`.
