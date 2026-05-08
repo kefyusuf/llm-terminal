@@ -1,6 +1,6 @@
 # Stabilization Foundation Implementation Plan
 
-> **STATUS: IN PROGRESS** — Tasks 1-8 are implemented and locally validated as of 2026-05-08; remaining completion evidence is CI history, specifically 3 consecutive green runs.
+> **STATUS: COMPLETED** — Tasks 1-8 are implemented, locally validated, and closed by green CI history plus successful manual workflow dispatch validation as of 2026-05-08.
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the project reproducible, verifiable, and smoke-testable across Linux and Windows with a deterministic bootstrap flow and split CI lanes.
@@ -14,7 +14,8 @@
 - Tasks 1-8 are implemented in the working tree.
 - Host Windows validation passed: `python scripts/dev.py bootstrap`, `python scripts/dev.py verify`, `python scripts/dev.py smoke`.
 - Linux Docker validation passed for `python scripts/dev.py verify` and `python scripts/dev.py smoke` after bootstrapping.
-- Remaining completion evidence is CI history: 3 consecutive green runs on the split GitHub Actions lanes.
+- CI completion evidence is closed: 3 consecutive green `CI` runs were recorded.
+- `CI` now supports `workflow_dispatch`, and a manual dispatch run also completed successfully.
 
 ---
 
@@ -169,7 +170,7 @@ Option B: replace their usage entirely in README/CI and keep them out of operati
 
 Expected: no ambiguity remains about which files humans edit and which files CI/bootstrap consume.
 
-- [ ] **Step 6: Commit dependency topology**
+- [x] **Step 6: Commit dependency topology**
 
 ```bash
 git add requirements.in requirements-dev.in requirements-linux.txt requirements-dev-linux.txt requirements-windows.txt requirements-dev-windows.txt requirements.txt requirements-dev.txt
@@ -216,7 +217,7 @@ python scripts/dev.py lock
 
 Minimum responsibilities:
 
-- fail-fast on unsupported Python outside 3.10–3.12
+- fail-fast on unsupported Python outside 3.10–3.14
 - create/reuse `.venv`
 - select platform-specific committed lock files
 - install from committed lock files only
@@ -251,7 +252,7 @@ python scripts/dev.py smoke
 
 Also document:
 
-- supported Python: 3.10–3.12
+- supported Python: 3.10–3.14
 - primary tested Python: 3.12
 - locks are committed, not generated during bootstrap
 
@@ -263,7 +264,7 @@ python -m pytest tests/test_dev_script.py -q
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit bootstrap surface**
+- [x] **Step 6: Commit bootstrap surface**
 
 ```bash
 git add scripts/dev.py tests/test_dev_script.py README.md
@@ -318,7 +319,7 @@ python -m pytest tests/test_dev_script.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit lock maintenance**
+- [x] **Step 5: Commit lock maintenance**
 
 ```bash
 git add scripts/dev.py tests/test_dev_script.py .github/workflows/ci.yml
@@ -365,7 +366,7 @@ python scripts/dev.py verify
 
 Expected: currently may fail on real code issues, but command surface and step reporting must behave correctly.
 
-- [ ] **Step 4: Commit verify lane**
+- [x] **Step 4: Commit verify lane**
 
 ```bash
 git add scripts/dev.py README.md .github/workflows/ci.yml
@@ -450,7 +451,7 @@ python -m pytest tests/test_smoke_modes.py -q
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit smoke-mode hooks**
+- [x] **Step 6: Commit smoke-mode hooks**
 
 ```bash
 git add main.py app.py api_server.py download_service.py tests/test_smoke_modes.py
@@ -523,7 +524,7 @@ python scripts/dev.py smoke
 
 Expected: all four offline-safe checks pass and exit cleanly.
 
-- [ ] **Step 5: Commit smoke orchestrator**
+- [x] **Step 5: Commit smoke orchestrator**
 
 ```bash
 git add scripts/dev.py tests/test_dev_script.py service_client.py
@@ -572,7 +573,7 @@ Expected behavior:
 - maintainers can run them on demand
 - nightly visibility exists for external drift
 
-- [ ] **Step 5: Validate workflow syntax and commit**
+- [x] **Step 5: Validate workflow syntax and commit**
 
 ```bash
 git add .github/workflows/ci.yml .github/workflows/live.yml
@@ -633,7 +634,7 @@ python scripts/dev.py smoke
 
 Expected: PASS on supported environment.
 
-- [ ] **Step 5: Commit graceful-degradation hardening**
+- [x] **Step 5: Commit graceful-degradation hardening**
 
 ```bash
 git add hardware.py service_client.py api_server.py main.py app.py tests/
@@ -646,8 +647,8 @@ git commit -m "fix: harden startup degradation paths"
 
 Phase 1 is complete only when all of the following are true:
 
-- `python scripts/dev.py bootstrap` works on supported Python 3.10–3.12 and fails fast outside that range.
-- Linux and Windows both pass required `verify` and `smoke` jobs on Python 3.12.
+- `python scripts/dev.py bootstrap` works on supported Python 3.10–3.14 and fails fast outside that range.
+- Linux and Windows both pass required `verify` and `smoke` jobs on Python 3.12 and 3.14.
 - CI runs `lock --check` and catches stale generated locks.
 - Live tests are available via nightly schedule and workflow dispatch but are not PR merge gates.
 - Smoke uses explicit internal smoke modes and does not depend on blind process killing.
