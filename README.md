@@ -1,6 +1,12 @@
 # AI Model Explorer
 
-AI Model Explorer is a Textual-based terminal application for discovering LLM models, checking hardware fit with multi-dimensional scoring, and managing downloads. Supports Ollama, Hugging Face, LM Studio, Docker Model Runner, and MLX.
+AI Model Explorer is a Textual terminal app for discovering, scoring, comparing, and downloading local LLM models across Ollama, Hugging Face, LM Studio, Docker Model Runner, and MLX.
+
+## About
+
+AI Model Explorer is a terminal-first workspace for people who run local LLMs and want faster answers to three practical questions: which models are worth trying, which ones will actually fit their hardware, and how to download or compare them without bouncing between multiple tools.
+
+The repo combines model discovery, hardware-aware scoring, plan-mode analysis, local provider integration, and download orchestration in one place. It is designed for developers and power users who want a Textual UI, a scriptable CLI, and a local REST API over the same core model intelligence.
 
 ## Features
 
