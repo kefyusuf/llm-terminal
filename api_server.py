@@ -4,8 +4,8 @@ Provides a machine-readable HTTP API on port 8787 for programmatic access
 to model search, scoring, and hardware analysis.
 
 Usage:
-    python api_server.py          # Start on localhost:8787
-    python api_server.py --port 9000  # Custom port
+    python -m api_server          # Start on localhost:8787
+    python -m api_server --port 9000  # Custom port
 """
 
 from __future__ import annotations
@@ -16,13 +16,7 @@ import sys
 import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from urllib.parse import parse_qs, urlparse
-
-# Ensure project root is on path
-ROOT = Path(__file__).resolve().parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from core.hardware import HardwareMonitor  # noqa: E402
 from core.model_intelligence import plan_hardware_for_model  # noqa: E402

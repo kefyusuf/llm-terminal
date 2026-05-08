@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python scripts/release_check.py 2>&1 | tee release-check.log
+          python -m scripts.release_check 2>&1 | tee release-check.log
 
       - name: Upload live logs
         if: failure()

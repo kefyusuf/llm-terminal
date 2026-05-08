@@ -367,7 +367,7 @@ def test_smoke_runs_api_health_check(tmp_path, monkeypatch):
     monkeypatch.setattr(dev.subprocess, "run", _fake_run)
 
     assert dev.smoke() == 0
-    assert calls[1][0] == [str(venv_python), "api_server.py"]
+    assert calls[1][0] == [str(venv_python), "-m", "api_server"]
     assert calls[1][2]["timeout"] == 15
     assert calls[1][2]["env"]["AIMODEL_SMOKE"] == "1"
 

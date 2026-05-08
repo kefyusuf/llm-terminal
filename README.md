@@ -109,8 +109,8 @@ ai-model-explorer-cli scores "llama-70b"  # Detailed scoring breakdown
 ### REST API Server
 
 ```bash
-python api_server.py              # Start on localhost:8787
-python api_server.py --port 9000  # Custom port
+python -m api_server              # Start on localhost:8787
+python -m api_server --port 9000  # Custom port
 ```
 
 ## Configuration

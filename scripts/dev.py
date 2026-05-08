@@ -281,7 +281,7 @@ def smoke() -> int:
     run_smoke_step("cli", [str(venv_python), "-m", "cli", "system"], root, timeout=10)
     run_smoke_step(
         "api",
-        [str(venv_python), "api_server.py"],
+        [str(venv_python), "-m", "api_server"],
         root,
         timeout=15,
         env=smoke_env,
