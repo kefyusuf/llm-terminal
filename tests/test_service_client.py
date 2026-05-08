@@ -1,4 +1,4 @@
-from service_client import is_service_compatible
+from downloads.service_client import is_service_compatible
 
 
 def test_service_compatibility_true_for_current_version():

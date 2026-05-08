@@ -1,4 +1,4 @@
-from download_service import (
+from downloads.download_service import (
     _can_terminate_process,
     _has_duplicates,
     _is_hf_api_command,

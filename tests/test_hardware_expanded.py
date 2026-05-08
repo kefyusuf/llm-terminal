@@ -1,6 +1,6 @@
 """Tests for expanded hardware detection — AMD, Intel, Apple, backend."""
 
-from hardware import (
+from core.hardware import (
     HardwareMonitor,
     detect_gpu_vendor,
     detect_gpu_vendor_from_name,

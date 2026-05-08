@@ -108,7 +108,7 @@ def detect_available_providers() -> dict[str, bool]:
 
     Returns a dict mapping provider slug to availability bool.
     """
-    from hardware import check_ollama_running
+    from core.hardware import check_ollama_running
 
     available = {
         "ollama": check_ollama_running(),

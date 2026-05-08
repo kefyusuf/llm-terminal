@@ -1,4 +1,4 @@
-from download_history import (
+from downloads.download_history import (
     action_label_for_entry,
     cancel_model_payload,
     fallback_entry_from_target,

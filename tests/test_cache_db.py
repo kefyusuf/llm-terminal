@@ -1,7 +1,7 @@
 import json
 import time
 
-import cache_db
+from core import cache_db
 
 
 def _configure_temp_cache_db(tmp_path, monkeypatch):

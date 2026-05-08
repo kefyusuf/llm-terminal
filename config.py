@@ -5,6 +5,14 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _default_data_dir() -> Path:
+    return Path(__file__).resolve().parent / "data"
+
+
+def _default_cache_db_path() -> Path:
+    return _default_data_dir() / "cache.db"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="AIMODEL_",
@@ -14,7 +22,7 @@ class Settings(BaseSettings):
     )
 
     # Cache settings
-    cache_db_path: Path = Field(default_factory=lambda: Path(__file__).parent / "cache.db")
+    cache_db_path: Path = Field(default_factory=_default_cache_db_path)
     cache_ttl_seconds: int = 86400
     cache_max_per_source: int = 500
 

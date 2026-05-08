@@ -1,6 +1,6 @@
 """Tests for theme system."""
 
-from themes import THEME_NAMES, THEMES, get_theme, next_theme, theme_css
+from terminal_ui.themes import THEME_NAMES, THEMES, get_theme, next_theme, theme_css
 
 
 class TestThemes:

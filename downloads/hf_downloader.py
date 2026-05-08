@@ -16,7 +16,7 @@ def _resolve_token() -> str | None:
 def main(argv: list[str] | None = None) -> int:
     args = list(argv if argv is not None else sys.argv[1:])
     if not args:
-        print("Usage: python hf_downloader.py <repo_id>")
+        print("Usage: python -m downloads.hf_downloader <repo_id>")
         return 1
 
     repo_id = args[0]

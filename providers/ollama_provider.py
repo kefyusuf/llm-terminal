@@ -4,10 +4,10 @@ import threading
 import requests
 from bs4 import BeautifulSoup
 
-import cache_db
 import config
-from scoring import enrich_result_with_scores
-from utils import (
+from core import cache_db
+from core.scoring import enrich_result_with_scores
+from core.utils import (
     calculate_fit,
     determine_use_case,
     determine_use_case_key,

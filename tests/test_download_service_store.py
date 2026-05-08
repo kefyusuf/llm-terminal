@@ -1,4 +1,4 @@
-from download_service import DownloadStore
+from downloads.download_service import DownloadStore
 
 
 def test_upsert_job_rejects_duplicate_active_target(tmp_path):

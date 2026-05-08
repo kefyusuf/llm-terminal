@@ -1,6 +1,6 @@
 import pytest
 
-from release_check_helpers import unpack_search_output
+from scripts.release_check_helpers import unpack_search_output
 
 
 def test_unpack_search_output_accepts_two_tuple_shape():

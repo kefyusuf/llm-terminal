@@ -1,6 +1,6 @@
 import time
 
-from search_cache import SearchCache
+from search.search_cache import SearchCache
 
 
 def test_search_cache_returns_entry_when_fresh_and_compatible():

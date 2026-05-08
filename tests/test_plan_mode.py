@@ -1,6 +1,6 @@
 """Tests for plan mode — reverse hardware analysis."""
 
-from model_intelligence import _gpu_class_for_vram, plan_hardware_for_model
+from core.model_intelligence import _gpu_class_for_vram, plan_hardware_for_model
 
 
 class TestPlanHardwareForModel:

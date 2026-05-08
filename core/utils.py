@@ -57,7 +57,7 @@ def calculate_fit(size_gb, specs):
 
     Args:
         size_gb: Estimated model size in gigabytes.
-        specs: Hardware specification dict from :class:`~hardware.HardwareMonitor`.
+        specs: Hardware specification dict from :class:`~core.hardware.HardwareMonitor`.
 
     Returns:
         A 3-tuple ``(fit_markup, mode_markup, resource_label)`` — all Rich markup

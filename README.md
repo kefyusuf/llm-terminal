@@ -68,9 +68,10 @@ that can be `py -3.14` or another selected interpreter; after bootstrap, prefer 
 project virtualenv instead of a random global `python` on your `PATH`.
 
 `scripts/dev.py bootstrap` creates or reuses `.venv` and installs from the committed
-platform-specific development lock file. Edit `requirements.in` and `requirements-dev.in`
-for dependency intent; bootstrap does not resolve or regenerate locks. Canonical lock
-maintenance stays on Python 3.12 even though the runtime support window is 3.10-3.14.
+platform-specific development lock file. Edit `requirements/requirements.in` and
+`requirements/requirements-dev.in` for dependency intent; bootstrap does not resolve or
+regenerate locks. Canonical lock maintenance stays on Python 3.12 even though the runtime
+support window is 3.10-3.14.
 
 `scripts/dev.py verify` runs the required local checks in order: `pytest -q`, import smoke,
 and `ruff check .`.
@@ -164,15 +165,13 @@ llm-terminal/
   cli.py                    # CLI commands (system, search, fit, recommend, plan, scores)
   api_server.py             # REST API server (port 8787)
   config.py                 # Pydantic-settings configuration
-  hardware.py               # Hardware detection (NVIDIA, AMD, Intel, Apple)
-  scoring.py                # 4-dimension scoring engine
-  model_intelligence.py     # MoE detection, dynamic quant, size estimation
-  themes.py                 # Color theme definitions
-  models.py                 # TypedDict schema for model results
-  utils.py                  # Shared utilities (fit calc, size est, parsing)
-  download_service.py       # Background download HTTP service
-  download_manager.py       # Download command builder
-  service_client.py         # Download service client
+  core/                     # Shared cache, hardware, logging, model metadata, scoring, and helpers
+  requirements/            # Runtime/dev intent + committed platform locks
+  downloads/               # Download state, lifecycle, command builder, service client, HF downloader
+  results/                 # Table layout, formatting, filtering helpers
+  search/                  # Search cache and provider orchestration
+  scripts/                 # Dev, release, and maintenance utilities (Python + batch)
+  terminal_ui/             # Textual app package, theme definitions, and styles
   providers/
     __init__.py             # BaseProvider ABC + provider registry
     ollama_provider.py      # Ollama registry search (HTML scraping)
@@ -180,13 +179,6 @@ llm-terminal/
     lmstudio_provider.py    # LM Studio local server integration
     docker_provider.py      # Docker Model Runner integration
     mlx_provider.py         # Apple Silicon MLX cache integration
-  results_presenter.py      # Cell-level Rich markup formatting
-  results_view.py           # Result filtering and sorting
-  results_layout.py         # Responsive column layout
-  results_text.py           # Text truncation and alignment
-  search_orchestration.py   # Provider selection, pagination, cache keys
-  search_cache.py           # In-memory hardware-aware search cache
-  cache_db.py               # SQLite model metadata cache
   tests/                    # Test suite (261 tests)
 ```
 
@@ -211,7 +203,7 @@ Where efficiency depends on inference mode: GPU (0.55), GPU+CPU offload (0.30), 
 ## Notes
 
 - `terminal_ui/` is kept as a legacy experimental package and is not the primary product path.
-- Download service data is stored in `downloads.db`.
-- Metadata cache is stored in `cache.db`.
+- Download service data is stored in `data/downloads.db`.
+- Metadata cache is stored in `data/cache.db`.
 - REST API binds to `127.0.0.1:8787` by default (localhost only).
 - Provider auto-detection runs at startup; unavailable providers are silently skipped.

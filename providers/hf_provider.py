@@ -2,9 +2,9 @@ import requests
 from huggingface_hub import HfApi
 from huggingface_hub.errors import HfHubHTTPError
 
-import cache_db
-from scoring import enrich_result_with_scores
-from utils import (
+from core import cache_db
+from core.scoring import enrich_result_with_scores
+from core.utils import (
     calculate_fit,
     determine_use_case,
     determine_use_case_key,

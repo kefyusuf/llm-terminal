@@ -1,4 +1,4 @@
-import utils
+from core import utils
 
 
 def test_extract_params_detects_billions():

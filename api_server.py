@@ -24,17 +24,17 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from hardware import HardwareMonitor  # noqa: E402
-from model_intelligence import plan_hardware_for_model  # noqa: E402
-from providers.hf_provider import search_hf_models  # noqa: E402
-from providers.ollama_provider import get_installed_ollama_models, search_ollama_models  # noqa: E402
-from scoring import score_model  # noqa: E402
-from utils import (  # noqa: E402
+from core.hardware import HardwareMonitor  # noqa: E402
+from core.model_intelligence import plan_hardware_for_model  # noqa: E402
+from core.scoring import score_model  # noqa: E402
+from core.utils import (  # noqa: E402
     determine_use_case_key,
     estimate_model_size_gb,
     extract_params,
     infer_quant_from_name,
 )
+from providers.hf_provider import search_hf_models  # noqa: E402
+from providers.ollama_provider import get_installed_ollama_models, search_ollama_models  # noqa: E402
 
 API_VERSION = "1.0"
 DEFAULT_HOST = "127.0.0.1"
@@ -254,7 +254,7 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
     def _handle_providers(self):
         providers = []
         # Check Ollama
-        from hardware import check_ollama_running
+        from core.hardware import check_ollama_running
 
         providers.append(
             {

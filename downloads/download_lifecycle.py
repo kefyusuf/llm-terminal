@@ -7,7 +7,7 @@ from collections.abc import Callable
 from typing import Any
 from urllib.error import HTTPError
 
-from download_status import is_active_state
+from .download_status import is_active_state
 
 
 def cancel_error_detail_from_http_error(exc: HTTPError) -> str:

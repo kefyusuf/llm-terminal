@@ -1,4 +1,4 @@
-from download_lifecycle import (
+from downloads.download_lifecycle import (
     cancel_error_detail_from_http_error,
     delete_error_detail_from_http_error,
     entry_identity_keys,

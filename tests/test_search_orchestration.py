@@ -1,4 +1,4 @@
-from search_orchestration import (
+from search.search_orchestration import (
     build_query_key,
     cache_hit_suffix,
     has_more_pages_for_results,

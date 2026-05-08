@@ -1,6 +1,6 @@
 """Tests for the 4-dimension scoring engine."""
 
-from scoring import (
+from core.scoring import (
     USE_CASE_WEIGHTS,
     Scores,
     compute_fit_score,

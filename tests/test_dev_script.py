@@ -26,6 +26,14 @@ def test_bootstrap_rejects_unsupported_python():
         dev.ensure_supported_python((3, 15, 0))
 
 
+def test_requirement_path_prefers_requirements_directory(tmp_path):
+    dev = _load_dev_module()
+    requirements_dir = tmp_path / "requirements"
+    requirements_dir.mkdir()
+
+    assert dev.requirement_path(tmp_path, "requirements.in") == requirements_dir / "requirements.in"
+
+
 def test_bootstrap_selects_windows_dev_lock():
     dev = _load_dev_module()
 
@@ -411,6 +419,6 @@ def test_smoke_runs_download_service_check(tmp_path, monkeypatch):
     monkeypatch.setattr(dev.subprocess, "run", _fake_run)
 
     assert dev.smoke() == 0
-    assert calls[3][0] == [str(venv_python), "download_service.py"]
+    assert calls[3][0] == [str(venv_python), "-m", "downloads.download_service"]
     assert calls[3][2]["timeout"] == 15
     assert calls[3][2]["env"]["AIMODEL_SMOKE"] == "1"

@@ -1,7 +1,11 @@
+import os
 import platform
 import subprocess
 
-import psutil
+try:
+    import psutil
+except ImportError:  # pragma: no cover - exercised only in lightweight envs
+    psutil = None
 
 
 def get_real_cpu_name():
@@ -110,7 +114,7 @@ class HardwareMonitor:
         self.gpu_name = "No GPU detected"
         self.gpu_count = 0
         self.cpu_name = get_real_cpu_name()
-        self.cpu_cores = psutil.cpu_count(logical=True)
+        self.cpu_cores = _cpu_count()
 
         # Try NVIDIA first (most common for LLM)
         self._detect_nvidia()
@@ -177,7 +181,7 @@ class HardwareMonitor:
                         # Try to get VRAM
                         self._detect_amd_vram()
                         return
-        except (FileNotFoundError, subprocess.SubprocessError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
             pass
 
     def _detect_amd_vram(self):
@@ -193,7 +197,7 @@ class HardwareMonitor:
                 self._amd_vram_raw = result.stdout
             else:
                 self._amd_vram_raw = None
-        except (FileNotFoundError, subprocess.SubprocessError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
             self._amd_vram_raw = None
 
     def _detect_apple(self):
@@ -226,7 +230,7 @@ class HardwareMonitor:
                     self.apple_available = True
                     self.gpu_count = 1
                     self._apple_memory_gb = self._get_apple_memory()
-        except (FileNotFoundError, subprocess.SubprocessError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
             pass
 
     def _get_apple_memory(self) -> float:
@@ -241,9 +245,9 @@ class HardwareMonitor:
             if result.returncode == 0:
                 bytes_val = int(result.stdout.strip())
                 return bytes_val / (1024**3)
-        except (ValueError, subprocess.SubprocessError, subprocess.TimeoutExpired):
+        except (OSError, ValueError, subprocess.SubprocessError, subprocess.TimeoutExpired):
             pass
-        return psutil.virtual_memory().total / (1024**3)
+        return _virtual_memory().total / (1024**3)
 
     def _detect_intel(self):
         """Detect Intel Arc GPU via lspci or sysfs."""
@@ -261,7 +265,7 @@ class HardwareMonitor:
                         self.intel_available = True
                         self.gpu_count = 1
                         return
-        except (FileNotFoundError, subprocess.SubprocessError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
             pass
 
     def get_specs(self):
@@ -272,7 +276,7 @@ class HardwareMonitor:
         ``gpu_vendor``, ``backend``, ``gpu_count``, ``vram_total_all``.
         All memory values are in **gigabytes**.
         """
-        ram = psutil.virtual_memory()
+        ram = _virtual_memory()
         vendor = detect_gpu_vendor(self)
         backend = get_backend_label(vendor)
 
@@ -348,6 +352,9 @@ class HardwareMonitor:
 
 def check_ollama_running():
     """Return ``True`` if an Ollama process is currently running on this machine."""
+    if psutil is None:
+        return False
+
     for proc in psutil.process_iter(["name"]):
         try:
             if proc.info["name"] and "ollama" in proc.info["name"].lower():
@@ -355,3 +362,28 @@ def check_ollama_running():
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
     return False
+
+
+def _cpu_count() -> int:
+    if psutil is not None:
+        count = psutil.cpu_count(logical=True)
+        if count is not None:
+            return count
+    return os.cpu_count() or 1
+
+
+def _virtual_memory():
+    if psutil is not None:
+        return psutil.virtual_memory()
+
+    total = 0
+    if hasattr(os, "sysconf"):
+        total = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    available = total
+
+    class _Memory:
+        def __init__(self, total_bytes: int, available_bytes: int):
+            self.total = total_bytes
+            self.available = available_bytes
+
+    return _Memory(total, available)

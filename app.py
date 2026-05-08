@@ -19,15 +19,15 @@ from textual.widgets import (
     Static,
 )
 
-import cache_db
 import config
-from download_history import (
+from core import cache_db
+from downloads.download_history import (
     action_label_for_entry,
     cancel_model_payload,
     fallback_entry_from_target,
     is_external_entry,
 )
-from download_lifecycle import (
+from downloads.download_lifecycle import (
     cancel_error_detail_from_http_error,
     delete_error_detail_from_http_error,
     entry_identity_keys,
@@ -37,18 +37,18 @@ from download_lifecycle import (
     trim_download_registry,
     upsert_download_registry_entry,
 )
-from download_manager import download_target_id
-from download_status import (
+from downloads.download_manager import download_target_id
+from downloads.download_status import (
     is_active_state,
     label_for_state,
     map_service_job_status,
     state_markup_from_state_and_label,
 )
-from hardware import HardwareMonitor, check_ollama_running
+from core.hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
-from results_layout import column_keys_for_width, compute_column_widths
-from results_presenter import (
+from results.results_layout import column_keys_for_width, compute_column_widths
+from results.results_presenter import (
     download_cell_markup,
     fit_cell_markup,
     installed_cell_markup,
@@ -57,16 +57,16 @@ from results_presenter import (
     source_cell_markup,
     use_case_cell_markup,
 )
-from results_text import (
+from results.results_text import (
     align_plain_cell,
     blank_result_row,
     format_header_label,
     truncate_cell,
     truncate_plain_cell,
 )
-from results_view import filter_results_for_view, result_unique_key
-from search_cache import SearchCache
-from search_orchestration import (
+from results.results_view import filter_results_for_view, result_unique_key
+from search.search_cache import SearchCache
+from search.search_orchestration import (
     build_query_key,
     cache_hit_suffix,
     has_more_pages_for_results,
@@ -78,7 +78,7 @@ from search_orchestration import (
     providers_from_filter,
     validate_page_request,
 )
-from service_client import (
+from downloads.service_client import (
     cancel_job,
     create_job,
     delete_job,
@@ -673,7 +673,7 @@ class ComparisonModal(ModalScreen):
 class AIModelViewer(App):
     """Main TUI application for discovering, comparing, and downloading local LLM models.
 
-    Connects to a background :mod:`download_service` over HTTP, polls hardware
+    Connects to a background :mod:`downloads.download_service` over HTTP, polls hardware
     metrics via :class:`~hardware.HardwareMonitor`, and queries both the
     Ollama registry and Hugging Face for GGUF model results.
     """
@@ -1290,7 +1290,7 @@ class AIModelViewer(App):
 
     def action_cycle_theme(self) -> None:
         """Cycle to the next color theme."""
-        from themes import THEMES, next_theme, theme_css
+        from terminal_ui.themes import THEMES, next_theme, theme_css
 
         self._color_theme = next_theme(self._color_theme)
         theme = THEMES[self._color_theme]
@@ -1311,7 +1311,7 @@ class AIModelViewer(App):
         model_name = model.get("name", "")
 
         try:
-            from model_intelligence import plan_hardware_for_model
+            from core.model_intelligence import plan_hardware_for_model
 
             plans = plan_hardware_for_model(model_name)
             self.push_screen(PlanModeModal(model_name, plans))

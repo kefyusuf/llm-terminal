@@ -2,7 +2,7 @@
 
 import pytest
 
-from model_intelligence import (
+from core.model_intelligence import (
     QUANT_MULTIPLIERS,
     QuantInfo,
     detect_moe,

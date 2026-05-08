@@ -2,11 +2,13 @@ import json
 import subprocess
 import sys
 import time
-from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-import psutil
+try:
+    import psutil
+except ImportError:  # pragma: no cover - exercised only in lightweight envs
+    psutil = None
 
 SERVICE_HOST = "127.0.0.1"
 SERVICE_PORT = 8765
@@ -69,20 +71,19 @@ def is_service_compatible(health):
 
 
 def _start_service_process():
-    """Launch ``download_service.py`` as a detached background process."""
-    script_path = Path(__file__).resolve().with_name("download_service.py")
+    """Launch the download service module as a detached background process."""
     if sys.platform.startswith("win"):
         detached = getattr(subprocess, "DETACHED_PROCESS", 0)
         new_group = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         subprocess.Popen(
-            [sys.executable, str(script_path)],
+            [sys.executable, "-m", "downloads.download_service"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=detached | new_group,
         )
     else:
         subprocess.Popen(
-            [sys.executable, str(script_path)],
+            [sys.executable, "-m", "downloads.download_service"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
@@ -110,7 +111,7 @@ def stop_service():
     """Stop the running download service and wait for it to exit.
 
     First tries a graceful ``/shutdown`` request, then falls back to
-    killing any process with ``download_service.py`` in its command line.
+    killing any process with the download service module in its command line.
 
     Returns ``True`` if the service stopped within 3 seconds.
     """
@@ -122,15 +123,16 @@ def stop_service():
     except (URLError, HTTPError, TimeoutError, ValueError):
         pass
 
-    for proc in psutil.process_iter(["pid", "cmdline"]):
-        try:
-            cmdline = proc.info.get("cmdline") or []
-            joined = " ".join(cmdline).lower()
-            if "download_service.py" in joined:
-                proc.kill()
-                stopped_any = True
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            continue
+    if psutil is not None:
+        for proc in psutil.process_iter(["pid", "cmdline"]):
+            try:
+                cmdline = proc.info.get("cmdline") or []
+                joined = " ".join(cmdline).lower()
+                if "downloads.download_service" in joined or "download_service.py" in joined:
+                    proc.kill()
+                    stopped_any = True
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
 
     if not stopped_any:
         return False

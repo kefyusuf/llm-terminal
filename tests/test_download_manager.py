@@ -1,6 +1,6 @@
 import pytest
 
-from download_manager import (
+from downloads.download_manager import (
     build_download_command,
     download_target_id,
     normalize_target_id,

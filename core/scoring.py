@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from model_intelligence import QUANT_MULTIPLIERS
+from .model_intelligence import QUANT_MULTIPLIERS
 
 # ---------------------------------------------------------------------------
 # GPU Bandwidth Lookup Table (GB/s)
@@ -401,7 +401,7 @@ def enrich_result_with_scores(result: dict, specs: dict) -> dict:
     Also adds MoE metadata from model_intelligence if applicable.
     Returns the mutated *result* dict for convenience.
     """
-    from model_intelligence import detect_moe, parse_experts
+    from .model_intelligence import detect_moe, parse_experts
 
     name = result.get("name", "")
     params = result.get("params", "-")

@@ -1,0 +1,1 @@
+"""Results table formatting and view helpers."""

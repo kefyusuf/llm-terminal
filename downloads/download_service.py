@@ -11,14 +11,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from download_manager import (
+from .download_manager import (
     build_download_command,
     download_target_id,
     normalize_target_id,
 )
-from utils import extract_download_progress
+from config import _default_data_dir
+from core.utils import extract_download_progress
 
-DB_PATH = Path(__file__).resolve().with_name("downloads.db")
+DB_PATH = _default_data_dir() / "downloads.db"
 HOST = "127.0.0.1"
 PORT = 8765
 SERVICE_VERSION = "1.7"
@@ -26,6 +27,10 @@ SERVICE_VERSION = "1.7"
 
 def smoke_mode_enabled() -> bool:
     return os.getenv("AIMODEL_SMOKE") == "1"
+
+
+def ensure_data_dir() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 class DownloadStore:
@@ -40,6 +45,7 @@ class DownloadStore:
         return conn
 
     def _init_db(self):
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute(
                 """

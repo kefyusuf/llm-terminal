@@ -12,10 +12,22 @@ from pathlib import Path
 SUPPORTED_PYTHON_MIN = (3, 10)
 SUPPORTED_PYTHON_MAX = (3, 14)
 LOCK_PYTHON = (3, 12)
+REQUIREMENTS_DIRNAME = "requirements"
 
 
 def project_root() -> Path:
     return Path(__file__).resolve().parents[1]
+
+
+def requirements_dir(root: Path) -> Path:
+    candidate = root / REQUIREMENTS_DIRNAME
+    if candidate.exists():
+        return candidate
+    return root
+
+
+def requirement_path(root: Path, name: str) -> Path:
+    return requirements_dir(root) / name
 
 
 def ensure_supported_python(version_info: tuple[int, ...] | None = None) -> None:
@@ -121,9 +133,9 @@ def bootstrap() -> int:
     ensure_virtualenv(root, system_name)
     venv_python = venv_python_path(root, system_name)
     ensure_pip(venv_python, root)
-    lockfile = root / select_dev_lock(system_name)
+    lockfile = requirement_path(root, select_dev_lock(system_name))
     install_lockfile(venv_python, lockfile, root)
-    print(f"[bootstrap] installed from {lockfile.name}")
+    print(f"[bootstrap] installed from {lockfile.relative_to(root).as_posix()}")
     return 0
 
 
@@ -134,8 +146,8 @@ def compile_lock(source_file: Path, output_file: Path, cwd: Path) -> None:
             "-m",
             "piptools",
             "compile",
-            f"--output-file={output_file.name}",
-            source_file.name,
+            f"--output-file={output_file.relative_to(cwd).as_posix()}",
+            source_file.relative_to(cwd).as_posix(),
         ],
         check=True,
         cwd=cwd,
@@ -158,23 +170,26 @@ def normalize_lock_text(text: str) -> str:
 
 
 def check_lock_targets(root: Path, system_name: str | None = None) -> None:
+    source_root = requirements_dir(root)
     for source_name, output_name in select_lock_targets(system_name):
-        output_file = root / output_name
+        output_file = requirement_path(root, output_name)
 
         if not output_file.exists():
             raise SystemExit(f"Missing committed lock file: {output_name}")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
+            temp_requirements = temp_root / REQUIREMENTS_DIRNAME
+            temp_requirements.mkdir(exist_ok=True)
             for input_name, _output_name in select_lock_targets(system_name):
-                shutil.copy2(root / input_name, temp_root / input_name)
+                shutil.copy2(requirement_path(root, input_name), temp_requirements / input_name)
             for _input_name, existing_output_name in select_lock_targets(system_name):
-                committed_output = root / existing_output_name
+                committed_output = requirement_path(root, existing_output_name)
                 if committed_output.exists():
-                    shutil.copy2(committed_output, temp_root / existing_output_name)
+                    shutil.copy2(committed_output, temp_requirements / existing_output_name)
 
-            generated_file = temp_root / output_name
-            compile_lock(temp_root / source_name, generated_file, temp_root)
+            generated_file = temp_requirements / output_name
+            compile_lock(temp_requirements / source_name, generated_file, temp_root)
             generated_text = normalize_lock_text(generated_file.read_text(encoding="utf-8"))
 
         committed_text = normalize_lock_text(output_file.read_text(encoding="utf-8"))
@@ -204,8 +219,8 @@ def lock(*, check: bool = False) -> int:
         return 0
 
     for source_name, output_name in select_lock_targets(system_name):
-        compile_lock(root / source_name, root / output_name, root)
-        print(f"[lock] regenerated {output_name}")
+        compile_lock(requirement_path(root, source_name), requirement_path(root, output_name), root)
+        print(f"[lock] regenerated {REQUIREMENTS_DIRNAME}/{output_name}")
 
     return 0
 
@@ -280,7 +295,7 @@ def smoke() -> int:
     )
     run_smoke_step(
         "download-service",
-        [str(venv_python), "download_service.py"],
+        [str(venv_python), "-m", "downloads.download_service"],
         root,
         timeout=15,
         env=smoke_env,

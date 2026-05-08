@@ -1,4 +1,4 @@
-from download_status import (
+from downloads.download_status import (
     is_active_state,
     label_for_state,
     map_service_job_status,

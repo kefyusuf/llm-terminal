@@ -3,13 +3,10 @@ __pycache__/
 .ruff_cache/
 .venv/
 *.pyc
-downloads.db
-cache.db
+data/*.db
 .env
 .opencode/
 PAGINATION_*.md
-reset_all.bat
-reset_downloads.py
 nul
 models/*.gguf
 models/.cache/

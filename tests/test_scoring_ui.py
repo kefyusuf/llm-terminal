@@ -1,13 +1,13 @@
 """Tests for scoring-related presentation and sorting."""
 
-from results_presenter import (
+from results.results_presenter import (
     composite_score_cell_markup,
     moe_cell_markup,
     score_bar_cell_markup,
     tok_s_cell_markup,
 )
-from results_text import align_plain_cell, truncate_cell
-from results_view import filter_results_for_view
+from results.results_text import align_plain_cell, truncate_cell
+from results.results_view import filter_results_for_view
 
 # ---------------------------------------------------------------------------
 # Score Bar Presentation

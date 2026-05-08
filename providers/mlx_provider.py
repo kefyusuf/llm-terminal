@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from providers import BaseProvider
-from scoring import enrich_result_with_scores
-from utils import (
+from core.scoring import enrich_result_with_scores
+from core.utils import (
     calculate_fit,
     determine_use_case,
     determine_use_case_key,

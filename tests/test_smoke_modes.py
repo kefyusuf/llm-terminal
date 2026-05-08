@@ -1,7 +1,7 @@
 import asyncio
 
 import api_server
-import download_service
+import downloads.download_service as download_service
 import main
 from app import AIModelViewer
 

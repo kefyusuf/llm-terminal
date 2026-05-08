@@ -1,4 +1,4 @@
-from results_layout import column_keys_for_width, compute_column_widths
+from results.results_layout import column_keys_for_width, compute_column_widths
 
 
 def test_column_keys_for_width_full_layout():

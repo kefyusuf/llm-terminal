@@ -3,10 +3,10 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-import cache_db
 import config
-from hardware import HardwareMonitor, check_ollama_running
-from service_client import get_service_health
+from core import cache_db
+from core.hardware import HardwareMonitor, check_ollama_running
+from downloads.service_client import get_service_health
 
 console = Console()
 
@@ -271,7 +271,7 @@ def recommend(limit, use_case, output_json):
 @click.option("--context", "-c", default=4096, help="Target context length")
 def plan(model_name, context):
     """Show hardware requirements for MODEL_NAME across quantization levels."""
-    from model_intelligence import plan_hardware_for_model
+    from core.model_intelligence import plan_hardware_for_model
 
     plans = plan_hardware_for_model(model_name, target_context=context)
 
@@ -300,8 +300,8 @@ def plan(model_name, context):
 @click.argument("model_name")
 def scores(model_name):
     """Show detailed scoring breakdown for MODEL_NAME."""
-    from scoring import score_model
-    from utils import (
+    from core.scoring import score_model
+    from core.utils import (
         determine_use_case_key,
         estimate_model_size_gb,
         extract_params,

@@ -1,4 +1,4 @@
-from results_text import (
+from results.results_text import (
     align_plain_cell,
     blank_result_row,
     format_header_label,

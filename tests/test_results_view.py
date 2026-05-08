@@ -1,4 +1,4 @@
-from results_view import filter_results_for_view, result_unique_key
+from results.results_view import filter_results_for_view, result_unique_key
 
 
 def test_result_unique_key_prefers_id_when_present():
