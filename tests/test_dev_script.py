@@ -22,8 +22,8 @@ def _load_dev_module():
 def test_bootstrap_rejects_unsupported_python():
     dev = _load_dev_module()
 
-    with pytest.raises(SystemExit, match=r"requires Python 3\.10-3\.12"):
-        dev.ensure_supported_python((3, 14, 0))
+    with pytest.raises(SystemExit, match=r"requires Python 3\.10-3\.14"):
+        dev.ensure_supported_python((3, 15, 0))
 
 
 def test_bootstrap_selects_windows_dev_lock():
@@ -126,6 +126,45 @@ def test_bootstrap_recreates_incompatible_existing_venv(tmp_path, monkeypatch):
 
     monkeypatch.setattr(dev, "project_root", lambda: tmp_path)
     monkeypatch.setattr(dev.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(dev.subprocess, "run", _fake_run)
+    real_rmtree = dev.shutil.rmtree
+
+    def _recording_rmtree(path):
+        removed.append(Path(path))
+        real_rmtree(path)
+
+    monkeypatch.setattr(dev.shutil, "rmtree", _recording_rmtree)
+
+    assert dev.bootstrap() == 0
+    assert removed == [tmp_path / ".venv"]
+    assert any(command[:3] == [dev.sys.executable, "-m", "venv"] for command, _cwd, _kwargs in calls)
+
+
+def test_bootstrap_recreates_venv_when_python_minor_changes(tmp_path, monkeypatch):
+    dev = _load_dev_module()
+    (tmp_path / "requirements-dev-windows.txt").write_text("pytest==8.4.2\n", encoding="utf-8")
+    venv_dir = tmp_path / ".venv"
+    venv_dir.mkdir(parents=True)
+    (venv_dir / "Scripts").mkdir()
+    (venv_dir / "Scripts" / "python.exe").write_text("", encoding="utf-8")
+    (venv_dir / "pyvenv.cfg").write_text("version = 3.12.9\n", encoding="utf-8")
+
+    calls = []
+    removed = []
+
+    def _fake_run(cmd, check, cwd, **kwargs):
+        calls.append((cmd, cwd, kwargs))
+
+        class _Result:
+            returncode = 0
+            stdout = "pip 26.1.1"
+            stderr = ""
+
+        return _Result()
+
+    monkeypatch.setattr(dev, "project_root", lambda: tmp_path)
+    monkeypatch.setattr(dev.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(dev.sys, "version_info", (3, 14, 4, "final", 0))
     monkeypatch.setattr(dev.subprocess, "run", _fake_run)
     real_rmtree = dev.shutil.rmtree
 

@@ -46,8 +46,8 @@ AI Model Explorer is a Textual-based terminal application for discovering LLM mo
 
 ## Requirements
 
-- Python 3.10-3.12
-- Primary tested version: Python 3.12
+- Python 3.10-3.14
+- Tested in CI: Python 3.12 and Python 3.14
 - Internet access for provider searches
 - Ollama (optional; required only for local runtime and `ollama pull/run`)
 - LM Studio (optional; auto-detected on `localhost:1234`)
@@ -62,6 +62,10 @@ python scripts/dev.py bootstrap
 python scripts/dev.py verify
 python scripts/dev.py smoke
 ```
+
+Use a supported Python 3.10-3.14 interpreter for the bootstrap command. On Windows,
+that can be `py -3.14` or another selected interpreter; after bootstrap, prefer the
+project virtualenv instead of a random global `python` on your `PATH`.
 
 `scripts/dev.py bootstrap` creates or reuses `.venv` and installs from the committed
 platform-specific development lock file. Edit `requirements.in` and `requirements-dev.in`
@@ -78,7 +82,9 @@ TUI startup path, and download service.
 ### TUI Application
 
 ```bash
-python main.py
+.venv/Scripts/python.exe main.py  # Windows
+# or
+.venv/bin/python main.py          # Linux/macOS
 ```
 
 Or with the installed script entrypoint:

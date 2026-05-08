@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 SUPPORTED_PYTHON_MIN = (3, 10)
-SUPPORTED_PYTHON_MAX = (3, 12)
+SUPPORTED_PYTHON_MAX = (3, 14)
 
 
 def project_root() -> Path:
@@ -21,7 +21,7 @@ def ensure_supported_python(version_info: tuple[int, ...] | None = None) -> None
     version = version_info or tuple(sys.version_info)
     major_minor = version[:2]
     if major_minor < SUPPORTED_PYTHON_MIN or major_minor > SUPPORTED_PYTHON_MAX:
-        raise SystemExit("scripts/dev.py requires Python 3.10-3.12")
+        raise SystemExit("scripts/dev.py requires Python 3.10-3.14")
 
 
 def select_lock_targets(system_name: str | None = None) -> list[tuple[str, str]]:
@@ -50,10 +50,38 @@ def venv_python_path(root: Path, system_name: str | None = None) -> Path:
     return root / ".venv" / "bin" / "python"
 
 
+def read_venv_python_version(venv_dir: Path) -> tuple[int, int] | None:
+    config_path = venv_dir / "pyvenv.cfg"
+    if not config_path.exists():
+        return None
+
+    for line in config_path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("version ="):
+            continue
+
+        raw_version = line.split("=", 1)[1].strip()
+        parts = raw_version.split(".")
+        if len(parts) < 2:
+            return None
+
+        try:
+            return int(parts[0]), int(parts[1])
+        except ValueError:
+            return None
+
+    return None
+
+
 def ensure_virtualenv(root: Path, system_name: str | None = None) -> Path:
     venv_dir = root / ".venv"
     expected_python = venv_python_path(root, system_name)
-    if venv_dir.exists() and not expected_python.exists():
+    expected_version = tuple(sys.version_info[:2])
+    existing_version = read_venv_python_version(venv_dir)
+    needs_recreate = venv_dir.exists() and (
+        not expected_python.exists() or (existing_version is not None and existing_version != expected_version)
+    )
+
+    if needs_recreate:
         shutil.rmtree(venv_dir)
     if not venv_dir.exists():
         subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True, cwd=root)

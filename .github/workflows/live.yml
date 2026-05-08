@@ -16,7 +16,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install lock tooling
         run: |
@@ -44,7 +44,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: live-logs-ubuntu-latest
+          name: live-logs-ubuntu-latest-py3.14
           path: |
             live-tests.log
             release-check.log
