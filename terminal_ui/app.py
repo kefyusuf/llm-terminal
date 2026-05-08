@@ -3,7 +3,7 @@
 ║  OBSIDIAN CONSOLE                                               ║
 ║  A brutally refined terminal workspace — built with Textual     ║
 ║                                                                  ║
-║  Run:  python -m terminal_ui                                    ║
+║  Legacy internal module — not a primary entrypoint              ║
 ║  Keys: ctrl+q quit · ctrl+t terminal · ctrl+d dashboard        ║
 ╚══════════════════════════════════════════════════════════════════╝
 """

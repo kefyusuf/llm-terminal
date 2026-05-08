@@ -171,7 +171,7 @@ llm-terminal/
   results/                 # Table layout, formatting, filtering helpers
   search/                  # Search cache and provider orchestration
   scripts/                 # Dev, release, and maintenance utilities (Python + batch)
-  terminal_ui/             # Textual app package, theme definitions, and styles
+  terminal_ui/             # Theme/style assets plus isolated legacy UI internals
   providers/
     __init__.py             # BaseProvider ABC + provider registry
     ollama_provider.py      # Ollama registry search (HTML scraping)
@@ -202,7 +202,7 @@ Where efficiency depends on inference mode: GPU (0.55), GPU+CPU offload (0.30), 
 
 ## Notes
 
-- `terminal_ui/` is kept as a legacy experimental package and is not the primary product path.
+- `terminal_ui/` now exists mainly for theme/style assets; the legacy experimental UI remains isolated there.
 - Download service data is stored in `data/downloads.db`.
 - Metadata cache is stored in `data/cache.db`.
 - REST API binds to `127.0.0.1:8787` by default (localhost only).

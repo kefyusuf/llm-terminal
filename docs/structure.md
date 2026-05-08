@@ -41,7 +41,7 @@ llm-terminal/
 - `results/`: results-table layout, formatting, and filtering.
 - `search/`: in-memory search cache and provider pagination helpers.
 - `scripts/`: developer, release, and maintenance entry scripts (Python and batch wrappers).
-- `terminal_ui/`: Textual-specific modules, stylesheets, and runtime theme definitions.
+- `terminal_ui/`: theme/style assets and isolated legacy UI internals.
 - `providers/`: external provider integrations.
 
 ## Next Refactor Candidates
