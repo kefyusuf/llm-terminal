@@ -10,16 +10,18 @@ on:
     branches:
       - master
       - main
-  workflow_dispatch:
-    inputs:
-      run_live:
-        description: Run live platform tests
-        required: false
-        default: "false"
 
 jobs:
-  unit-tests:
-    runs-on: ubuntu-latest
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            dev_lock: requirements-dev-linux.txt
+          - os: windows-latest
+            dev_lock: requirements-dev-windows.txt
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -30,21 +32,41 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install lock tooling
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip pip-tools
 
-      - name: Run unit tests
-        run: pytest -q
+      - name: Check committed locks
+        run: python scripts/dev.py lock --check
 
-      - name: Import smoke check
-        run: python -c "import main, app; print('import-ok')"
+      - name: Bootstrap environment
+        run: python scripts/dev.py bootstrap
 
-  live-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_live == 'true'
+      - name: Run verify lane
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/dev.py verify 2>&1 | tee verify.log
+
+      - name: Upload verify logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-logs-${{ matrix.os }}
+          path: verify.log
+          if-no-files-found: ignore
+
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            dev_lock: requirements-dev-linux.txt
+          - os: windows-latest
+            dev_lock: requirements-dev-windows.txt
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -54,13 +76,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install lock tooling
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip pip-tools
 
-      - name: Run live tests
-        run: pytest -q --run-live
+      - name: Check committed locks
+        run: python scripts/dev.py lock --check
 
-      - name: Run release preflight
-        run: python scripts/release_check.py
+      - name: Bootstrap environment
+        run: python scripts/dev.py bootstrap
+
+      - name: Run smoke lane
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/dev.py smoke 2>&1 | tee smoke.log
+
+      - name: Upload smoke logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs-${{ matrix.os }}
+          path: smoke.log
+          if-no-files-found: ignore

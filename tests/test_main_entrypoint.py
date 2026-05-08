@@ -9,6 +9,6 @@ def test_main_invokes_app_run(monkeypatch):
             calls.append("run")
 
     monkeypatch.setattr(main, "AIModelViewer", _DummyViewer)
-    main.main()
+    assert main.main() == 0
 
     assert calls == ["run"]

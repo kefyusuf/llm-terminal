@@ -11,8 +11,10 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -37,6 +39,10 @@ from utils import (  # noqa: E402
 API_VERSION = "1.0"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8787
+
+
+def smoke_mode_enabled() -> bool:
+    return os.getenv("AIMODEL_SMOKE") == "1"
 
 
 class ModelAPIHandler(BaseHTTPRequestHandler):
@@ -305,8 +311,35 @@ def start_server_background(
     return server, thread
 
 
-if __name__ == "__main__":
+def run_smoke_check() -> int:
+    server, thread = start_server_background(DEFAULT_HOST, 0)
+    port = int(server.server_address[1])
+
+    try:
+        with urllib.request.urlopen(f"http://{DEFAULT_HOST}:{port}/health", timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if payload.get("status") != "ok":
+            raise SystemExit("[smoke] api health check failed")
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+        server.server_close()
+
+    print("[smoke] api server ok")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if smoke_mode_enabled():
+        return run_smoke_check()
+
     port = DEFAULT_PORT
-    if len(sys.argv) > 1 and sys.argv[1] == "--port":
-        port = int(sys.argv[2])
+    if len(args) > 1 and args[0] == "--port":
+        port = int(args[1])
     run_server(port=port)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -46,7 +46,8 @@ AI Model Explorer is a Textual-based terminal application for discovering LLM mo
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.10-3.12
+- Primary tested version: Python 3.12
 - Internet access for provider searches
 - Ollama (optional; required only for local runtime and `ollama pull/run`)
 - LM Studio (optional; auto-detected on `localhost:1234`)
@@ -57,13 +58,20 @@ AI Model Explorer is a Textual-based terminal application for discovering LLM mo
 ```bash
 git clone https://github.com/kefyusuf/llm-terminal
 cd llm-terminal
-
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/macOS
-
-pip install -r requirements.txt
+python scripts/dev.py bootstrap
+python scripts/dev.py verify
+python scripts/dev.py smoke
 ```
+
+`scripts/dev.py bootstrap` creates or reuses `.venv` and installs from the committed
+platform-specific development lock file. Edit `requirements.in` and `requirements-dev.in`
+for dependency intent; bootstrap does not resolve or regenerate locks.
+
+`scripts/dev.py verify` runs the required local checks in order: `pytest -q`, import smoke,
+and `ruff check .`.
+
+`scripts/dev.py smoke` runs the offline-safe process smoke checks for the CLI, API server,
+TUI startup path, and download service.
 
 ## Run
 

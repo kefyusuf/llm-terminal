@@ -5,6 +5,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,10 @@ DB_PATH = Path(__file__).resolve().with_name("downloads.db")
 HOST = "127.0.0.1"
 PORT = 8765
 SERVICE_VERSION = "1.7"
+
+
+def smoke_mode_enabled() -> bool:
+    return os.getenv("AIMODEL_SMOKE") == "1"
 
 
 class DownloadStore:
@@ -729,6 +734,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    if smoke_mode_enabled():
+        return run_smoke_check()
+
     worker = threading.Thread(target=worker_loop, daemon=True)
     worker.start()
     STATE.worker_thread = worker
@@ -741,6 +749,42 @@ def main():
         STATE.stop_event.set()
         server.server_close()
 
+    return 0
+
+
+def run_smoke_check() -> int:
+    STATE.stop_event.clear()
+
+    worker = threading.Thread(target=worker_loop, daemon=True, name="download-service-smoke-worker")
+    worker.start()
+    STATE.worker_thread = worker
+
+    server = ThreadingHTTPServer((HOST, 0), Handler)
+    STATE.server = server
+    thread = threading.Thread(
+        target=server.serve_forever,
+        kwargs={"poll_interval": 0.1},
+        daemon=True,
+        name="download-service-smoke-server",
+    )
+    thread.start()
+    port = int(server.server_address[1])
+
+    try:
+        for path, expected_key in (("/health", "ok"), ("/jobs", "jobs")):
+            with urllib.request.urlopen(f"http://{HOST}:{port}{path}", timeout=5) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            if expected_key not in payload:
+                raise SystemExit(f"[smoke] download service check failed for {path}")
+    finally:
+        STATE.request_shutdown()
+        thread.join(timeout=5)
+        worker.join(timeout=5)
+        server.server_close()
+
+    print("[smoke] download service ok")
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

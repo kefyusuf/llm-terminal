@@ -1,0 +1,51 @@
+name: Live Checks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  live-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lock tooling
+        run: |
+          python -m pip install --upgrade pip pip-tools
+
+      - name: Check committed locks
+        run: python scripts/dev.py lock --check
+
+      - name: Bootstrap environment
+        run: python scripts/dev.py bootstrap
+
+      - name: Run live tests
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest -q --run-live 2>&1 | tee live-tests.log
+
+      - name: Run release preflight
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/release_check.py 2>&1 | tee release-check.log
+
+      - name: Upload live logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-logs-ubuntu-latest
+          path: |
+            live-tests.log
+            release-check.log
+          if-no-files-found: ignore

@@ -1,3 +1,4 @@
+import os
 import subprocess
 import time
 from urllib.error import HTTPError
@@ -1158,6 +1159,16 @@ class AIModelViewer(App):
         yield Static("", id="status-bar")
         yield Footer()
 
+    def _smoke_mode_enabled(self) -> bool:
+        return os.getenv("AIMODEL_SMOKE") == "1"
+
+    def _finish_smoke_mode(self) -> None:
+        if getattr(self, "_smoke_exit_requested", False):
+            return
+        self._smoke_exit_requested = True
+        self.update_status("Smoke mode startup complete.")
+        self.exit()
+
     def on_mount(self) -> None:
         """Initialise the UI, start the download service, and set up polling timers."""
         self.title = "AI Model Explorer"
@@ -1173,6 +1184,14 @@ class AIModelViewer(App):
             "Detail",
             "Action",
         )
+        self.refresh_download_history_table()
+        self._update_results_meta(0)
+
+        if self._smoke_mode_enabled():
+            self.call_after_refresh(self._finish_smoke_mode)
+            self.set_timer(1, self._finish_smoke_mode)
+            return
+
         service_ok = ensure_service_running()
         if not service_ok:
             self.update_status(
@@ -1189,9 +1208,7 @@ class AIModelViewer(App):
             self.latest_specs = cached_specs
             self.query_one(SystemInfoWidget).update_info(cached_specs, check_ollama_running())
 
-        self.refresh_download_history_table()
         self.last_download_history_refresh_at = time.monotonic()
-        self._update_results_meta(0)
         self.update_status(
             "Ready. Search defaults to Ollama. Select 'Hugging Face' filter for HF models."
         )
