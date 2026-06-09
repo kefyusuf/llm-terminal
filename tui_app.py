@@ -269,6 +269,7 @@ class AIModelViewer(App):
         self._modal_poll_pause_count = 0
         self.results_column_keys = []
         self.results_column_widths = {}
+        self._table_row_keys: set[str] = set()
         self.current_page = 0
         self.page_size = config.settings.hf_search_limit
         self.max_pages = config.settings.hf_search_max_pages
@@ -971,6 +972,7 @@ class AIModelViewer(App):
         self.active_search_id = self.search_counter
         table = self.query_one("#results-table", DataTable)
         table.clear()
+        self._table_row_keys = set()
         table.loading = True
         self._search_progress_visible = False
         self._update_results_meta(0)
@@ -1508,8 +1510,8 @@ class AIModelViewer(App):
         prev_scroll_x = table.scroll_x
         prev_scroll_y = table.scroll_y
 
-        # Incremental path: only update download column when rows exist
-        if table.row_count > 0 and len(self.all_results) > 0:
+        # Incremental path: only update download column when row keys match
+        if self._table_row_keys and len(self.all_results) > 0:
             filtered_results = filter_results_for_view(
                 self.all_results,
                 current_filter=self.current_filter,
@@ -1518,10 +1520,8 @@ class AIModelViewer(App):
                 sort_mode=self.sort_mode,
                 fit_filter=self.fit_filter,
             )
-            changed = False
-            current_keys = {str(table.get_key_at_row(i)) for i in range(table.row_count)}
             new_keys = {result_unique_key(r) for r in filtered_results}
-            if current_keys == new_keys:
+            if self._table_row_keys == new_keys:
                 for result in filtered_results:
                     key = result_unique_key(result)
                     download_text = self._download_cell_text(result)
@@ -1530,9 +1530,8 @@ class AIModelViewer(App):
                     try:
                         table.update_cell(key, "download", download_markup)
                     except Exception:
-                        changed = True
-                if not changed:
-                    return
+                        pass
+                return
             # Fall through to full rebuild
 
         table.clear()
@@ -1616,6 +1615,7 @@ class AIModelViewer(App):
             row_data["download"] = download
             table.add_row(*self._row_cells_for_current_layout(row_data), key=unique_key)
 
+        self._table_row_keys = added
         self._update_results_meta(table.row_count)
 
         if table.row_count > 0:
