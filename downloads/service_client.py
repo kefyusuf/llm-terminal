@@ -73,14 +73,11 @@ def is_service_compatible(health):
 def _start_service_process():
     """Launch the download service module as a detached background process."""
     if sys.platform.startswith("win"):
-        detached = getattr(subprocess, "DETACHED_PROCESS", 0)
-        new_group = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        pythonw = sys.executable.replace("python.exe", "pythonw.exe")
         subprocess.Popen(
-            [sys.executable, "-m", "downloads.download_service"],
+            [pythonw, "-m", "downloads.download_service"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            creationflags=detached | new_group | no_window,
         )
     else:
         subprocess.Popen(
