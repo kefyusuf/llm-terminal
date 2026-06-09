@@ -1325,12 +1325,19 @@ class AIModelViewer(App):
         if search_id != self.active_search_id:
             return
 
+        def _is_cancelled():
+            return search_id != self.active_search_id
+
         def _search_ollama():
+            if _is_cancelled():
+                return [], [], False
             self.call_from_thread(self.on_search_progress, search_id, "Fetching Ollama data...")
             page_size = config.settings.ollama_search_limit
             return search_ollama_models(query, specs, local_models, page=self.current_page, page_size=page_size)
 
         def _search_hf():
+            if _is_cancelled():
+                return [], []
             self.call_from_thread(self.on_search_progress, search_id, "Fetching Hugging Face data...")
             offset = self.current_page * self.page_size
             return search_hf_models(
@@ -1339,6 +1346,8 @@ class AIModelViewer(App):
             )
 
         def _search_extra(slug):
+            if _is_cancelled():
+                return [], []
             for provider_cls in get_all_provider_classes():
                 if provider_cls.slug == slug:
                     self.call_from_thread(
