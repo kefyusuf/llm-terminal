@@ -79,35 +79,13 @@ def calculate_fit(size_gb, specs):
 
 
 def estimate_model_size_gb(model_name):
-    """Heuristically estimate model disk-size in GB from parameter count tokens in *model_name*.
+    """Estimate model disk-size in GB using the MoE-aware v2 estimator.
 
-    Falls back to ``4.8 GB`` (typical 7-8B Q4 model) when no recognisable size
-    token is found.
+    Delegates to :func:`core.model_intelligence.estimate_model_size_gb_v2`.
     """
-    mn = model_name.lower()
-    if "70b" in mn or "72b" in mn:
-        return 40.0
-    if "32b" in mn:
-        return 19.0
-    if "27b" in mn:
-        return 16.0
-    if "14b" in mn or "13b" in mn:
-        return 8.0
-    if "8b" in mn or "7b" in mn:
-        return 4.8
-    if "3b" in mn or "3B" in mn:
-        return 2.0
-    if "1.5b" in mn:
-        return 1.2
-    if "1b" in mn:
-        return 0.8
-    if "0.5b" in mn:
-        return 0.6
-    if "0.6b" in mn or "0.8b" in mn:
-        return 0.5
-    if "0.2b" in mn or "0.3b" in mn:
-        return 0.2
-    return 4.8
+    from core.model_intelligence import estimate_model_size_gb as _v2
+
+    return _v2(model_name)
 
 
 def infer_quant_from_name(name, default="GGUF"):

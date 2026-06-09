@@ -6,7 +6,7 @@ from core.model_intelligence import (
     QUANT_MULTIPLIERS,
     QuantInfo,
     detect_moe,
-    estimate_model_size_gb_v2,
+    estimate_model_size_gb,
     parse_experts,
     select_best_quant,
 )
@@ -142,26 +142,26 @@ class TestSelectBestQuant:
 
 class TestEstimateModelSizeV2:
     def test_standard_sizes(self):
-        assert estimate_model_size_gb_v2("llama-3-8b") == pytest.approx(4.8, abs=0.5)
-        assert estimate_model_size_gb_v2("llama-3-70b") == pytest.approx(40.0, abs=1.0)
+        assert estimate_model_size_gb("llama-3-8b") == pytest.approx(4.8, abs=0.5)
+        assert estimate_model_size_gb("llama-3-70b") == pytest.approx(40.0, abs=1.0)
 
     def test_moe_model_smaller_than_raw_params(self):
         """Mixtral 8x7B raw params 46.7B, estimated ~20GB (closest match to 34B class)."""
-        size = estimate_model_size_gb_v2("mixtral-8x7b")
+        size = estimate_model_size_gb("mixtral-8x7b")
         # 8*7*0.85 = 47.6B total, closest match in our map
         assert size < 40.0  # Not as big as a 70B dense model
         assert size > 10.0  # But larger than a small dense model
 
     def test_deepseek_v2_moe(self):
-        size = estimate_model_size_gb_v2("deepseek-v2")
+        size = estimate_model_size_gb("deepseek-v2")
         assert size > 0
 
     def test_unknown_model_returns_default(self):
-        size = estimate_model_size_gb_v2("unknown-model-xyz")
+        size = estimate_model_size_gb("unknown-model-xyz")
         assert size == pytest.approx(4.8, abs=0.1)
 
     def test_empty_string(self):
-        size = estimate_model_size_gb_v2("")
+        size = estimate_model_size_gb("")
         assert size > 0
 
     @pytest.mark.parametrize(
@@ -174,7 +174,7 @@ class TestEstimateModelSizeV2:
         ],
     )
     def test_size_ranges(self, name, expected_range):
-        size = estimate_model_size_gb_v2(name)
+        size = estimate_model_size_gb(name)
         assert expected_range[0] <= size <= expected_range[1], (
             f"{name}: {size} not in {expected_range}"
         )

@@ -210,7 +210,7 @@ def _find_closest_param_key(total_params: float) -> str | None:
     return best_key
 
 
-def estimate_model_size_gb_v2(name: str) -> float:
+def estimate_model_size_gb(name: str) -> float:
     """Estimate model size in GB with MoE awareness.
 
     For MoE models, calculates the full model size (all experts stored in memory).
@@ -282,7 +282,7 @@ def plan_hardware_for_model(
     - ``mode``: recommended inference mode (GPU, GPU+CPU, CPU)
     - ``min_gpu_class``: human-readable minimum GPU recommendation
     """
-    size_gb = estimate_model_size_gb_v2(model_name)
+    size_gb = estimate_model_size_gb(model_name)
     context_overhead = estimate_context_overhead_gb(target_context)
     plans = []
 
