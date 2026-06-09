@@ -126,7 +126,7 @@ python -m api_server --port 9000  # Custom port
 
 | Variable | Default | Description |
 |---|---|---|
-| `HF_TOKEN` | - | Hugging Face read-only token for higher rate limits (standard env var) |
+| `HF_TOKEN` | - | Hugging Face read-only token for higher rate limits |
 | `AIMODEL_DOWNLOAD_MAX_WORKERS` | 2 | Parallel download worker count |
 | `AIMODEL_HF_SEARCH_LIMIT` | 15 | HF results per page |
 | `AIMODEL_HF_SEARCH_MAX_PAGES` | 10 | Max HF pages |

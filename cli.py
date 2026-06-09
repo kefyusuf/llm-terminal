@@ -93,7 +93,7 @@ def search(query, provider, limit, sort):
     with console.status(f"Searching for '{query}'..."):
         if provider in ("all", "ollama"):
             local = get_installed_ollama_models()
-            ollama_results, _ = search_ollama_models(query, specs, local, page_size=limit)
+            ollama_results, _, _ = search_ollama_models(query, specs, local, page_size=limit)
             results.extend(ollama_results)
 
         if provider in ("all", "huggingface"):
@@ -156,7 +156,7 @@ def fit(perfect, limit):
 
     with console.status("Scanning models for hardware fit..."):
         local = get_installed_ollama_models()
-        ollama_results, _ = search_ollama_models("*", specs, local, page_size=50)
+        ollama_results, _, _ = search_ollama_models("*", specs, local, page_size=50)
         results.extend(ollama_results)
 
         hf_results, _ = search_hf_models("*", specs, {}, limit=50)
@@ -210,7 +210,7 @@ def recommend(limit, use_case, output_json):
 
     with console.status(f"Finding best {use_case} models..."):
         local = get_installed_ollama_models()
-        ollama_results, _ = search_ollama_models("*", specs, local, page_size=50)
+        ollama_results, _, _ = search_ollama_models("*", specs, local, page_size=50)
         results.extend(ollama_results)
 
         hf_results, _ = search_hf_models("*", specs, {}, limit=50)

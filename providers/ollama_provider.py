@@ -227,13 +227,13 @@ def search_ollama_models(query, specs, local_models, page=0, page_size=15):
                 errors.append(f"Ollama registry rate-limited (429). Retry in {retry_after}s.")
             else:
                 errors.append("Ollama registry rate-limited (429). Retry shortly.")
-            return results, errors
+            return results, errors, False
         if response.status_code >= 500:
             errors.append(f"Ollama registry unavailable (HTTP {response.status_code}).")
-            return results, errors
+            return results, errors, False
         if response.status_code != 200:
             errors.append(f"Ollama registry request failed (HTTP {response.status_code}).")
-            return results, errors
+            return results, errors, False
 
         html_text = response.text
         soup = BeautifulSoup(html_text, "html.parser")
