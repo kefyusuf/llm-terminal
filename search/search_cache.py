@@ -38,6 +38,13 @@ class SearchCache:
             return None
         return entry
 
+    def get_stale(self, query_key: str) -> dict[str, Any] | None:
+        """Return cached entry even if expired (for offline mode)."""
+        entry = self._entries.get(query_key)
+        if not entry:
+            return None
+        return entry
+
     def set(
         self,
         query_key: str,

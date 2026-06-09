@@ -990,6 +990,18 @@ class AIModelViewer(App):
             self.update_status(f"Loaded{cache_msg}")
             return
 
+        # Try stale cache as fallback (offline mode)
+        stale = self.search_cache.get_stale(query_key)
+        if stale:
+            self.all_results = [item.copy() for item in stale["results"]]
+            self.dl.ensure_download_fields(self.all_results)
+            self.last_search_error = "Offline — showing cached results"
+            if "has_more_pages" in stale:
+                self.has_more_pages = stale["has_more_pages"]
+            self.on_search_completed(self.active_search_id)
+            self.update_status("Offline mode — showing cached results")
+            return
+
         self.run_search_worker(query, query_key, self.active_search_id, providers)
 
     def on_search_progress(self, search_id: int, message: str) -> None:
