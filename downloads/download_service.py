@@ -343,12 +343,10 @@ def _service_popen_kwargs():
     kwargs = {}
     if sys.platform.startswith("win"):
         kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    # Add HF token to environment if available
     env = os.environ.copy()
     hf_token = getattr(config.settings, "hf_token", None)
     if hf_token:
         env["HF_TOKEN"] = hf_token
-        env["AIMODEL_HF_TOKEN"] = hf_token
     kwargs["env"] = env
     return kwargs
 

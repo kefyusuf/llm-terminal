@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
@@ -107,8 +108,7 @@ def run_shell_command(cmd: str, cwd: str | None = None) -> str:
     """Execute a shell command and return output."""
     try:
         result = subprocess.run(
-            cmd,
-            shell=True,
+            shlex.split(cmd),
             capture_output=True,
             text=True,
             timeout=15,

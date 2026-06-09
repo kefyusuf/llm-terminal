@@ -10,7 +10,7 @@ from huggingface_hub import HfApi, snapshot_download
 
 
 def _resolve_token() -> str | None:
-    return os.environ.get("AIMODEL_HF_TOKEN") or os.environ.get("HF_TOKEN")
+    return os.environ.get("HF_TOKEN")
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -121,10 +121,17 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
     def _handle_models(self, params):
         query = params.get("search", [""])[0]
         provider = params.get("provider", ["all"])[0].lower()
-        limit = int(params.get("limit", ["20"])[0])
+        try:
+            limit = int(params.get("limit", ["20"])[0])
+        except (ValueError, IndexError):
+            return self._error("Invalid 'limit' parameter; expected integer.", 400)
         min_fit = params.get("min_fit", ["all"])[0].lower()
         use_case = params.get("use_case", ["all"])[0].lower()
         sort_by = params.get("sort", ["composite"])[0].lower()
+
+        valid_sorts = {"composite", "speed", "quality", "name"}
+        if sort_by not in valid_sorts:
+            return self._error(f"Invalid 'sort' parameter '{sort_by}'.", 400)
 
         specs = self.monitor.get_specs()
         results = []
@@ -195,7 +202,10 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
         )
 
     def _handle_models_top(self, params):
-        limit = int(params.get("limit", ["5"])[0])
+        try:
+            limit = int(params.get("limit", ["5"])[0])
+        except (ValueError, IndexError):
+            return self._error("Invalid 'limit' parameter; expected integer.", 400)
 
         # Forward to models endpoint with composite sort
         params["sort"] = ["composite"]
@@ -203,7 +213,10 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
         self._handle_models(params)
 
     def _handle_plan(self, model_name, params):
-        context = int(params.get("context", ["4096"])[0])
+        try:
+            context = int(params.get("context", ["4096"])[0])
+        except (ValueError, IndexError):
+            return self._error("Invalid 'context' parameter; expected integer.", 400)
         plans = plan_hardware_for_model(model_name, target_context=context)
         self._json_response(
             {
