@@ -16,6 +16,8 @@ from .download_manager import (
     download_target_id,
     normalize_target_id,
 )
+from loguru import logger
+
 from config import _default_data_dir
 from core.utils import extract_download_progress
 
@@ -471,6 +473,7 @@ def _run_hf_api_download_job(target_id, command):
                 return_code=return_code,
             )
     except Exception as exc:
+        logger.warning("HF download failed for {}: {}", target_id, exc)
         detail = str(exc).strip() or "hugging face download failed"
         STATE.store.update_job(
             target_id,
@@ -571,6 +574,7 @@ def worker_loop():
         try:
             job = STATE.store.claim_next_queued()
         except Exception:
+            logger.warning("Failed to claim next queued job, retrying")
             time.sleep(0.5)
             continue
 

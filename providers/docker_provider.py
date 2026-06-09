@@ -9,8 +9,9 @@ from __future__ import annotations
 import os
 from typing import Any
 
-import requests
+from requests.exceptions import RequestException
 
+from core.http_client import get_session
 from providers import BaseProvider
 from core.scoring import enrich_result_with_scores
 from core.utils import (
@@ -36,9 +37,9 @@ class DockerProvider(BaseProvider):
     def detect(self) -> bool:
         """Check if Docker Model Runner is available."""
         try:
-            resp = requests.get(f"{self.host}/models", timeout=2)
+            resp = get_session().get(f"{self.host}/models", timeout=2)
             return resp.status_code == 200
-        except (requests.RequestException, requests.ConnectionError):
+        except (RequestException, RequestException):
             return False
 
     def search(
@@ -53,7 +54,7 @@ class DockerProvider(BaseProvider):
         errors: list[str] = []
 
         try:
-            resp = requests.get(f"{self.host}/models", timeout=5)
+            resp = get_session().get(f"{self.host}/models", timeout=5)
             if resp.status_code != 200:
                 errors.append(f"Docker Model Runner API error (HTTP {resp.status_code})")
                 return results, errors
@@ -111,9 +112,9 @@ class DockerProvider(BaseProvider):
                 if len(results) >= limit:
                     break
 
-        except requests.ConnectionError:
+        except RequestException:
             errors.append("Docker Model Runner not reachable. Is Docker Desktop running?")
-        except requests.RequestException as exc:
+        except RequestException as exc:
             errors.append(f"Docker Model Runner request failed: {exc}")
 
         return results, errors
@@ -121,7 +122,7 @@ class DockerProvider(BaseProvider):
     def list_installed(self) -> list[str]:
         """List installed Docker models."""
         try:
-            resp = requests.get(f"{self.host}/models", timeout=2)
+            resp = get_session().get(f"{self.host}/models", timeout=2)
             if resp.status_code == 200:
                 data = resp.json()
                 models = (
@@ -134,6 +135,6 @@ class DockerProvider(BaseProvider):
                     else:
                         ids.append(m.get("id", m.get("name", "")).lower())
                 return ids
-        except (requests.RequestException, ValueError):
+        except (RequestException, ValueError):
             pass
         return []

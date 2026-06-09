@@ -1,11 +1,12 @@
 import re
 import threading
 
-import requests
 from bs4 import BeautifulSoup
+from requests.exceptions import RequestException
 
 import config
 from core import cache_db
+from core.http_client import get_session
 from core.scoring import enrich_result_with_scores
 from core.utils import (
     calculate_fit,
@@ -34,12 +35,12 @@ def get_installed_ollama_models():
     Returns an empty list if Ollama is not running or the request fails.
     """
     try:
-        response = requests.get(f"{config.settings.ollama_api_base}/api/tags", timeout=1)
+        response = get_session().get(f"{config.settings.ollama_api_base}/api/tags", timeout=1)
         if response.status_code == 200:
             return [
                 model["name"].split(":")[0].lower() for model in response.json().get("models", [])
             ]
-    except (requests.RequestException, ValueError):
+    except (RequestException, ValueError):
         return []
     return []
 
@@ -165,7 +166,7 @@ def get_ollama_model_metadata(model_name):
     metadata = None
     try:
         detail_url = f"https://ollama.com/library/{model_name}"
-        detail_response = requests.get(
+        detail_response = get_session().get(
             detail_url,
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=config.settings.ollama_timeout,
@@ -182,7 +183,7 @@ def get_ollama_model_metadata(model_name):
                     "quant": infer_quant_from_name(variant_name, default="GGUF"),
                     "params": extract_params(variant_name),
                 }
-    except requests.RequestException:
+    except RequestException:
         metadata = None
 
     if metadata is not None:
@@ -218,7 +219,7 @@ def search_ollama_models(query, specs, local_models, page=0, page_size=15):
         # Always fetch from page 1 and get all results
         url = f"https://ollama.com/search?q={query}"
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=config.settings.ollama_timeout)
+        response = get_session().get(url, headers=headers, timeout=config.settings.ollama_timeout)
 
         if response.status_code == 429:
             retry_after = _retry_after_from_response(response)
@@ -310,7 +311,7 @@ def search_ollama_models(query, specs, local_models, page=0, page_size=15):
         errors.append("Ollama registry request timed out.")
     except requests.ConnectionError:
         errors.append("Ollama registry unreachable. Check network connectivity.")
-    except requests.RequestException as exc:
+    except RequestException as exc:
         errors.append(f"Ollama search failed: {exc}")
     except (ValueError, AttributeError) as exc:
         errors.append(f"Ollama parse failed: {exc}")

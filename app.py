@@ -21,6 +21,14 @@ from textual.widgets import (
 
 import config
 from core import cache_db
+from core.logging_ import get_logger
+
+logger = get_logger(__name__)
+
+from core.model_intelligence import plan_hardware_for_model
+from providers import get_all_provider_classes, get_provider_filter_labels
+from terminal_ui.themes import THEMES, next_theme, theme_css
+
 from downloads.download_history import (
     action_label_for_entry,
     cancel_model_payload,
@@ -256,6 +264,7 @@ class ModelDetailModal(ModalScreen):
             if hasattr(self.app, "update_status"):
                 self.app.update_status("Command copied to clipboard!")
         except Exception:
+            logger.warning("Copy to clipboard failed for command: {}", cmd_text)
             if hasattr(self.app, "update_status"):
                 self.app.update_status(f"Copy failed. Command: {cmd_text}")
 
@@ -965,6 +974,7 @@ class AIModelViewer(App):
             results_meta = self.query_one("#results-meta", Static)
             footer = self.query_one(Footer)
         except Exception:
+            logger.debug("UI mode widgets not yet mounted, skipping apply")
             return
 
         if self.compact_mode:
@@ -1099,7 +1109,7 @@ class AIModelViewer(App):
             radio_button = self.query_one(f"#{radio_id}", RadioButton)
             radio_button.value = True
         except Exception:
-            pass
+            logger.debug("Radio button #{} not found, skipping set", radio_id)
 
     def action_cycle_use_case(self) -> None:
         keys = [key for key, _label in self.USE_CASE_OPTIONS]
@@ -1234,7 +1244,7 @@ class AIModelViewer(App):
             try:
                 self._resize_reflow_timer.stop()
             except Exception:
-                pass
+                logger.debug("Resize reflow timer already stopped")
         self._resize_reflow_timer = self.set_timer(
             0.16,
             lambda: self._apply_resize_reflow(generation),
@@ -1264,8 +1274,6 @@ class AIModelViewer(App):
         self._go_to_page(self.current_page + 1)
 
     def action_cycle_provider(self) -> None:
-        from providers import get_provider_filter_labels
-
         cycle = get_provider_filter_labels()
         current = self.current_filter if self.current_filter in cycle else cycle[0]
         next_filter = cycle[(cycle.index(current) + 1) % len(cycle)]
@@ -1290,15 +1298,13 @@ class AIModelViewer(App):
 
     def action_cycle_theme(self) -> None:
         """Cycle to the next color theme."""
-        from terminal_ui.themes import THEMES, next_theme, theme_css
-
         self._color_theme = next_theme(self._color_theme)
         theme = THEMES[self._color_theme]
         # Inject theme CSS
         try:
             self.stylesheet.add_source(theme_css(theme))
         except Exception:
-            pass
+            logger.warning("Failed to inject theme CSS for {}", self._color_theme)
         self.update_status(f"Theme: {self._color_theme}")
 
     def action_open_plan_mode(self) -> None:
@@ -1311,11 +1317,10 @@ class AIModelViewer(App):
         model_name = model.get("name", "")
 
         try:
-            from core.model_intelligence import plan_hardware_for_model
-
             plans = plan_hardware_for_model(model_name)
             self.push_screen(PlanModeModal(model_name, plans))
         except Exception as exc:
+            logger.warning("Plan analysis failed for {}: {}", model_name, exc)
             self.update_status(f"Plan analysis failed: {exc}")
 
     def _get_selected_model(self) -> dict | None:
@@ -1334,6 +1339,7 @@ class AIModelViewer(App):
                 None,
             )
         except Exception:
+            logger.debug("Failed to get selected model from cursor position")
             return None
 
     def action_toggle_comparison(self) -> None:
@@ -1489,6 +1495,7 @@ class AIModelViewer(App):
             results_meta = self.query_one("#results-meta", Static)
             compact_chipbar = self.query_one("#compact-chipbar", Static)
         except Exception:
+            logger.debug("Results meta widgets not yet mounted, skipping update")
             return
 
         results_meta.update(f"Models ({shown_count} shown / {total} total)")
@@ -1504,7 +1511,7 @@ class AIModelViewer(App):
         try:
             self.query_one("#status-bar", Static).update(text)
         except Exception:
-            return
+            logger.debug("Status bar not yet mounted, skipping update")
 
     def update_system_info(self):
         """Compatibility wrapper that triggers an async system-info refresh."""
@@ -1528,8 +1535,8 @@ class AIModelViewer(App):
             specs = self.monitor.get_specs()
             running_now = check_ollama_running()
             cache_db.set_hardware_snapshot(specs)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("System info refresh failed: {}", exc)
         self.call_from_thread(self._apply_system_info_refresh, specs, running_now)
 
     def _apply_system_info_refresh(self, specs, running_now):
@@ -2261,9 +2268,6 @@ class AIModelViewer(App):
 
         if search_id != self.active_search_id:
             return
-
-        # New providers: LM Studio, Docker, MLX
-        from providers import get_all_provider_classes
 
         for provider_cls in get_all_provider_classes():
             slug = provider_cls.slug

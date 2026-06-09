@@ -7,6 +7,8 @@ from collections.abc import Callable
 from typing import Any
 from urllib.error import HTTPError
 
+from loguru import logger
+
 from .download_status import is_active_state
 
 
@@ -19,7 +21,7 @@ def cancel_error_detail_from_http_error(exc: HTTPError) -> str:
         if error_text:
             detail = f"Cancel failed: {error_text}"
     except Exception:
-        pass
+        logger.debug("Failed to parse cancel error payload from HTTP error")
     return detail
 
 
@@ -34,7 +36,7 @@ def delete_error_detail_from_http_error(exc: HTTPError) -> str:
         elif error_text:
             detail = f"Delete failed: {error_text}"
     except Exception:
-        pass
+        logger.debug("Failed to parse delete error payload from HTTP error")
     return detail
 
 

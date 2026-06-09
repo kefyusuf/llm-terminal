@@ -5,6 +5,9 @@ import time
 from pathlib import Path
 
 import config
+from core.logging_ import get_logger
+
+logger = get_logger(__name__)
 
 _cache_db_path: Path | None = None
 _init_lock = threading.Lock()
@@ -68,7 +71,8 @@ def get_model_cache(source: str, model_id: str) -> dict | None:
                 return None
 
             return json.loads(row["metadata_json"])
-    except (sqlite3.Error, json.JSONDecodeError, OSError):
+    except (sqlite3.Error, json.JSONDecodeError, OSError) as exc:
+        logger.warning("Failed to read model cache for {}/{}: {}", source, model_id, exc)
         return None
 
 
@@ -82,8 +86,8 @@ def set_model_cache(source: str, model_id: str, metadata: dict) -> None:
                 """,
                 (source, model_id, json.dumps(metadata), time.time()),
             )
-    except (sqlite3.Error, json.JSONDecodeError, OSError):
-        pass
+    except (sqlite3.Error, json.JSONDecodeError, OSError) as exc:
+        logger.warning("Failed to write model cache for {}/{}: {}", source, model_id, exc)
 
 
 def cleanup_old_entries(
@@ -120,8 +124,8 @@ def cleanup_old_entries(
                 """,
                 (max_per_source,),
             )
-    except (sqlite3.Error, OSError):
-        pass
+    except (sqlite3.Error, OSError) as exc:
+        logger.warning("Failed to clean up old cache entries: {}", exc)
 
 
 def get_hardware_snapshot() -> dict | None:
@@ -140,7 +144,8 @@ def get_hardware_snapshot() -> dict | None:
                 return None
 
             return json.loads(row["specs_json"])
-    except (sqlite3.Error, json.JSONDecodeError, OSError):
+    except (sqlite3.Error, json.JSONDecodeError, OSError) as exc:
+        logger.warning("Failed to read hardware snapshot: {}", exc)
         return None
 
 
@@ -154,5 +159,5 @@ def set_hardware_snapshot(specs: dict) -> None:
                 """,
                 (json.dumps(specs), time.time()),
             )
-    except (sqlite3.Error, json.JSONDecodeError, OSError):
-        pass
+    except (sqlite3.Error, json.JSONDecodeError, OSError) as exc:
+        logger.warning("Failed to write hardware snapshot: {}", exc)

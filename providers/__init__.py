@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from abc import ABC, abstractmethod
+from loguru import logger
 from typing import Any
 
 
@@ -120,6 +121,7 @@ def detect_available_providers() -> dict[str, bool]:
             instance = provider_cls()
             available[instance.slug] = instance.detect()
         except Exception:
+            logger.debug("Provider {} detection failed, skipping", provider_cls.__name__)
             pass
 
     return available
@@ -149,6 +151,6 @@ def get_provider_filter_labels() -> list[str]:
             if instance.detect():
                 labels.append(instance.display_name)
         except Exception:
-            pass
+            logger.debug("Provider {} filter label detection failed, skipping", provider_cls.__name__)
 
     return labels

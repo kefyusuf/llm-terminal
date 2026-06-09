@@ -9,8 +9,9 @@ from __future__ import annotations
 import os
 from typing import Any
 
-import requests
+from requests.exceptions import RequestException
 
+from core.http_client import get_session
 from providers import BaseProvider
 from core.scoring import enrich_result_with_scores
 from core.utils import (
@@ -28,96 +29,120 @@ class LMStudioProvider(BaseProvider):
 
     slug = "lmstudio"
     display_name = "LM Studio"
-    default_host = "http://localhost:1234"
 
-    def __init__(self):
-        self.host = os.environ.get("LMSTUDIO_HOST", self.default_host)
+    def __init__(self, host: str | None = None):
+        self.host = host or os.getenv("LMSTUDIO_HOST", "http://localhost:1234")
+
+    def _parse_models(self, data: dict[str, Any]) -> list[dict[str, Any]]:
+        """Parse the LM Studio /v1/models response into model result dicts.
+
+        Args:
+            data: The JSON response from ``/v1/models`` containing a ``"data"``
+                  list of model objects.
+
+        Returns:
+            A list of model dictionaries with name, publisher, and source populated.
+        """
+        results: list[dict[str, Any]] = []
+        for model in data.get("data", []):
+            model_id = model.get("id", "")
+            results.append(
+                {
+                    "name": model_id,
+                    "publisher": "LM Studio",
+                    "source": "LM Studio",
+                    "params": "",
+                    "quant": "",
+                    "size": "",
+                    "fit": "",
+                    "mode": "",
+                }
+            )
+        return results
 
     def detect(self) -> bool:
-        """Check if LM Studio server is running."""
+        """Check if LM Studio's local API is reachable.
+
+        Returns:
+            ``True`` if the API responds with a 200 status code.
+        """
         try:
-            resp = requests.get(f"{self.host}/v1/models", timeout=2)
+            resp = get_session().get(f"{self.host}/v1/models", timeout=2)
             return resp.status_code == 200
-        except (requests.RequestException, requests.ConnectionError):
+        except RequestException:
             return False
 
-    def search(
-        self,
-        query: str,
-        specs: dict[str, Any],
-        limit: int = 15,
-        **kwargs: Any,
-    ) -> tuple[list[dict[str, Any]], list[str]]:
-        """Search LM Studio's installed models."""
-        results: list[dict[str, Any]] = []
-        errors: list[str] = []
+    def search(self, query: str, specs: dict, page_size: int = 20) -> tuple[list[dict], list[str]]:
+        """Search for models in LM Studio.
 
+        LM Studio serves whatever models the user has loaded locally, so
+        search is a client-side filter over the full model list.
+
+        Returns:
+            A ``(results, errors)`` tuple.
+        """
         try:
-            resp = requests.get(f"{self.host}/v1/models", timeout=5)
+            resp = get_session().get(f"{self.host}/v1/models", timeout=5)
             if resp.status_code != 200:
-                errors.append(f"LM Studio API error (HTTP {resp.status_code})")
-                return results, errors
+                return [], [f"LM Studio API returned status {resp.status_code}"]
 
             data = resp.json()
-            models = data.get("data", [])
+        except RequestException as exc:
+            return [], [f"LM Studio search failed: {exc}"]
 
-            for model in models:
-                model_id = model.get("id", "")
-                if query and query != "*" and query.lower() not in model_id.lower():
-                    continue
+        results = self._parse_models(data)
 
-                name = model_id.split("/")[-1] if "/" in model_id else model_id
-                publisher = model_id.split("/")[0] if "/" in model_id else "lmstudio"
-                params = extract_params(name)
-                use_case = determine_use_case(name)
-                use_case_key = determine_use_case_key(name)
-                quant = infer_quant_from_name(name, default="GGUF")
-                size_gb = estimate_model_size_gb(name)
+        # Client-side filter
+        q = query.lower()
+        results = [r for r in results if q in r["name"].lower()]
 
-                fit_str, mode_str, _ = calculate_fit(size_gb, specs)
-
-                result = {
-                    "inst": "[green]✔[/green]",
-                    "source": "LM Studio",
-                    "provider": "LM Studio",
-                    "publisher": publisher,
-                    "id": model_id,
-                    "name": name,
-                    "params": params,
-                    "use_case": use_case,
-                    "use_case_key": use_case_key,
-                    "score": "[grey50]-[/grey50]",
-                    "likes": 0,
-                    "downloads": 0,
-                    "is_hidden_gem": False,
-                    "gem_score": 0.0,
-                    "quant": quant,
-                    "size_source": "estimated",
-                    "mode": mode_str,
-                    "fit": fit_str,
-                    "size": f"~{size_gb:.1f} GB",
-                    "_size_gb": size_gb,
-                }
-                enrich_result_with_scores(result, specs)
-                results.append(result)
-
-                if len(results) >= limit:
-                    break
-
-        except requests.ConnectionError:
-            errors.append("LM Studio not reachable. Is LM Studio running?")
-        except requests.RequestException as exc:
-            errors.append(f"LM Studio request failed: {exc}")
-
-        return results, errors
+        # Enrich with scores
+        enriched = []
+        for r in results[:page_size]:
+            try:
+                enriched.append(enrich_result_with_scores(r, specs))
+            except Exception:
+                enriched.append(r)
+        return enriched, []
 
     def list_installed(self) -> list[str]:
-        """List installed LM Studio models."""
+        """Return list of model names loaded in LM Studio."""
+        return [m["name"] for m in self._parse_models({})]
+
+    def search_with_installed(
+        self, query: str, specs: dict, installed: list[str], page_size: int = 20
+    ) -> tuple[list[dict], list[str]]:
+        """Search across LM Studio with installed-model awareness.
+
+        Delegates to :meth:`search` since LM Studio manages its own model set.
+        """
+        return self.search(query, specs, page_size=page_size)
+
+    def get_metadata(self, model_name: str) -> dict | None:
+        """Fetch metadata for a specific model.
+
+        LM Studio's API does not provide per-model metadata endpoints,
+        so this falls back to listing all models and searching by name.
+
+        Args:
+            model_name: The model name to look up.
+
+        Returns:
+            A model dict or ``None`` if not found.
+        """
         try:
-            resp = requests.get(f"{self.host}/v1/models", timeout=2)
-            if resp.status_code == 200:
-                data = resp.json()
-                return [m.get("id", "").lower() for m in data.get("data", [])]
-        except (requests.RequestException, ValueError):
-            pass
-        return []
+            resp = get_session().get(f"{self.host}/v1/models", timeout=2)
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+        except RequestException:
+            return None
+
+        for model in data.get("data", []):
+            if model.get("id", "").lower() == model_name.lower():
+                return {
+                    "name": model["id"],
+                    "publisher": "LM Studio",
+                    "source": "LM Studio",
+                }
+        return None

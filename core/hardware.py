@@ -2,6 +2,8 @@ import os
 import platform
 import subprocess
 
+from loguru import logger
+
 try:
     import psutil
 except ImportError:  # pragma: no cover - exercised only in lightweight envs
@@ -141,8 +143,7 @@ class HardwareMonitor:
             self.gpu_count = nvidia_smi.nvmlDeviceGetCount()
             return
         except Exception:
-            # Covers missing NVML library on CI runners (e.g., NVMLError_LibraryNotFound)
-            pass
+            logger.debug("nvidia_smi NVML init failed (expected on CI/headless)")
 
         try:
             import pynvml
@@ -155,8 +156,7 @@ class HardwareMonitor:
             self.nvidia_available = True
             self.gpu_count = pynvml.nvmlDeviceGetCount()
         except Exception:
-            # Covers missing NVML library on CI runners (e.g., NVMLError_LibraryNotFound)
-            pass
+            logger.debug("pynvml NVML init failed (expected on CI/headless)")
 
     def _detect_amd(self):
         """Detect AMD GPU via rocm-smi."""

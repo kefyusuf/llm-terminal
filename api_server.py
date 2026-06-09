@@ -18,6 +18,8 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from loguru import logger  # noqa: E402
+
 from core.hardware import HardwareMonitor  # noqa: E402
 from core.model_intelligence import plan_hardware_for_model  # noqa: E402
 from core.scoring import score_model  # noqa: E402
@@ -86,6 +88,7 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
             else:
                 self._error(f"Unknown endpoint: {path}", 404)
         except Exception as exc:
+            logger.warning("API request failed: {}", exc)
             self._error(str(exc), 500)
 
     def _handle_health(self):

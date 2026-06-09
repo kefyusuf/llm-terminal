@@ -1,4 +1,5 @@
-import requests
+from requests.exceptions import RequestException
+
 from huggingface_hub import HfApi
 from huggingface_hub.errors import HfHubHTTPError
 
@@ -126,7 +127,7 @@ def search_hf_models(
         hf_models = list(hf_models_iter)[offset : offset + limit]
     except HfHubHTTPError as exc:
         return results, [_format_hf_http_error(exc)]
-    except (requests.RequestException, ValueError, OSError) as exc:
+    except (RequestException, ValueError, OSError) as exc:
         return results, [f"Hugging Face search failed: {exc}"]
 
     for model in hf_models:
@@ -194,7 +195,7 @@ def search_hf_models(
             TypeError,
             ValueError,
             HfHubHTTPError,
-            requests.RequestException,
+            RequestException,
             OSError,
         ) as exc:
             errors.append(f"Hugging Face model parse failed: {exc}")
@@ -266,7 +267,7 @@ def enrich_hf_model_details(model, specs, model_info_cache):
             repo_id,
             {"size_gb": size, "target_file": target},
         )
-    except (HfHubHTTPError, requests.RequestException, OSError, ValueError, TypeError):
+    except (HfHubHTTPError, RequestException, OSError, ValueError, TypeError):
         return model
 
     return model
