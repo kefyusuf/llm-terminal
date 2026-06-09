@@ -1298,6 +1298,8 @@ class AIModelViewer(App):
         search_id: int,
         providers: list[str] | None = None,
     ) -> None:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         if providers is None:
             providers = self._get_search_providers()
 
@@ -1305,70 +1307,84 @@ class AIModelViewer(App):
         ollama_results, ollama_errors = [], []
         hf_results, hf_errors = [], []
         extra_results, extra_errors = [], []
+
+        local_models = []
         if "ollama" in providers:
             self.call_from_thread(self.on_search_progress, search_id, "Checking Ollama runtime...")
             ollama_running = check_ollama_running()
             if ollama_running:
                 self.call_from_thread(
-                    self.on_search_progress,
-                    search_id,
-                    "Connecting to Ollama and fetching installed models...",
+                    self.on_search_progress, search_id, "Fetching installed models..."
                 )
                 local_models = get_installed_ollama_models()
             else:
                 self.call_from_thread(
-                    self.on_search_progress,
-                    search_id,
-                    "Ollama not running; skipping installed model check...",
+                    self.on_search_progress, search_id, "Ollama not running; skipping..."
                 )
-                local_models = []
-
-            self.call_from_thread(self.on_search_progress, search_id, "Fetching Ollama data...")
-            ollama_page_size = config.settings.ollama_search_limit
-            ollama_results, ollama_errors, _ollama_has_more = search_ollama_models(
-                query,
-                specs,
-                local_models,
-                page=self.current_page,
-                page_size=ollama_page_size,
-            )
-
-        if "huggingface" in providers:
-            self.call_from_thread(
-                self.on_search_progress, search_id, "Fetching Hugging Face data..."
-            )
-            offset = self.current_page * self.page_size
-            hf_token = config.settings.hf_token
-            hf_results, hf_errors = search_hf_models(
-                query,
-                specs,
-                self.hf_model_info_cache,
-                limit=self.page_size,
-                offset=offset,
-                hf_token=hf_token,
-            )
 
         if search_id != self.active_search_id:
             return
 
-        for provider_cls in get_all_provider_classes():
-            slug = provider_cls.slug
-            if slug not in providers:
-                continue
-            if slug in ("ollama", "huggingface"):
-                continue  # Already handled above
+        def _search_ollama():
+            self.call_from_thread(self.on_search_progress, search_id, "Fetching Ollama data...")
+            page_size = config.settings.ollama_search_limit
+            return search_ollama_models(query, specs, local_models, page=self.current_page, page_size=page_size)
 
-            self.call_from_thread(
-                self.on_search_progress, search_id, f"Fetching {provider_cls.display_name} data..."
+        def _search_hf():
+            self.call_from_thread(self.on_search_progress, search_id, "Fetching Hugging Face data...")
+            offset = self.current_page * self.page_size
+            return search_hf_models(
+                query, specs, self.hf_model_info_cache,
+                limit=self.page_size, offset=offset, hf_token=config.settings.hf_token,
             )
-            try:
-                instance = provider_cls()
-                if instance.detect():
-                    p_results, p_errors = instance.search(query, specs, limit=self.page_size)
-                    extra_results.extend(p_results)
-                    extra_errors.extend(p_errors)
-            except Exception:
-                pass
+
+        def _search_extra(slug):
+            for provider_cls in get_all_provider_classes():
+                if provider_cls.slug == slug:
+                    self.call_from_thread(
+                        self.on_search_progress, search_id, f"Fetching {provider_cls.display_name} data..."
+                    )
+                    instance = provider_cls()
+                    if instance.detect():
+                        return instance.search(query, specs, limit=self.page_size)
+                    return [], [f"{slug} not reachable"]
+            return [], []
+
+        futures = {}
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            if "ollama" in providers:
+                futures[pool.submit(_search_ollama)] = "ollama"
+            if "huggingface" in providers:
+                futures[pool.submit(_search_hf)] = "huggingface"
+            for provider_cls in get_all_provider_classes():
+                slug = provider_cls.slug
+                if slug in providers and slug not in ("ollama", "huggingface"):
+                    futures[pool.submit(_search_extra, slug)] = slug
+
+            for future in as_completed(futures):
+                if search_id != self.active_search_id:
+                    return
+                label = futures[future]
+                try:
+                    result = future.result()
+                    if label == "ollama":
+                        if len(result) == 3:
+                            ollama_results, ollama_errors, _ = result
+                        else:
+                            ollama_results, ollama_errors = result
+                    elif label == "huggingface":
+                        hf_results, hf_errors = result
+                    else:
+                        p_results, p_errors = result
+                        extra_results.extend(p_results)
+                        extra_errors.extend(p_errors)
+                except Exception:
+                    if label == "ollama":
+                        ollama_errors.append("Ollama search failed")
+                    elif label == "huggingface":
+                        hf_errors.append("HuggingFace search failed")
+                    else:
+                        extra_errors.append(f"{label} search failed")
 
         if search_id != self.active_search_id:
             return
