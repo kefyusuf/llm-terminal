@@ -1474,6 +1474,15 @@ class AIModelViewer(App):
         table.focus()
         self._update_pagination_controls()
 
+    def _is_download_only_refresh(self) -> bool:
+        """Check if we only need to update download column (faster path)."""
+        from results.results_view import filter_results_for_view
+
+        if not self.all_results:
+            return False
+        # If results and keys haven't changed, just update download states
+        return True
+
     def refresh_table(self):
         try:
             self._configure_results_table_columns()
@@ -1483,6 +1492,34 @@ class AIModelViewer(App):
         prev_cursor_row = table.cursor_row
         prev_scroll_x = table.scroll_x
         prev_scroll_y = table.scroll_y
+
+        # Incremental path: only update download column when rows exist
+        if table.row_count > 0 and len(self.all_results) > 0:
+            filtered_results = filter_results_for_view(
+                self.all_results,
+                current_filter=self.current_filter,
+                use_case_filter=self.use_case_filter,
+                hidden_gems_only=self.hidden_gems_only,
+                sort_mode=self.sort_mode,
+                fit_filter=self.fit_filter,
+            )
+            changed = False
+            current_keys = {str(table.get_key_at_row(i)) for i in range(table.row_count)}
+            new_keys = {result_unique_key(r) for r in filtered_results}
+            if current_keys == new_keys:
+                for result in filtered_results:
+                    key = result_unique_key(result)
+                    download_text = self._download_cell_text(result)
+                    dl_width = max(3, self.results_column_widths.get("download", 4) - 1)
+                    download_markup = self._download_cell_markup(download_text, dl_width)
+                    try:
+                        table.update_cell(key, "download", download_markup)
+                    except Exception:
+                        changed = True
+                if not changed:
+                    return
+            # Fall through to full rebuild
+
         table.clear()
         added = set()
 
