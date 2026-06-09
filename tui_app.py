@@ -1195,6 +1195,9 @@ class AIModelViewer(App):
         except Exception:
             return
         table.clear()
+        active_count = len(self.dl.active_downloads)
+        if active_count > 0:
+            self.update_status(f"{active_count} download(s) active")
         rows = self.dl.refresh_history_table(self.dl.download_registry)
         for r in rows:
             table.add_row(
