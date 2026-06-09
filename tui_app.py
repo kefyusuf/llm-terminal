@@ -28,29 +28,6 @@ from core.model_intelligence import plan_hardware_for_model
 from providers import get_all_provider_classes, get_provider_filter_labels
 from terminal_ui.themes import THEMES, next_theme, theme_css
 
-from downloads.download_history import (
-    action_label_for_entry,
-    cancel_model_payload,
-    fallback_entry_from_target,
-    is_external_entry,
-)
-from downloads.download_lifecycle import (
-    cancel_error_detail_from_http_error,
-    delete_error_detail_from_http_error,
-    entry_identity_keys,
-    reset_results_download_state,
-    should_cancel_before_delete,
-    should_delete_ollama_data,
-    trim_download_registry,
-    upsert_download_registry_entry,
-)
-from downloads.download_manager import download_target_id
-from downloads.download_status import (
-    is_active_state,
-    label_for_state,
-    map_service_job_status,
-    state_markup_from_state_and_label,
-)
 from core.hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
@@ -85,16 +62,12 @@ from search.search_orchestration import (
     providers_from_filter,
     validate_page_request,
 )
-from downloads.service_client import (
-    cancel_job,
-    create_job,
-    delete_job,
-    ensure_service_running,
-    get_active_download_debug,
-    get_service_health,
-    list_jobs,
-)
+from downloads.download_history import cancel_model_payload, fallback_entry_from_target, is_external_entry
+from downloads.download_manager import download_target_id
+from downloads.download_status import is_active_state
+from downloads.service_client import ensure_service_running
 
+from app.download_manager import DownloadManager
 from app.modals import (
     ComparisonModal,
     DownloadJobModal,
@@ -320,7 +293,7 @@ class AIModelViewer(App):
         self.sort_mode = "score"
         self.fit_filter = "all"
         self.hidden_gems_only = False
-        self.comparison_set: list[dict] = []  # Models selected for comparison (max 4)
+        self.comparison_set: list[dict] = []
         self._color_theme = config.settings.theme
         self.ollama_running = False
         self.last_search_error = ""
@@ -337,17 +310,7 @@ class AIModelViewer(App):
         self.ollama_status_timer = None
         self.download_status_timer = None
         self.latest_specs = None
-        self.active_downloads = set()
-        self.download_spinner_index = 0
-        self.download_spinner_frames = ["-", "\\", "|", "/"]
-        self.download_registry = {}
-        self._download_poll_running = False
         self._modal_poll_pause_count = 0
-        self.download_history_limit = config.settings.download_history_limit
-        self.download_history_refresh_interval = config.settings.download_history_refresh_interval
-        self.last_download_history_refresh_at = 0.0
-        self.download_history_refresh_pending = False
-        self.download_poll_request_timeout = config.settings.download_poll_request_timeout
         self.results_column_keys = []
         self.results_column_widths = {}
         self.current_page = 0
@@ -365,6 +328,19 @@ class AIModelViewer(App):
         self._search_inflight_started_at = 0.0
         self._search_progress_stamp = (0, "", 0.0)
         self._search_progress_visible = False
+
+        self.dl = DownloadManager(
+            update_status=self.update_status,
+            refresh_table=self.refresh_table,
+            refresh_download_history_table=self._refresh_download_history_table_ui,
+            request_download_history_refresh=self._request_download_history_refresh_ui,
+            render_download_debug=self._render_download_debug,
+            ensure_download_fields=None,
+            find_model_by_target_id=self._find_model_by_target_id,
+            history_limit=config.settings.download_history_limit,
+            history_refresh_interval=config.settings.download_history_refresh_interval,
+            poll_request_timeout=config.settings.download_poll_request_timeout,
+        )
 
     def _set_modal_poll_pause(self, enabled: bool) -> None:
         if enabled:
@@ -633,7 +609,7 @@ class AIModelViewer(App):
                 "Download service is unavailable or outdated. Restart the app/service."
             )
         else:
-            self.sync_download_jobs_from_service(force=True)
+            self.dl.sync_jobs(force=True)
 
         cache_db.init_db()
         cache_db.cleanup_old_entries()
@@ -1071,7 +1047,7 @@ class AIModelViewer(App):
         cached = self.search_cache.get(query_key, current_specs)
         if cached:
             self.all_results = [item.copy() for item in cached["results"]]
-            self._ensure_download_fields()
+            self.dl.ensure_download_fields(self.all_results)
             self.last_search_error = cached["error"]
             if "has_more_pages" in cached:
                 self.has_more_pages = cached["has_more_pages"]
@@ -1194,7 +1170,7 @@ class AIModelViewer(App):
         data_table = getattr(event, "data_table", None)
         if data_table is not None and data_table.id == "download-history-table":
             target_id = str(event.row_key.value)
-            entry = self.download_registry.get(target_id)
+            entry = self.dl.download_registry.get(target_id)
 
             if not entry:
                 entry = fallback_entry_from_target(target_id)
@@ -1237,349 +1213,93 @@ class AIModelViewer(App):
 
     def cancel_model_download(self, model):
         """Request cancellation of an in-progress or queued download for *model*."""
-        target_id = download_target_id(model)
-        try:
-            response = cancel_job(target_id)
-            _ = response.get("job")
-            self.update_status(f"Cancel requested: {model.get('name', target_id)}")
-            self.sync_download_jobs_from_service(force=True)
-            self.refresh_download_history_table()
-            self.refresh_table()  # Also refresh main results table
-        except HTTPError as exc:
-            self.update_status(cancel_error_detail_from_http_error(exc))
-        except Exception:
-            self.update_status("Failed to cancel download through service.")
+        ok, msg = self.dl.cancel_download(model)
+        self.update_status(msg)
+        if ok:
+            self.dl.sync_jobs(force=True)
+            self._refresh_download_history_table_ui()
+            self.refresh_table()
 
     def delete_download_entry(self, target_id, delete_data=False):
-        """Delete download entry from history.
-
-        Args:
-            target_id: The download target ID
-            delete_data: If True, also delete downloaded/partial data (e.g., ollama rm)
-        """
-        entry = self.download_registry.get(target_id)
-        source = entry.get("source", "").lower() if entry else ""
-        model_name = entry.get("name", "") if entry else ""
-        state = entry.get("state", "idle") if entry else "idle"
-
-        if should_cancel_before_delete(delete_data, state):
-            try:
-                cancel_job(target_id)
-                time.sleep(1)
-                self.update_status(f"Download canceled: {model_name}")
-            except Exception as e:
-                self.update_status(f"Could not cancel download: {e}")
-
-        if should_delete_ollama_data(delete_data, source, model_name):
-            try:
-                result = subprocess.run(
-                    ["ollama", "rm", model_name],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-                if result.returncode == 0:
-                    self.update_status(f"Deleted model data: {model_name}")
-                else:
-                    result2 = subprocess.run(
-                        ["ollama", "rm", f"{model_name}:latest"],
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
-                    )
-                    if result2.returncode == 0:
-                        self.update_status(f"Deleted model data: {model_name}:latest")
-                    else:
-                        self.update_status(f"Could not delete model data: {result2.stderr.strip()}")
-            except subprocess.TimeoutExpired:
-                self.update_status(f"Timeout deleting model data: {model_name}")
-            except Exception as e:
-                self.update_status(f"Delete model data error: {e!s}")
-
-        try:
-            delete_job(target_id)
-        except HTTPError as exc:
-            self.update_status(delete_error_detail_from_http_error(exc))
-            return
-        except Exception as exc:
-            self.update_status(f"Failed to delete download entry: {exc}")
-            return
-
-        deleted_entry = self.download_registry.pop(target_id, None)
-        source_key, name_key = entry_identity_keys(deleted_entry)
-        reset_results_download_state(
-            self.all_results,
-            target_id=target_id,
-            source_key=source_key,
-            name_key=name_key,
-            target_id_for_item=download_target_id,
-        )
-
+        ok, msg, keys, tid = self.dl.delete_entry(target_id, delete_data=delete_data)
+        if keys:
+            source_key, name_key = keys
+            from downloads.download_lifecycle import reset_results_download_state
+            reset_results_download_state(
+                self.all_results,
+                target_id=tid,
+                source_key=source_key,
+                name_key=name_key,
+                target_id_for_item=download_target_id,
+            )
         self.refresh_table()
-        self.refresh_download_history_table()
-        self.update_status("Download entry deleted.")
+        self._refresh_download_history_table_ui()
+        self.update_status(msg)
 
     def start_model_download(self, model):
-        if not ensure_service_running():
-            self.update_status("Download service is unavailable.")
-            return
+        ok, msg = self.dl.start_download(model)
+        self.update_status(msg)
+        if ok:
+            self.dl.sync_jobs(force=True)
+            self._refresh_download_history_table_ui()
 
-        target_id = download_target_id(model)
-        try:
-            response = create_job(model)
-            queued = bool(response.get("queued"))
-            if queued:
-                self.update_status(f"Download queued: {model.get('name', target_id)}")
-            else:
-                self.update_status(f"Download already active: {model.get('name', target_id)}")
-            self.sync_download_jobs_from_service(force=True)
-            self.refresh_download_history_table()
-        except Exception as exc:
-            self.update_status(f"Failed to queue download: {exc}")
-
-    def _record_download_entry(self, target_id, model=None, state=None, label=None, detail=None):
-        if model is None:
-            model = self._find_model_by_target_id(target_id)
-        now = time.time()
-        upsert_download_registry_entry(
-            self.download_registry,
-            target_id=target_id,
-            model=model,
-            state=state,
-            label=label,
-            detail=detail,
-            now=now,
-        )
-        trim_download_registry(self.download_registry, self.download_history_limit)
-
-    def sync_download_jobs_from_service(self, force=False, jobs=None):
-        if jobs is None:
-            try:
-                jobs = list_jobs(
-                    limit=self.download_history_limit,
-                    timeout=self.download_poll_request_timeout,
-                )
-            except Exception:
-                return
-
-        running_targets = set()
-        for job in jobs:
-            target_id = job.get("target_id")
-            if not target_id:
-                continue
-            target_id = download_target_id(
-                {
-                    "source": job.get("source", "unknown"),
-                    "id": target_id.split(":", maxsplit=1)[1] if ":" in target_id else target_id,
-                }
-            )
-            mapped_status = map_service_job_status(
-                job.get("status", "idle"),
-                cancel_requested=bool(job.get("cancel_requested")),
-                detail=job.get("detail", ""),
-            )
-            label = label_for_state(mapped_status)
-
-            detail = job.get("progress") or job.get("detail") or ""
-            self._record_download_entry(
-                target_id,
-                model={
-                    "source": job.get("source", "-"),
-                    "publisher": job.get("publisher", "-"),
-                    "name": job.get("name", target_id),
-                },
-                state=mapped_status,
-                label=label,
-                detail=detail,
-            )
-            self.download_registry[target_id]["created_at"] = job.get(
-                "created_at",
-                self.download_registry[target_id].get("created_at", time.time()),
-            )
-            self.download_registry[target_id]["updated_at"] = job.get(
-                "updated_at",
-                self.download_registry[target_id].get("updated_at", time.time()),
-            )
-            if is_active_state(mapped_status):
-                running_targets.add(target_id)
-
-        self.active_downloads = running_targets
-        state_changed = self._ensure_download_fields()
-        if force:
-            self.refresh_table()
-            self.refresh_download_history_table()
-        elif state_changed:
-            self.refresh_table()
-            self.request_download_history_refresh()
-
-    def refresh_download_history_table(self):
+    def _refresh_download_history_table_ui(self):
         try:
             table = self.query_one("#download-history-table", DataTable)
         except Exception:
             return
         table.clear()
-
-        entries = sorted(
-            self.download_registry.values(),
-            key=lambda item: (
-                item.get("created_at", 0),
-                item.get("target_id", ""),
-            ),
-            reverse=True,
-        )
-
-        for entry in entries[: self.download_history_limit]:
-            target_id = entry.get("target_id", "-")
-            action_btn = action_label_for_entry(entry)
-
+        rows = self.dl.refresh_history_table(self.dl.download_registry)
+        for r in rows:
             table.add_row(
-                entry.get("source", "-"),
-                entry.get("publisher", "-"),
-                entry.get("name", "-"),
-                self._download_status_text_from_state(
-                    entry.get("state", "idle"),
-                    entry.get("label", "Idle"),
-                ),
-                entry.get("detail", ""),
-                action_btn,
-                key=target_id,
+                r["source"], r["publisher"], r["name"],
+                self.dl.status_text_from_state(r["state"], r["label"]),
+                r["detail"], r["action"],
+                key=r["key"],
             )
 
+    def _request_download_history_refresh_ui(self, force=False):
+        if self.dl.request_history_refresh(force):
+            self._refresh_download_history_table_ui()
+
+    def refresh_download_history_table(self):
+        self._refresh_download_history_table_ui()
+
     def request_download_history_refresh(self, force=False):
-        now = time.monotonic()
-        if force or (
-            now - self.last_download_history_refresh_at >= self.download_history_refresh_interval
-        ):
-            try:
-                self.refresh_download_history_table()
-            except Exception:
-                return
-            self.last_download_history_refresh_at = now
-            self.download_history_refresh_pending = False
-            return
-        self.download_history_refresh_pending = True
-
-    def _download_status_text_from_state(self, state, label=None):
-        return state_markup_from_state_and_label(
-            state,
-            label,
-            unknown_is_external=True,
-        )
-
-    def _set_download_state(
-        self,
-        target_id,
-        state,
-        label,
-        detail,
-        model=None,
-        refresh_results=True,
-        refresh_history=True,
-    ):
-        self._record_download_entry(target_id, model=model, state=state, label=label, detail=detail)
-        model = self._find_model_by_target_id(target_id)
-        if model and refresh_results:
-            model["download_state"] = state
-            model["download_label"] = label
-            model["download_detail"] = detail
-            self.refresh_table()
-        elif model:
-            model["download_state"] = state
-            model["download_label"] = label
-            model["download_detail"] = detail
-        if refresh_history:
-            self.request_download_history_refresh()
-
-    def _download_cell_text(self, model):
-        state = model.get("download_state", "idle")
-        return state_markup_from_state_and_label(state, model.get("download_label"))
-
-    def _ensure_download_fields(self):
-        changed = False
-        for item in self.all_results:
-            target_id = download_target_id(item)
-            entry = self.download_registry.get(target_id)
-            if entry is None:
-                source_key = str(item.get("source", "")).strip().lower()
-                name_key = str(item.get("name", "")).strip().lower()
-                for value in self.download_registry.values():
-                    if (
-                        str(value.get("source", "")).strip().lower() == source_key
-                        and str(value.get("name", "")).strip().lower() == name_key
-                    ):
-                        entry = value
-                        break
-            if entry:
-                next_state = entry.get("state", "idle")
-                next_label = entry.get("label", "Idle")
-                if (
-                    item.get("download_state") != next_state
-                    or item.get("download_label") != next_label
-                ):
-                    changed = True
-                item["download_state"] = next_state
-                item["download_label"] = next_label
-                item["download_detail"] = entry.get("detail", "")
-            else:
-                if item.get("download_state") not in {None, "idle"}:
-                    changed = True
-                item.setdefault("download_state", "idle")
-                item.setdefault("download_label", "Idle")
-                item.setdefault("download_detail", "")
-        return changed
-
-    def refresh_download_progress(self):
-        self.request_download_poll()
+        self._request_download_history_refresh_ui(force)
 
     def request_download_poll(self, force=False):
-        if self._modal_poll_pause_count > 0 and not force:
+        if not self.dl.can_poll(self._modal_poll_pause_count, force):
             return
-        if self._download_poll_running and not force:
-            return
-        if self._download_poll_running:
-            return
-        self._download_poll_running = True
+        self.dl.set_poll_running(True)
         self._run_download_poll_worker()
 
     @work(thread=True)
     def _run_download_poll_worker(self):
-        jobs = None
-        debug = None
-        health = None
-
-        try:
-            jobs = list_jobs(
-                limit=self.download_history_limit,
-                timeout=self.download_poll_request_timeout,
-            )
-        except Exception:
-            jobs = None
-
-        try:
-            debug = get_active_download_debug(timeout=self.download_poll_request_timeout)
-        except Exception:
-            try:
-                health = get_service_health(timeout=self.download_poll_request_timeout)
-            except Exception:
-                health = None
-
+        jobs, debug, health = self.dl.poll_jobs()
         self.call_from_thread(self._apply_download_poll_snapshot, jobs, debug, health)
 
     def _apply_download_poll_snapshot(self, jobs, debug, health):
-        self._download_poll_running = False
+        self.dl.set_poll_running(False)
         if jobs is not None:
-            self.sync_download_jobs_from_service(force=False, jobs=jobs)
+            self.dl.sync_jobs(force=False, jobs=jobs)
+            changed = self.dl.ensure_download_fields(self.all_results)
+            if changed:
+                self.refresh_table()
         self._render_download_debug(debug, health)
 
-        if not self.active_downloads:
-            if self.download_history_refresh_pending:
-                self.request_download_history_refresh()
+        if not self.dl.active_downloads:
+            if self.dl.download_history_refresh_pending:
+                self._request_download_history_refresh_ui()
             return
         if any(
-            is_active_state(self.download_registry.get(target_id, {}).get("state"))
-            for target_id in self.active_downloads
+            is_active_state(self.dl.download_registry.get(target_id, {}).get("state"))
+            for target_id in self.dl.active_downloads
         ):
-            self.request_download_history_refresh()
+            self._request_download_history_refresh_ui()
+
+    def refresh_download_progress(self):
+        self.request_download_poll()
 
     def refresh_download_debug(self):
         self.request_download_poll(force=True)
@@ -1605,6 +1325,9 @@ class AIModelViewer(App):
             return
 
         debug_widget.update("Workers: unavailable | Duplicates: unknown")
+
+    def _download_cell_text(self, model):
+        return self.dl.download_cell_text(model)
 
     def _mark_ollama_model_installed(self, model_name):
         for item in self.all_results:
@@ -1718,7 +1441,7 @@ class AIModelViewer(App):
 
         self.call_from_thread(self.on_search_progress, search_id, "Finalizing search results...")
         self.all_results = ollama_results + hf_results + extra_results
-        self._ensure_download_fields()
+        self.dl.ensure_download_fields(self.all_results)
         self.last_search_error = " | ".join((ollama_errors + hf_errors + extra_errors)[:2])
 
         self.has_more_pages = has_more_pages_for_results(
