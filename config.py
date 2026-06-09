@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     download_history_limit: int = 50
     download_history_refresh_interval: float = 0.9
     download_poll_request_timeout: float = 0.35
+    download_max_workers: int = 2
 
     # Hardware monitoring
     hardware_poll_interval: float = 3.0

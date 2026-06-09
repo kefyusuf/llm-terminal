@@ -567,49 +567,73 @@ def _run_stream_download_job(target_id, command):
         STATE.clear_process(target_id)
 
 
-def worker_loop():
-    while not STATE.stop_event.is_set():
-        try:
-            job = STATE.store.claim_next_queued()
-        except Exception:
-            logger.warning("Failed to claim next queued job, retrying")
-            time.sleep(0.5)
-            continue
+def _max_workers():
+    try:
+        import config as _cfg
+        return getattr(_cfg.settings, "download_max_workers", 2)
+    except Exception:
+        return 2
 
-        if job is None:
-            time.sleep(0.25)
-            continue
 
-        target_id = job["target_id"]
-        latest = STATE.store.get_job_by_target(target_id)
-        if latest and latest.get("cancel_requested"):
-            STATE.store.update_job(target_id, status="cancelled", detail="Canceled", progress="")
-            continue
-
-        try:
-            cmd = STATE.store.get_command(target_id)
-            if not cmd:
-                STATE.store.update_job(
-                    target_id, status="failed", detail="missing command", return_code=1
-                )
-                continue
-
-            if _is_hf_api_command(cmd):
-                _run_hf_api_download_job(target_id, cmd)
-                continue
-
-            _run_stream_download_job(target_id, cmd)
-        except FileNotFoundError:
+def _process_job(target_id):
+    """Process a single download job (called in thread pool)."""
+    try:
+        cmd = STATE.store.get_command(target_id)
+        if not cmd:
             STATE.store.update_job(
-                target_id,
-                status="failed",
-                detail="required command not found",
-                return_code=127,
+                target_id, status="failed", detail="missing command", return_code=1
             )
-        except OSError as exc:
-            STATE.store.update_job(target_id, status="failed", detail=str(exc)[:180], return_code=1)
-        finally:
-            STATE.clear_process(target_id)
+            return
+
+        if _is_hf_api_command(cmd):
+            _run_hf_api_download_job(target_id, cmd)
+            return
+
+        _run_stream_download_job(target_id, cmd)
+    except FileNotFoundError:
+        STATE.store.update_job(
+            target_id,
+            status="failed",
+            detail="required command not found",
+            return_code=127,
+        )
+    except OSError as exc:
+        STATE.store.update_job(target_id, status="failed", detail=str(exc)[:180], return_code=1)
+    finally:
+        STATE.clear_process(target_id)
+
+
+def worker_loop():
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _claim():
+        while not STATE.stop_event.is_set():
+            try:
+                job = STATE.store.claim_next_queued()
+            except Exception:
+                logger.warning("Failed to claim next queued job, retrying")
+                time.sleep(0.5)
+                continue
+
+            if job is None:
+                time.sleep(0.25)
+                continue
+
+            target_id = job["target_id"]
+            latest = STATE.store.get_job_by_target(target_id)
+            if latest and latest.get("cancel_requested"):
+                STATE.store.update_job(target_id, status="cancelled", detail="Canceled", progress="")
+                continue
+
+            return target_id
+        return None
+
+    with ThreadPoolExecutor(max_workers=_max_workers()) as pool:
+        while not STATE.stop_event.is_set():
+            target_id = _claim()
+            if target_id is None:
+                continue
+            pool.submit(_process_job, target_id)
 
 
 class Handler(BaseHTTPRequestHandler):
