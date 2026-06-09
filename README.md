@@ -14,7 +14,8 @@ The repo combines model discovery, hardware-aware scoring, plan-mode analysis, l
 - Search across 5 providers: **Ollama**, **Hugging Face**, **LM Studio**, **Docker Model Runner**, **MLX**
 - Filter by provider, use case (coding, chat, vision, reasoning, math, embedding, general)
 - Hidden-gem detection for high-download, low-visibility HF models
-- Pagination support for Hugging Face results
+- Parallel provider search (Ollama + Hugging Face + extras concurrently)
+- Stale-cache fallback when offline
 
 ### 4-Dimension Scoring System
 - **Quality** (0-100): Parameter count and quantization quality
@@ -125,7 +126,8 @@ python -m api_server --port 9000  # Custom port
 
 | Variable | Default | Description |
 |---|---|---|
-| `AIMODEL_HF_TOKEN` | - | Hugging Face read-only token for higher rate limits |
+| `HF_TOKEN` | - | Hugging Face read-only token for higher rate limits (standard env var) |
+| `AIMODEL_DOWNLOAD_MAX_WORKERS` | 2 | Parallel download worker count |
 | `AIMODEL_HF_SEARCH_LIMIT` | 15 | HF results per page |
 | `AIMODEL_HF_SEARCH_MAX_PAGES` | 10 | Max HF pages |
 | `AIMODEL_OLLAMA_API_BASE` | `http://localhost:11434` | Ollama API base URL |
@@ -137,7 +139,7 @@ python -m api_server --port 9000  # Custom port
 ### Example `.env`
 
 ```env
-AIMODEL_HF_TOKEN=hf_your_token_here
+HF_TOKEN=hf_your_token_here
 AIMODEL_UI_MODE=compact
 AIMODEL_THEME=nord
 ```
@@ -171,6 +173,7 @@ llm-terminal/
   cli.py                    # CLI commands (system, search, fit, recommend, plan, scores)
   api_server.py             # REST API server (port 8787)
   config.py                 # Pydantic-settings configuration
+  app/                      # Modular screens, widgets, download manager, search constants
   core/                     # Shared cache, hardware, logging, model metadata, scoring, and helpers
   requirements/            # Runtime/dev intent + committed platform locks
   downloads/               # Download state, lifecycle, command builder, service client, HF downloader
@@ -185,7 +188,7 @@ llm-terminal/
     lmstudio_provider.py    # LM Studio local server integration
     docker_provider.py      # Docker Model Runner integration
     mlx_provider.py         # Apple Silicon MLX cache integration
-  tests/                    # Test suite (261 tests)
+  tests/                    # Test suite (370+ tests)
 ```
 
 ## Scoring System
