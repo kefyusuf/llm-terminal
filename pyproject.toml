@@ -56,7 +56,7 @@ known-first-party = ["app", "core", "downloads", "providers",
                      "results", "scripts", "search"]
 
 [tool.ruff.lint.per-file-ignores]
-"app.py" = ["I001", "RUF012", "SIM105", "SIM117", "RUF010"]
+"tui_app.py" = ["I001", "RUF012", "SIM105", "SIM117", "RUF010"]
 "downloads/download_service.py" = ["SIM105"]
 "providers/__init__.py" = ["I001"]
 "results/results_layout.py" = ["I001"]

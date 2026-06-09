@@ -1,4 +1,4 @@
-import app as app_module
+import tui_app as app_module
 
 
 def _make_viewer(monkeypatch):

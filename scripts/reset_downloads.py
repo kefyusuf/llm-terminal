@@ -8,4 +8,4 @@ cache_db.cleanup_old_entries()
 
 print("Cache database cleaned")
 print("Download states reset")
-print("\nYou can now restart the app with: python app.py")
+print("\nYou can now restart the app with: python -m main")

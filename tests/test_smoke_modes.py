@@ -3,7 +3,7 @@ import asyncio
 import api_server
 import downloads.download_service as download_service
 import main
-from app import AIModelViewer
+from tui_app import AIModelViewer
 
 
 def test_main_smoke_mode_exits_cleanly(monkeypatch):

@@ -166,7 +166,7 @@ AIMODEL_THEME=nord
 
 ```text
 llm-terminal/
-  app.py                    # Main Textual TUI application
+  tui_app.py                # Main Textual TUI application
   main.py                   # Entry point
   cli.py                    # CLI commands (system, search, fit, recommend, plan, scores)
   api_server.py             # REST API server (port 8787)
