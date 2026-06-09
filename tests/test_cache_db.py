@@ -5,9 +5,9 @@ from core import cache_db
 
 
 def _configure_temp_cache_db(tmp_path, monkeypatch):
-    db_path = tmp_path / "cache.db"
-    monkeypatch.setattr(cache_db, "_cache_db_path", db_path)
-    monkeypatch.setattr(cache_db.config.settings, "cache_db_path", db_path)
+    db_path = tmp_path / "test_cache.db"
+    monkeypatch.setattr("config.settings.cache_db_path", db_path)
+    cache_db._close_conn()
     cache_db.init_db()
 
 
