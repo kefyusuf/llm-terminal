@@ -2,7 +2,7 @@ import re
 import threading
 
 from bs4 import BeautifulSoup
-from requests.exceptions import RequestException
+from requests.exceptions import ConnectionError, RequestException, Timeout
 
 import config
 from core import cache_db
@@ -307,9 +307,9 @@ def search_ollama_models(query, specs, local_models, page=0, page_size=15):
             }
             enrich_result_with_scores(result_dict, specs)
             results.append(result_dict)
-    except requests.Timeout:
+    except Timeout:
         errors.append("Ollama registry request timed out.")
-    except requests.ConnectionError:
+    except ConnectionError:
         errors.append("Ollama registry unreachable. Check network connectivity.")
     except RequestException as exc:
         errors.append(f"Ollama search failed: {exc}")
