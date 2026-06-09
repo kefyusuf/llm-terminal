@@ -150,10 +150,21 @@ class Scores:
 # ---------------------------------------------------------------------------
 
 
+# Pre-built normalized lookup for find_gpu_bandwidth
+_GPU_BANDWIDTH_NORMALIZED: list[tuple[str, int]] = [
+    (key.lower(), bw) for key, bw in sorted(GPU_BANDWIDTH.items(), key=lambda x: -len(x[0]))
+]
+_GPU_PARTS_MAP: dict[str, int] = {}
+for key, bw in GPU_BANDWIDTH.items():
+    for part in key.lower().split():
+        if len(part) > 2:
+            _GPU_PARTS_MAP[part] = bw
+
+
 def find_gpu_bandwidth(gpu_name: str) -> int | None:
     """Find the memory bandwidth in GB/s for a GPU by name.
 
-    Does case-insensitive substring matching against the lookup table.
+    Uses pre-built normalized lookup for O(1) matching.
     Returns ``None`` if no match is found.
     """
     if not gpu_name:
@@ -161,17 +172,15 @@ def find_gpu_bandwidth(gpu_name: str) -> int | None:
 
     lower = gpu_name.lower()
 
-    # Direct substring match (case-insensitive)
-    for key, bw in GPU_BANDWIDTH.items():
-        if key.lower() in lower:
+    # Direct substring match via pre-sorted longest-first keys
+    for norm_key, bw in _GPU_BANDWIDTH_NORMALIZED:
+        if norm_key in lower:
             return bw
 
-    # Try matching just the model number/name part
-    for key, bw in GPU_BANDWIDTH.items():
-        key_parts = key.lower().split()
-        for part in key_parts:
-            if len(part) > 2 and part in lower:
-                return bw
+    # Part-based match via pre-computed map
+    for part, bw in _GPU_PARTS_MAP.items():
+        if part in lower:
+            return bw
 
     return None
 
