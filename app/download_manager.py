@@ -51,7 +51,6 @@ class DownloadManager:
         refresh_download_history_table: Callable[[], None],
         request_download_history_refresh: Callable[[bool], None],
         render_download_debug: Callable[[Any, Any], None],
-        ensure_download_fields: Callable[[list[dict], dict], bool],
         find_model_by_target_id: Callable[[str], dict | None],
         history_limit: int = 50,
         history_refresh_interval: float = 0.9,
@@ -62,7 +61,6 @@ class DownloadManager:
         self._refresh_download_history_table = refresh_download_history_table
         self._request_download_history_refresh = request_download_history_refresh
         self._render_download_debug = render_download_debug
-        self._ensure_download_fields = ensure_download_fields
         self._find_model_by_target_id = find_model_by_target_id
 
         self.download_registry: dict[str, dict] = {}

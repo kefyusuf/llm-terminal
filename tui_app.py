@@ -1,7 +1,5 @@
 import os
-import subprocess
 import time
-from urllib.error import HTTPError
 
 from textual import events, on, work
 from textual.app import App, ComposeResult
@@ -293,7 +291,6 @@ class AIModelViewer(App):
             refresh_download_history_table=self._refresh_download_history_table_ui,
             request_download_history_refresh=self._request_download_history_refresh_ui,
             render_download_debug=self._render_download_debug,
-            ensure_download_fields=None,
             find_model_by_target_id=self._find_model_by_target_id,
             history_limit=config.settings.download_history_limit,
             history_refresh_interval=config.settings.download_history_refresh_interval,
