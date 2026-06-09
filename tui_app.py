@@ -68,6 +68,16 @@ from downloads.download_status import is_active_state
 from downloads.service_client import ensure_service_running
 
 from app.download_manager import DownloadManager
+from app.search_constants import (
+    FIT_COMPACT_TAGS,
+    FIT_OPTIONS,
+    RESULTS_COLUMN_LABELS_COMFORTABLE,
+    RESULTS_COLUMN_LABELS_COMPACT,
+    SORT_COMPACT_TAGS,
+    SORT_OPTIONS,
+    USE_CASE_COMPACT_TAGS,
+    USE_CASE_OPTIONS,
+)
 from app.modals import (
     ComparisonModal,
     DownloadJobModal,
@@ -230,58 +240,6 @@ class AIModelViewer(App):
         ("shift+tab", "focus_previous", "Previous"),
     ]
 
-    RESULTS_COLUMN_LABELS_COMFORTABLE = {
-        "inst": "Install",
-        "source": "Source",
-        "publisher": "Provider",
-        "name": "Model",
-        "params": "Scale",
-        "use_case": "Use Case",
-        "score": "Score",
-        "quant": "Format",
-        "mode": "Mode",
-        "fit": "Fit",
-        "download": "Download",
-    }
-
-    RESULTS_COLUMN_LABELS_COMPACT = {
-        "inst": "In",
-        "source": "Src",
-        "publisher": "Prov",
-        "name": "Model",
-        "params": "Param",
-        "use_case": "Use",
-        "score": "Score",
-        "quant": "Quant",
-        "mode": "Mode",
-        "fit": "Fit",
-        "download": "D/L",
-    }
-
-    USE_CASE_OPTIONS = [
-        ("all", "Any Use"),
-        ("chat", "Chat"),
-        ("coding", "Coding"),
-        ("vision", "Vision"),
-        ("reasoning", "Reason"),
-        ("math", "Math"),
-        ("embedding", "Embed"),
-        ("general", "General"),
-    ]
-
-    SORT_OPTIONS = [
-        ("score", "Score"),
-        ("downloads", "Downloads"),
-        ("name", "Name"),
-    ]
-
-    FIT_OPTIONS = [
-        ("all", "All"),
-        ("fit", "Fit"),
-        ("partial", "Partial"),
-        ("nofit", "No Fit"),
-    ]
-
     def __init__(self):
         super().__init__()
         self.monitor = HardwareMonitor()
@@ -354,8 +312,8 @@ class AIModelViewer(App):
 
     def _column_labels(self):
         if self.compact_mode:
-            return self.RESULTS_COLUMN_LABELS_COMPACT
-        return self.RESULTS_COLUMN_LABELS_COMFORTABLE
+            return RESULTS_COLUMN_LABELS_COMPACT
+        return RESULTS_COLUMN_LABELS_COMFORTABLE
 
     def _apply_ui_mode(self) -> None:
         try:
@@ -438,52 +396,31 @@ class AIModelViewer(App):
             self.update_status("View mode: comfortable")
 
     def _use_case_label(self, key: str) -> str:
-        for option_key, option_label in self.USE_CASE_OPTIONS:
+        for option_key, option_label in USE_CASE_OPTIONS:
             if option_key == key:
                 return option_label
         return "Any Use"
 
     def _sort_label(self, key: str) -> str:
-        for option_key, option_label in self.SORT_OPTIONS:
+        for option_key, option_label in SORT_OPTIONS:
             if option_key == key:
                 return option_label
         return "Score"
 
     def _fit_label(self, key: str) -> str:
-        for option_key, option_label in self.FIT_OPTIONS:
+        for option_key, option_label in FIT_OPTIONS:
             if option_key == key:
                 return option_label
         return "All"
 
     def _use_case_compact_tag(self, key: str) -> str:
-        mapping = {
-            "all": "ALL",
-            "chat": "CHAT",
-            "coding": "CODE",
-            "vision": "VIS",
-            "reasoning": "RSN",
-            "math": "MATH",
-            "embedding": "EMB",
-            "general": "GEN",
-        }
-        return mapping.get(key, "ALL")
+        return USE_CASE_COMPACT_TAGS.get(key, "ALL")
 
     def _sort_compact_tag(self, key: str) -> str:
-        mapping = {
-            "score": "SCORE",
-            "downloads": "DL",
-            "name": "NAME",
-        }
-        return mapping.get(key, "SCORE")
+        return SORT_COMPACT_TAGS.get(key, "SCORE")
 
     def _fit_compact_tag(self, key: str) -> str:
-        mapping = {
-            "all": "ALL",
-            "fit": "FIT",
-            "partial": "PART",
-            "nofit": "NO",
-        }
-        return mapping.get(key, "ALL")
+        return FIT_COMPACT_TAGS.get(key, "ALL")
 
     def _compact_chip_text(self, shown_count: int, total: int) -> str:
         provider_short = "HF" if self.current_filter == "Hugging Face" else "OL"
@@ -513,7 +450,7 @@ class AIModelViewer(App):
             logger.debug("Radio button #{} not found, skipping set", radio_id)
 
     def action_cycle_use_case(self) -> None:
-        keys = [key for key, _label in self.USE_CASE_OPTIONS]
+        keys = [key for key, _label in USE_CASE_OPTIONS]
         current_key = self.use_case_filter if self.use_case_filter in keys else "all"
         next_key = keys[(keys.index(current_key) + 1) % len(keys)]
         self._set_use_case_filter(next_key)
@@ -521,7 +458,7 @@ class AIModelViewer(App):
         self.update_status(f"Use Case filter set to {self._use_case_label(next_key)}.")
 
     def action_cycle_sort_mode(self) -> None:
-        keys = [key for key, _label in self.SORT_OPTIONS]
+        keys = [key for key, _label in SORT_OPTIONS]
         current_key = self.sort_mode if self.sort_mode in keys else "score"
         next_key = keys[(keys.index(current_key) + 1) % len(keys)]
         self.sort_mode = next_key
@@ -529,7 +466,7 @@ class AIModelViewer(App):
         self.update_status(f"Sort set to {self._sort_label(next_key)}.")
 
     def action_cycle_fit_filter(self) -> None:
-        keys = [key for key, _label in self.FIT_OPTIONS]
+        keys = [key for key, _label in FIT_OPTIONS]
         current_key = self.fit_filter if self.fit_filter in keys else "all"
         next_key = keys[(keys.index(current_key) + 1) % len(keys)]
         self.fit_filter = next_key
