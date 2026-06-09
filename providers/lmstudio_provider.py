@@ -12,16 +12,8 @@ from typing import Any
 from requests.exceptions import RequestException
 
 from core.http_client import get_session
-from providers import BaseProvider
 from core.scoring import enrich_result_with_scores
-from core.utils import (
-    calculate_fit,
-    determine_use_case,
-    determine_use_case_key,
-    estimate_model_size_gb,
-    extract_params,
-    infer_quant_from_name,
-)
+from providers import BaseProvider
 
 
 class LMStudioProvider(BaseProvider):

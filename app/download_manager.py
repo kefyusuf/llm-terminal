@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Callable
-
+from collections.abc import Callable
+from typing import Any
 from urllib.error import HTTPError
 
-from downloads.download_history import action_label_for_entry, cancel_model_payload, fallback_entry_from_target, is_external_entry
+from downloads.download_history import (
+    action_label_for_entry,
+)
 from downloads.download_lifecycle import (
     cancel_error_detail_from_http_error,
     delete_error_detail_from_http_error,
     entry_identity_keys,
-    reset_results_download_state,
     should_cancel_before_delete,
     should_delete_ollama_data,
     trim_download_registry,
@@ -29,10 +30,10 @@ from downloads.service_client import (
     cancel_job,
     create_job,
     delete_job,
-    list_jobs,
+    ensure_service_running,
     get_active_download_debug,
     get_service_health,
-    ensure_service_running,
+    list_jobs,
 )
 
 
@@ -245,9 +246,7 @@ class DownloadManager:
     def can_poll(self, modal_poll_pause_count: int, force: bool) -> bool:
         if modal_poll_pause_count > 0 and not force:
             return False
-        if self._download_poll_running and not force:
-            return False
-        return True
+        return force or not self._download_poll_running
 
     def set_poll_running(self, running: bool):
         self._download_poll_running = running

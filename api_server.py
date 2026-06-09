@@ -18,19 +18,19 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from loguru import logger  # noqa: E402
+from loguru import logger
 
-from core.hardware import HardwareMonitor  # noqa: E402
-from core.model_intelligence import plan_hardware_for_model  # noqa: E402
-from core.scoring import score_model  # noqa: E402
-from core.utils import (  # noqa: E402
+from core.hardware import HardwareMonitor
+from core.model_intelligence import plan_hardware_for_model
+from core.scoring import score_model
+from core.utils import (
     determine_use_case_key,
     estimate_model_size_gb,
     extract_params,
     infer_quant_from_name,
 )
-from providers.hf_provider import search_hf_models  # noqa: E402
-from providers.ollama_provider import get_installed_ollama_models, search_ollama_models  # noqa: E402
+from providers.hf_provider import search_hf_models
+from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
 
 API_VERSION = "1.0"
 DEFAULT_HOST = "127.0.0.1"

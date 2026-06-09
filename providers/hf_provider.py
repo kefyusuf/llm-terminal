@@ -1,7 +1,6 @@
-from requests.exceptions import RequestException
-
 from huggingface_hub import HfApi
 from huggingface_hub.errors import HfHubHTTPError
+from requests.exceptions import RequestException
 
 from core import cache_db
 from core.scoring import enrich_result_with_scores
@@ -126,7 +125,7 @@ def search_hf_models(
         )
         hf_models = list(hf_models_iter)[offset : offset + limit]
     except HfHubHTTPError as exc:
-        from core.errors import NetworkError, RateLimitError, ProviderError
+        from core.errors import NetworkError, RateLimitError
 
         msg = _format_hf_http_error(exc)
         if "429" in str(exc):

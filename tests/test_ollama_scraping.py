@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from requests.exceptions import RequestException
-
-import pytest
 
 SEARCH_HTML = """
 <html><body>
@@ -50,7 +48,7 @@ class TestOllamaSearch:
             "vram_total": 24, "vram_free": 20, "ram_total": 32, "ram_free": 28,
             "gpu_name": "RTX 4090", "has_gpu": True,
         }
-        results, errors, has_more = search_ollama_models("*", specs, [], page=0, page_size=20)
+        results, _errors, _has_more = search_ollama_models("*", specs, [], page=0, page_size=20)
         assert len(results) >= 2
         assert any("llama3" in r["name"] for r in results)
 
@@ -61,7 +59,7 @@ class TestOllamaSearch:
         from providers.ollama_provider import search_ollama_models
 
         specs = {"vram_total": 0, "vram_free": 0, "ram_total": 0, "ram_free": 0, "gpu_name": "", "has_gpu": False}
-        results, errors, has_more = search_ollama_models("*", specs, [], page=0, page_size=20)
+        results, _errors, _has_more = search_ollama_models("*", specs, [], page=0, page_size=20)
         assert results == []
 
     @patch("providers.ollama_provider.get_session")
@@ -70,7 +68,7 @@ class TestOllamaSearch:
         from providers.ollama_provider import search_ollama_models
 
         specs = {"vram_total": 0, "vram_free": 0, "ram_total": 0, "ram_free": 0, "gpu_name": "", "has_gpu": False}
-        results, errors, has_more = search_ollama_models("test", specs, [], page=0, page_size=20)
+        results, _errors, _has_more = search_ollama_models("test", specs, [], page=0, page_size=20)
         assert results == []
 
 

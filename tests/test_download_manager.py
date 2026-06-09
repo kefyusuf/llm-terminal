@@ -155,12 +155,12 @@ class TestCancelDownload:
     @patch("app.download_manager.cancel_job")
     def test_success_returns_ok(self, mock_cancel, manager):
         mock_cancel.return_value = {"job": {}}
-        ok, msg = manager.cancel_download({"source": "Ollama", "name": "llama3"})
+        ok, _ = manager.cancel_download({"source": "Ollama", "name": "llama3"})
         assert ok is True
 
     @patch("app.download_manager.cancel_job", side_effect=Exception("fail"))
     def test_failure_returns_error(self, mock_cancel, manager):
-        ok, msg = manager.cancel_download({"source": "Ollama", "name": "llama3"})
+        ok, _ = manager.cancel_download({"source": "Ollama", "name": "llama3"})
         assert ok is False
 
 
@@ -175,13 +175,13 @@ class TestStartDownload:
 
     @patch("app.download_manager.ensure_service_running", return_value=False)
     def test_service_unavailable(self, mock_ensure, manager):
-        ok, msg = manager.start_download({})
+        ok, _ = manager.start_download({})
         assert ok is False
 
     @patch("app.download_manager.ensure_service_running", return_value=True)
     @patch("app.download_manager.create_job", side_effect=Exception("fail"))
     def test_create_fails(self, mock_create, mock_ensure, manager):
-        ok, msg = manager.start_download({})
+        ok, _ = manager.start_download({})
         assert ok is False
 
 
@@ -189,14 +189,14 @@ class TestDeleteEntry:
     def test_deletes_idle_entry(self, manager):
         manager.download_registry["test-id"] = {"state": "completed", "source": "Ollama", "name": "llama3"}
         with patch("app.download_manager.delete_job"):
-            ok, msg, keys, tid = manager.delete_entry("test-id", delete_data=False)
+            ok, _, _, _ = manager.delete_entry("test-id", delete_data=False)
         assert ok is True
         assert "test-id" not in manager.download_registry
 
     def test_returns_none_keys_on_delete_failure(self, manager):
         manager.download_registry["test-id"] = {"state": "idle"}
         with patch("app.download_manager.delete_job", side_effect=Exception("fail")):
-            ok, msg, keys, tid = manager.delete_entry("test-id")
+            ok, _, keys, _ = manager.delete_entry("test-id")
         assert ok is False
         assert keys is None
 
@@ -207,7 +207,7 @@ class TestPollJobs:
     def test_returns_jobs_and_debug(self, mock_debug, mock_jobs, manager):
         mock_jobs.return_value = [{"target_id": "x", "status": "running"}]
         mock_debug.return_value = {"count": 1}
-        jobs, debug, health = manager.poll_jobs()
+        jobs, debug, _health = manager.poll_jobs()
         assert jobs == [{"target_id": "x", "status": "running"}]
         assert debug == {"count": 1}
 

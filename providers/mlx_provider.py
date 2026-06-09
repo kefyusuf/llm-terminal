@@ -11,7 +11,6 @@ import platform
 from pathlib import Path
 from typing import Any
 
-from providers import BaseProvider
 from core.scoring import enrich_result_with_scores
 from core.utils import (
     calculate_fit,
@@ -21,6 +20,7 @@ from core.utils import (
     extract_params,
     infer_quant_from_name,
 )
+from providers import BaseProvider
 
 # Common MLX model cache locations
 _MLX_CACHE_PATHS = [

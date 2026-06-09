@@ -11,15 +11,16 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from loguru import logger
+
+from config import _default_data_dir
+from core.utils import extract_download_progress
+
 from .download_manager import (
     build_download_command,
     download_target_id,
     normalize_target_id,
 )
-from loguru import logger
-
-from config import _default_data_dir
-from core.utils import extract_download_progress
 
 DB_PATH = _default_data_dir() / "downloads.db"
 HOST = "127.0.0.1"

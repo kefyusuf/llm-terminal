@@ -12,7 +12,6 @@ from typing import Any
 from requests.exceptions import RequestException
 
 from core.http_client import get_session
-from providers import BaseProvider
 from core.scoring import enrich_result_with_scores
 from core.utils import (
     calculate_fit,
@@ -22,6 +21,7 @@ from core.utils import (
     extract_params,
     infer_quant_from_name,
 )
+from providers import BaseProvider
 
 
 class DockerProvider(BaseProvider):
@@ -39,7 +39,7 @@ class DockerProvider(BaseProvider):
         try:
             resp = get_session().get(f"{self.host}/models", timeout=2)
             return resp.status_code == 200
-        except (RequestException, RequestException):
+        except RequestException:
             return False
 
     def search(
@@ -112,8 +112,6 @@ class DockerProvider(BaseProvider):
                 if len(results) >= limit:
                     break
 
-        except RequestException:
-            errors.append("Docker Model Runner not reachable. Is Docker Desktop running?")
         except RequestException as exc:
             errors.append(f"Docker Model Runner request failed: {exc}")
 

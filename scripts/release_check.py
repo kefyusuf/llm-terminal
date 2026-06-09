@@ -1,6 +1,6 @@
-from providers.hf_provider import search_hf_models  # noqa: E402
-from providers.ollama_provider import get_installed_ollama_models, search_ollama_models  # noqa: E402
-from scripts.release_check_helpers import unpack_search_output  # noqa: E402
+from providers.hf_provider import search_hf_models
+from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
+from scripts.release_check_helpers import unpack_search_output
 
 TEST_SPECS = {
     "has_gpu": False,

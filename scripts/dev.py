@@ -170,7 +170,6 @@ def normalize_lock_text(text: str) -> str:
 
 
 def check_lock_targets(root: Path, system_name: str | None = None) -> None:
-    source_root = requirements_dir(root)
     for source_name, output_name in select_lock_targets(system_name):
         output_file = requirement_path(root, output_name)
 

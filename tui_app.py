@@ -1,7 +1,7 @@
 import os
 import time
 
-from textual import events, on, work
+from textual import events, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import (
@@ -19,13 +19,9 @@ from textual.widgets import (
 import config
 from core import cache_db
 from core.logging_ import get_logger
-
-logger = get_logger(__name__)
-
 from core.model_intelligence import plan_hardware_for_model
 from providers import get_all_provider_classes, get_provider_filter_labels
 from terminal_ui.themes import THEMES, next_theme, theme_css
-
 from core.hardware import HardwareMonitor, check_ollama_running
 from providers.hf_provider import enrich_hf_model_details, search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
@@ -64,7 +60,6 @@ from downloads.download_history import cancel_model_payload, fallback_entry_from
 from downloads.download_manager import download_target_id
 from downloads.download_status import is_active_state
 from downloads.service_client import ensure_service_running
-
 from app.download_manager import DownloadManager
 from app.search_constants import (
     FIT_COMPACT_TAGS,
@@ -83,6 +78,8 @@ from app.modals import (
     PlanModeModal,
 )
 from app.widgets import SystemInfoWidget
+
+logger = get_logger(__name__)
 
 
 class AIModelViewer(App):
@@ -1169,7 +1166,7 @@ class AIModelViewer(App):
             self.refresh_table()
 
     def delete_download_entry(self, target_id, delete_data=False):
-        ok, msg, keys, tid = self.dl.delete_entry(target_id, delete_data=delete_data)
+        _ok, msg, keys, tid = self.dl.delete_entry(target_id, delete_data=delete_data)
         if keys:
             source_key, name_key = keys
             from downloads.download_lifecycle import reset_results_download_state
@@ -1490,15 +1487,6 @@ class AIModelViewer(App):
             table.add_row(*self._row_cells_for_current_layout(row_data))
         table.focus()
         self._update_pagination_controls()
-
-    def _is_download_only_refresh(self) -> bool:
-        """Check if we only need to update download column (faster path)."""
-        from results.results_view import filter_results_for_view
-
-        if not self.all_results:
-            return False
-        # If results and keys haven't changed, just update download states
-        return True
 
     def refresh_table(self):
         try:
