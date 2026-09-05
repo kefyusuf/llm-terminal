@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-model-explorer"
-version = "1.0.0"
+version = "1.0.1"
 description = "Terminal UI for discovering, comparing, and downloading local LLM models"
 readme = "README.md"
 requires-python = ">=3.10"
