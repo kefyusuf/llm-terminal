@@ -52,6 +52,9 @@ class SearchCache:
         has_more_pages: bool,
         specs: dict[str, Any],
     ) -> None:
+        if error and not results:
+            return
+
         self._entries[query_key] = {
             "timestamp": time.monotonic(),
             "results": [item.copy() for item in results],
