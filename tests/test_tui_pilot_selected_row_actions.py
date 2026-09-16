@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 
-from textual.widgets import DataTable
-
 from app.modals import PlanModeModal
 from app.viewer import AIModelViewer
 from results.results_view import result_unique_key
@@ -47,6 +45,8 @@ class _DummyMonitor:
 class _InteractionViewer(AIModelViewer):
     async def on_mount(self) -> None:
         """Mount deterministic widgets without starting services or polling."""
+        from textual.widgets import DataTable
+
         self._apply_ui_mode()
         self._configure_results_table_columns(force=True)
         self.query_one("#results-table", DataTable).zebra_stripes = True
@@ -63,6 +63,8 @@ def test_pilot_plan_and_compare_shortcuts_use_selected_result(monkeypatch):
     monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ["Ollama"])
 
     async def _run() -> None:
+        from textual.widgets import DataTable
+
         app = _InteractionViewer()
         async with app.run_test(size=(100, 30)) as pilot:
             await pilot.pause()
