@@ -13,10 +13,10 @@ def _load_dev_module():
     return module
 
 
-def test_api_smoke_outer_timeout_covers_bounded_platform_probes(tmp_path, monkeypatch):
-    """The process deadline must exceed bounded hardware probes plus health/shutdown work."""
+def test_macos_api_smoke_timeout_covers_bounded_platform_probes(tmp_path, monkeypatch):
+    """Darwin needs room for system_profiler plus health and shutdown deadlines."""
     dev = _load_dev_module()
-    venv_python = tmp_path / ".venv" / "Scripts" / "python.exe"
+    venv_python = tmp_path / ".venv" / "bin" / "python"
     venv_python.parent.mkdir(parents=True)
     venv_python.write_text("", encoding="utf-8")
 
@@ -31,7 +31,7 @@ def test_api_smoke_outer_timeout_covers_bounded_platform_probes(tmp_path, monkey
         return _Result()
 
     monkeypatch.setattr(dev, "project_root", lambda: tmp_path)
-    monkeypatch.setattr(dev.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(dev.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(dev.subprocess, "run", _fake_run)
 
     assert dev.smoke() == 0
