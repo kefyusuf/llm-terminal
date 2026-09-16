@@ -34,6 +34,7 @@ def _configure_mount(monkeypatch) -> None:
     monkeypatch.setattr(app_module.cache_db, "cleanup_old_entries", lambda: None)
     monkeypatch.setattr(app_module.cache_db, "get_hardware_snapshot", lambda: None)
     monkeypatch.setattr(AIModelViewer, "request_system_info_refresh", lambda self, force=False: None)
+    monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)
 
 
 def test_mount_runs_service_readiness_and_initial_job_io_off_ui_thread(monkeypatch):
