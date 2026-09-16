@@ -2,48 +2,18 @@ from __future__ import annotations
 
 import asyncio
 
-from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical
-from textual.widgets import Input, RadioButton, RadioSet
+from tui_app import AIModelViewer
 
 
-class _FilterRowApp(App):
-    CSS = """
-    Screen { padding: 1; }
-    #search-filters-row { height: 3; }
-    #search-panel { width: 34%; min-width: 28; margin-right: 1; height: 3; }
-    #provider-panel { width: 22; margin-right: 1; height: 3; }
-    #use-case-panel { width: 1fr; height: 3; }
-    Input { width: 100%; height: 3; }
-    RadioSet {
-        layout: horizontal;
-        width: 100%;
-        height: 3;
-        border: round;
-    }
-    """
-
-    def compose(self) -> ComposeResult:
-        with Horizontal(id="search-filters-row"):
-            with Vertical(id="search-panel"):
-                yield Input(id="search-input")
-            with Vertical(id="provider-panel"), RadioSet(id="filter-set"):
-                yield RadioButton("Ollama", value=True, id="filter-ollama")
-                yield RadioButton("Hugging Face", id="filter-hf")
-            with Vertical(id="use-case-panel"), RadioSet(id="use-case-filter"):
-                yield RadioButton("Any Use", value=True, id="uc-all")
-                yield RadioButton("Chat", id="uc-chat")
-                yield RadioButton("Coding", id="uc-coding")
-                yield RadioButton("Vision", id="uc-vision")
-                yield RadioButton("Reason", id="uc-reasoning")
-                yield RadioButton("Math", id="uc-math")
-                yield RadioButton("Embed", id="uc-embedding")
-                yield RadioButton("General", id="uc-general")
+class _LayoutOnlyViewer(AIModelViewer):
+    def on_mount(self) -> None:
+        """Skip services/timers; this test exercises only the real composed layout."""
+        pass
 
 
 def test_filter_controls_stay_inside_80_column_viewport():
     async def _run() -> None:
-        app = _FilterRowApp()
+        app = _LayoutOnlyViewer()
         async with app.run_test(size=(80, 24)) as pilot:
             await pilot.pause()
 
