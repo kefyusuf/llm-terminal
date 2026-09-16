@@ -4,9 +4,8 @@ import asyncio
 
 from textual.widgets import DataTable
 
-import app.viewer as viewer_module
-import tui_app as base_module
 from app.modals import PlanModeModal
+from app.viewer import AIModelViewer
 from results.results_view import result_unique_key
 
 
@@ -45,7 +44,7 @@ class _DummyMonitor:
         }
 
 
-class _InteractionViewer(viewer_module.AIModelViewer):
+class _InteractionViewer(AIModelViewer):
     async def on_mount(self) -> None:
         """Mount deterministic widgets without starting services or polling."""
         self._apply_ui_mode()
@@ -60,8 +59,8 @@ class _InteractionViewer(viewer_module.AIModelViewer):
 
 
 def test_pilot_plan_and_compare_shortcuts_use_selected_result(monkeypatch):
-    monkeypatch.setattr(base_module, "HardwareMonitor", _DummyMonitor)
-    monkeypatch.setattr(viewer_module, "get_provider_filter_labels", lambda: ["Ollama"])
+    monkeypatch.setattr("tui_app.HardwareMonitor", _DummyMonitor)
+    monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ["Ollama"])
 
     async def _run() -> None:
         app = _InteractionViewer()
