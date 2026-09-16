@@ -57,6 +57,7 @@ class DockerProvider(BaseProvider):
 
         model_ids: list[str] = []
         for model in models:
+            candidate: object
             if isinstance(model, str):
                 candidate = model
             elif isinstance(model, dict):
