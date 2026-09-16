@@ -109,7 +109,6 @@ def smoke_mode_enabled() -> bool:
 class ModelAPIHandler(BaseHTTPRequestHandler):
     """HTTP request handler for the model API."""
 
-    # Shared state (set by server startup)
     monitor: HardwareMonitor = None  # type: ignore[assignment]
 
     def log_message(self, format, *args):
@@ -410,11 +409,12 @@ def start_server_background(
     *,
     monitor: HardwareMonitor | None = None,
 ) -> tuple[ThreadingHTTPServer, threading.Thread]:
-    """Start the API server in a background thread.
+    """Start the API server in a background thread with autonomous request threads.
 
     Returns ``(server, thread)`` for later shutdown via ``server.shutdown()``.
     """
     server = create_server(host, port, monitor=monitor)
+    server.daemon_threads = True
     thread = threading.Thread(target=server.serve_forever, daemon=True, name="api-server")
     thread.start()
     return server, thread
