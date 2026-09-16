@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 
+from textual.widgets import Select
+
 import app.viewer as viewer_module
 import tui_app as base_app
-from textual.widgets import Select
 
 
 class _DummyMonitor:
