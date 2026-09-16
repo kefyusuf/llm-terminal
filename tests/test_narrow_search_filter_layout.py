@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 
+import app.viewer as viewer_module
 import tui_app as base_app
-from app.viewer import AIModelViewer
-from textual.widgets import RadioButton, RadioSet
+from textual.widgets import Select
 
 
 class _DummyMonitor:
@@ -34,6 +34,7 @@ def _configure_mount(monkeypatch) -> None:
     monkeypatch.setattr(base_app.cache_db, "init_db", lambda: None)
     monkeypatch.setattr(base_app.cache_db, "cleanup_old_entries", lambda: None)
     monkeypatch.setattr(base_app.cache_db, "get_hardware_snapshot", lambda: None)
+    monkeypatch.setattr(viewer_module, "get_provider_filter_labels", lambda: ("Ollama", "Hugging Face"))
     monkeypatch.setattr(
         base_app.AIModelViewer,
         "request_system_info_refresh",
@@ -46,10 +47,10 @@ def _configure_mount(monkeypatch) -> None:
     )
 
 
-def test_use_case_controls_stay_inside_panel_at_80_columns(monkeypatch):
-    """Every mouse-selectable use-case option must remain visible at 80 columns."""
+def test_use_case_selector_fits_and_stays_synced_at_80_columns(monkeypatch):
+    """The compact use-case selector must fit and synchronize mouse/keyboard state."""
     _configure_mount(monkeypatch)
-    app = AIModelViewer()
+    app = viewer_module.AIModelViewer()
     app.ui_mode = "comfortable"
     app.compact_mode = False
     monkeypatch.setattr(app.dl, "sync_jobs", lambda force=False, jobs=None: True)
@@ -59,18 +60,23 @@ def test_use_case_controls_stay_inside_panel_at_80_columns(monkeypatch):
             await pilot.pause()
 
             panel = app.query_one("#use-case-panel")
-            radio_set = app.query_one("#use-case-filter", RadioSet)
-            buttons = list(radio_set.query(RadioButton))
-
+            selector = app.query_one("#use-case-select", Select)
             panel_left = panel.region.x
             panel_right = panel.region.x + panel.region.width
-            screen_right = app.size.width
+            selector_right = selector.region.x + selector.region.width
 
-            assert len(buttons) == 8
-            for button in buttons:
-                assert button.region.width > 0
-                assert button.region.x >= panel_left
-                assert button.region.x + button.region.width <= panel_right
-                assert button.region.x + button.region.width <= screen_right
+            assert selector.region.width > 0
+            assert selector.region.x >= panel_left
+            assert selector_right <= panel_right
+            assert selector_right <= app.size.width
+
+            selector.value = "coding"
+            await pilot.pause()
+            assert app.use_case_filter == "coding"
+
+            app.action_cycle_use_case()
+            await pilot.pause()
+            assert app.use_case_filter == "vision"
+            assert selector.value == "vision"
 
     asyncio.run(_run())
