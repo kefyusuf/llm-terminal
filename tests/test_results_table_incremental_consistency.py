@@ -86,22 +86,24 @@ def test_same_key_metadata_change_updates_non_download_cells():
             app.hidden_gems_only = False
             app.sort_mode = "name"
             app.all_results = [
-                _result(model_id="alpha-id", name="alpha", publisher="Before", quality=50)
+                _result(model_id="alpha-id", name="alpha", publisher="Alpha", quality=50)
             ]
 
             app.refresh_table()
             await pilot.pause()
 
             table = app.query_one("#results-table", DataTable)
-            before = str(table.get_cell("Ollama:alpha-id", "publisher"))
-            assert "Before" in before
+            before = str(table.get_cell("Ollama:alpha-id", "score"))
+            assert "50" in before
 
-            app.all_results[0]["publisher"] = "After"
+            app.all_results[0]["score"] = "99"
+            app.all_results[0]["score_quality"] = 99
+            app.all_results[0]["score_composite"] = 99
             app.refresh_table()
             await pilot.pause()
 
-            after = str(table.get_cell("Ollama:alpha-id", "publisher"))
-            assert "After" in after
+            after = str(table.get_cell("Ollama:alpha-id", "score"))
+            assert "99" in after
             assert before != after
 
     asyncio.run(_run())
