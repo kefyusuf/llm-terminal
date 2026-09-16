@@ -4,7 +4,7 @@ import asyncio
 
 from textual.app import App
 
-from app.modals import ModelDetailModal
+from app.responsive_modals import ModelDetailModal
 
 
 class _HostApp(App):
