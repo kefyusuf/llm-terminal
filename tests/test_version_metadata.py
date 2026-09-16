@@ -16,6 +16,14 @@ def _project_version() -> str:
     raise AssertionError("project version not found")
 
 
+def _requires_python() -> str:
+    """Read the declared Python support range from pyproject.toml."""
+    for line in (_root() / "pyproject.toml").read_text(encoding="utf-8").splitlines():
+        if line.startswith('requires-python = "'):
+            return line.split('"', 2)[1]
+    raise AssertionError("requires-python not found")
+
+
 def _latest_changelog_version() -> str:
     """Read the latest release version heading from CHANGELOG.md."""
     for line in (_root() / "CHANGELOG.md").read_text(encoding="utf-8").splitlines():
@@ -31,3 +39,8 @@ def test_package_cli_and_changelog_versions_match():
     project_version = _project_version()
     assert get_version() == project_version
     assert _latest_changelog_version() == project_version
+
+
+def test_package_python_range_matches_runtime_support_policy():
+    """Wheel metadata must not advertise Python versions rejected by scripts/dev.py."""
+    assert _requires_python() == ">=3.10,<3.15"
