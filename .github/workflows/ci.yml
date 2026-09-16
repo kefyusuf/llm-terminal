@@ -147,6 +147,15 @@ jobs:
           set -o pipefail
           python scripts/dev.py verify 2>&1 | tee verify-macos.log
 
+      - name: Diagnose API smoke subprocess
+        continue-on-error: true
+        timeout-minutes: 1
+        shell: bash
+        env:
+          AIMODEL_SMOKE: "1"
+        run: |
+          .venv/bin/python -c "import faulthandler, api_server; faulthandler.dump_traceback_later(10); raise SystemExit(api_server.main([]))"
+
       - name: Run smoke lane
         shell: bash
         run: |
