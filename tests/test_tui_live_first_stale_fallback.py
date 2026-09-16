@@ -54,15 +54,14 @@ class _SearchViewer(AIModelViewer):
 def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
     import asyncio
 
-    from search.search_orchestration import build_query_key
-    from search.search_orchestrator import SearchOutcome
-
     monkeypatch.setattr("tui_app.HardwareMonitor", _DummyMonitor)
     monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ["Ollama"])
 
     calls: list[tuple[int, str, tuple[str, ...]]] = []
 
     def _failed_search(self, *, search_id, query, providers, **_kwargs):
+        from search.search_orchestrator import SearchOutcome
+
         _ = self
         calls.append((search_id, query, tuple(providers)))
         return SearchOutcome(
@@ -76,6 +75,8 @@ def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
     monkeypatch.setattr("search.search_orchestrator.SearchOrchestrator.search", _failed_search)
 
     async def _run() -> None:
+        from search.search_orchestration import build_query_key
+
         app = _SearchViewer()
         async with app.run_test(size=(100, 30)) as pilot:
             specs = _DummyMonitor().get_specs()
