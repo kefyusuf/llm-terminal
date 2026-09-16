@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from textual.widgets import DataTable
-
 from app.viewer import AIModelViewer
-from search.search_orchestration import build_query_key
 
 
 STALE_MODEL = {
@@ -45,6 +42,8 @@ class _DummyMonitor:
 
 class _SearchViewer(AIModelViewer):
     async def on_mount(self) -> None:
+        from textual.widgets import DataTable
+
         self._apply_ui_mode()
         self._configure_results_table_columns(force=True)
         self.query_one("#results-table", DataTable).zebra_stripes = True
@@ -57,6 +56,7 @@ class _SearchViewer(AIModelViewer):
 
 
 def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
+    from search.search_orchestration import build_query_key
     from search.search_orchestrator import SearchOutcome
 
     monkeypatch.setattr("tui_app.HardwareMonitor", _DummyMonitor)
