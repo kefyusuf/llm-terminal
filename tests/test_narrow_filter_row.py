@@ -13,7 +13,12 @@ class _LayoutOnlyViewer(AIModelViewer):
         pass
 
 
-def test_runtime_filter_controls_stay_inside_80_column_viewport():
+def test_runtime_filter_controls_stay_inside_80_column_viewport(monkeypatch):
+    monkeypatch.setattr(
+        "app.viewer.get_provider_filter_labels",
+        lambda: ("Ollama", "Hugging Face"),
+    )
+
     async def _run() -> None:
         app = _LayoutOnlyViewer()
         async with app.run_test(size=(80, 24)) as pilot:
@@ -30,8 +35,13 @@ def test_runtime_filter_controls_stay_inside_80_column_viewport():
                 assert widget.region.x + widget.region.width <= viewport_width
 
             assert str(use_case_select.value) == "all"
+
+            results_table = app.query_one("#results-table")
+            results_table.focus()
+            await pilot.pause()
             await pilot.press("u")
             await pilot.pause()
+
             assert app.use_case_filter == "chat"
             assert str(use_case_select.value) == "chat"
 
