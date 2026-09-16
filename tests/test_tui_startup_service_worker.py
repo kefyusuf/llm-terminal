@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import threading
 
+import app.startup_viewer as startup_module
+import app.viewer as viewer_module
 import tui_app as app_module
-from tui_app import AIModelViewer
+from app.viewer import AIModelViewer
 
 
 class _DummyMonitor:
@@ -30,15 +32,16 @@ class _DummyMonitor:
 def _configure_mount(monkeypatch) -> None:
     monkeypatch.delenv("AIMODEL_SMOKE", raising=False)
     monkeypatch.setattr(app_module, "HardwareMonitor", _DummyMonitor)
-    monkeypatch.setattr(app_module.cache_db, "init_db", lambda: None)
-    monkeypatch.setattr(app_module.cache_db, "cleanup_old_entries", lambda: None)
-    monkeypatch.setattr(app_module.cache_db, "get_hardware_snapshot", lambda: None)
+    monkeypatch.setattr(viewer_module, "get_provider_filter_labels", lambda: ["Ollama"])
+    monkeypatch.setattr(startup_module.cache_db, "init_db", lambda: None)
+    monkeypatch.setattr(startup_module.cache_db, "cleanup_old_entries", lambda: None)
+    monkeypatch.setattr(startup_module.cache_db, "get_hardware_snapshot", lambda: None)
     monkeypatch.setattr(AIModelViewer, "request_system_info_refresh", lambda self, force=False: None)
     monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)
 
 
 def test_mount_runs_service_readiness_and_initial_job_io_off_ui_thread(monkeypatch):
-    """Mount must render without performing service startup/network I/O on Textual's UI thread."""
+    """Mounted runtime startup must keep service readiness and first job I/O off the UI thread."""
     _configure_mount(monkeypatch)
     ui_thread_id = threading.get_ident()
     ensure_thread_ids: list[int] = []
@@ -65,8 +68,8 @@ def test_mount_runs_service_readiness_and_initial_job_io_off_ui_thread(monkeypat
         list_thread_ids.append(threading.get_ident())
         return jobs
 
-    monkeypatch.setattr(app_module, "ensure_service_running", _ensure_service_running)
-    monkeypatch.setattr(app_module, "list_jobs", _list_jobs, raising=False)
+    monkeypatch.setattr(startup_module, "ensure_service_running", _ensure_service_running)
+    monkeypatch.setattr(startup_module, "list_jobs", _list_jobs)
 
     app = AIModelViewer()
 
