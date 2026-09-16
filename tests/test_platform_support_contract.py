@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -18,6 +17,13 @@ def _load_dev_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _requires_python() -> str:
+    for line in (_root() / "pyproject.toml").read_text(encoding="utf-8").splitlines():
+        if line.startswith('requires-python = "'):
+            return line.split('"', 2)[1]
+    raise AssertionError("requires-python metadata not found")
 
 
 def test_macos_bootstrap_selects_compatibility_dev_requirements():
@@ -37,6 +43,4 @@ def test_macos_lock_management_remains_explicitly_unsupported_without_native_loc
 
 def test_package_metadata_matches_supported_python_range():
     """pip must reject Python versions that scripts/dev.py intentionally does not support."""
-    metadata = tomllib.loads((_root() / "pyproject.toml").read_text(encoding="utf-8"))
-
-    assert metadata["project"]["requires-python"] == ">=3.10,<3.15"
+    assert _requires_python() == ">=3.10,<3.15"
