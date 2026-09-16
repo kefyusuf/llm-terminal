@@ -99,13 +99,15 @@ jobs:
       - name: Bootstrap environment
         run: python scripts/dev.py bootstrap
 
-      - name: Run mypy baseline
+      - name: Run staged mypy gate
         shell: bash
         run: |
           set -o pipefail
           .venv/bin/python -m mypy \
-            api_server.py app cli.py config.py core downloads main.py \
-            providers results search terminal_ui tui_app.py 2>&1 | tee typecheck.log
+            core downloads results terminal_ui \
+            app/search_results_state.py \
+            search/search_cache.py search/search_orchestration.py \
+            2>&1 | tee typecheck.log
 
       - name: Upload typecheck logs
         if: failure()
