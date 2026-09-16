@@ -1,3 +1,5 @@
+# ruff: noqa: I001
+
 from app.viewer import AIModelViewer
 
 
