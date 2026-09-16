@@ -10,6 +10,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Button, DataTable, Input, Select
 
 from app.modals import DownloadJobModal as BaseDownloadJobModal
+from app.responsive_modals import ModelDetailModal as ResponsiveModelDetailModal
 from app.startup_viewer import AIModelViewer as BaseAIModelViewer
 from downloads.download_history import cancel_model_payload, fallback_entry_from_target, is_external_entry
 from downloads.download_lifecycle import reset_results_download_state
@@ -197,6 +198,10 @@ class AIModelViewer(BaseAIModelViewer):
         self.refresh_table()
         self._refresh_download_history_table_ui()
         self.update_status(msg)
+
+    def open_model_detail_modal(self, model):
+        """Open the viewport-bounded runtime model detail modal."""
+        self.push_screen(ResponsiveModelDetailModal(model))
 
     def _compact_chip_text(self, shown_count: int, total: int) -> str:
         """Render compact search state using a provider-specific short tag."""
