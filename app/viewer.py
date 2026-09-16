@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 
 from textual import on, work
@@ -9,6 +10,7 @@ from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Button, DataTable, Input, RadioSet, Select
 
+import config
 from app.modals import DownloadJobModal as BaseDownloadJobModal
 from app.responsive_modals import ModelDetailModal as ResponsiveModelDetailModal
 from app.search_constants import USE_CASE_OPTIONS
@@ -19,6 +21,12 @@ from downloads.download_manager import download_target_id
 from downloads.download_status import is_active_state
 from providers import get_provider_filter_labels
 from results.results_view import filter_results_for_view, result_unique_key
+from search.search_orchestration import (
+    build_query_key,
+    cache_hit_suffix,
+    provider_display_name,
+    provider_search_status,
+)
 
 
 _PROVIDER_COMPACT_TAGS = {
@@ -151,6 +159,129 @@ class AIModelViewer(BaseAIModelViewer):
 
         super().refresh_table()
         self._results_table_render_signature = self._results_table_signature()
+
+    def _dispatch_debounced_search(self) -> None:
+        """Use fresh cache immediately, otherwise prefer live search before stale fallback."""
+        self._search_debounce_timer = None
+        payload = self._pending_search_payload
+        self._pending_search_payload = None
+        if payload is None:
+            return
+
+        query, providers, page, signature = payload
+        self.current_page = page
+        self._search_inflight_signature = signature
+        self._search_inflight_started_at = time.monotonic()
+        query_key = build_query_key(providers, query, self.current_page)
+
+        current_specs = self._current_specs_for_search_ui()
+        self.last_search_error = ""
+        self.search_counter += 1
+        self.active_search_id = self.search_counter
+        table = self.query_one("#results-table", DataTable)
+        table.clear()
+        self._table_row_keys = set()
+        table.loading = True
+        self._search_progress_visible = False
+        self._update_results_meta(0)
+
+        provider_name = provider_display_name(providers)
+        self.on_search_progress(self.active_search_id, f"Searching {provider_name}: {query}")
+
+        cached = self.search_cache.get(query_key, current_specs)
+        if cached:
+            self.all_results = [item.copy() for item in cached["results"]]
+            self.dl.ensure_download_fields(self.all_results)
+            self.last_search_error = cached["error"]
+            if "has_more_pages" in cached:
+                self.has_more_pages = cached["has_more_pages"]
+            self.on_search_completed(self.active_search_id)
+            cache_msg = cache_hit_suffix(providers, self.current_page)
+            self.update_status(f"Loaded{cache_msg}")
+            return
+
+        self.run_search_worker(query, query_key, self.active_search_id, providers)
+
+    @work(thread=True)
+    def run_search_worker(
+        self,
+        query: str,
+        query_key: str,
+        search_id: int,
+        providers: list[str] | None = None,
+    ) -> None:
+        """Run live provider search, falling back to retained stale data only on failure."""
+        from search.search_orchestrator import SearchOrchestrator
+
+        if providers is None:
+            providers = self._get_search_providers()
+
+        if search_id != self.search_state.active_id:
+            return
+
+        orchestrator = SearchOrchestrator(
+            monitor=self.monitor,
+            hf_provider=self.hf_provider,
+            ollama_provider=self.ollama_provider,
+            on_progress=lambda sid, msg: self.call_from_thread(
+                self.on_search_progress, sid, msg
+            ),
+            cancel_check=lambda: search_id != self.search_state.active_id,
+        )
+
+        outcome = orchestrator.search(
+            search_id=search_id,
+            query=query,
+            providers=providers,
+            page=self.current_page,
+            page_size=self.page_size,
+            hf_token=config.settings.hf_token,
+            ollama_page_size=config.settings.ollama_search_limit,
+        )
+
+        if outcome.cancelled or search_id != self.search_state.active_id:
+            return
+
+        self.call_from_thread(self.on_search_progress, search_id, "Finalizing search results...")
+
+        if not outcome.results and outcome.errors:
+            stale = self.search_cache.get_stale(query_key)
+            if stale:
+                self.all_results = [item.copy() for item in stale["results"]]
+                self.dl.ensure_download_fields(self.all_results)
+                self.last_search_error = "Offline — showing cached results"
+                if "has_more_pages" in stale:
+                    self.has_more_pages = stale["has_more_pages"]
+                self.call_from_thread(self.on_search_completed, search_id)
+                self.call_from_thread(
+                    self.update_status,
+                    "Offline mode — showing cached results",
+                )
+                return
+
+        self.all_results = outcome.results
+        self.dl.ensure_download_fields(self.all_results)
+        self.last_search_error = " | ".join(outcome.errors[:2])
+        self.has_more_pages = outcome.has_more_pages
+
+        self.call_from_thread(
+            self.update_status,
+            provider_search_status(
+                outcome.providers,
+                result_count=outcome.result_count,
+                has_more_pages=outcome.has_more_pages,
+                current_page=self.current_page,
+            ),
+        )
+
+        self.search_cache.set(
+            query_key,
+            results=self.all_results,
+            error=self.last_search_error,
+            has_more_pages=self.has_more_pages,
+            specs=self.monitor.get_specs(),
+        )
+        self.call_from_thread(self.on_search_completed, search_id)
 
     def _hide_legacy_use_case_radios(self) -> None:
         """Keep the base RadioSet in the DOM for base layout code without rendering it."""
