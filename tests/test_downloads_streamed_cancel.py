@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 from downloads import runner
 
 
@@ -29,26 +31,31 @@ class _State:
 
 class _SilentProcess:
     def __init__(self):
-        self.stdout = []
-        self._poll_values = [None, None, -9]
-        self._poll_index = 0
+        self.stdout = self
+        self._killed = threading.Event()
         self.terminate_calls = 0
         self.kill_calls = 0
 
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._killed.wait(timeout=0.5):
+            raise StopIteration
+        raise AssertionError("streamed runner did not cancel a silent subprocess")
+
     def poll(self):
-        index = min(self._poll_index, len(self._poll_values) - 1)
-        value = self._poll_values[index]
-        self._poll_index += 1
-        return value
+        return -9 if self._killed.is_set() else None
 
     def terminate(self):
         self.terminate_calls += 1
 
     def kill(self):
         self.kill_calls += 1
+        self._killed.set()
 
     def wait(self):
-        return -9
+        return -9 if self._killed.is_set() else 0
 
 
 def test_streamed_cancel_checks_silent_process_and_escalates_to_kill(monkeypatch):
