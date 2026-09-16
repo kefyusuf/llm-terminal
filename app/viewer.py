@@ -8,8 +8,8 @@ from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Input, Select
 
+from app.startup_viewer import AIModelViewer as BaseAIModelViewer
 from providers import get_provider_filter_labels
-from tui_app import AIModelViewer as BaseAIModelViewer
 
 
 _PROVIDER_COMPACT_TAGS = {
