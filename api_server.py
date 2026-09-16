@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import socketserver
 import sys
 import threading
 import urllib.request
@@ -378,6 +379,17 @@ class _SmokeHardwareMonitor:
         return {}
 
 
+class _LocalThreadingHTTPServer(ThreadingHTTPServer):
+    """HTTP server that binds locally without reverse/FQDN resolution."""
+
+    def server_bind(self) -> None:
+        """Bind the listening socket without the stdlib HTTPServer FQDN lookup."""
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = str(host)
+        self.server_port = int(port)
+
+
 def create_server(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
@@ -386,7 +398,7 @@ def create_server(
 ) -> ThreadingHTTPServer:
     """Create and configure the API server with an injectable hardware monitor."""
     ModelAPIHandler.monitor = monitor if monitor is not None else HardwareMonitor()
-    server = ThreadingHTTPServer((host, port), ModelAPIHandler)
+    server = _LocalThreadingHTTPServer((host, port), ModelAPIHandler)
     return server
 
 
