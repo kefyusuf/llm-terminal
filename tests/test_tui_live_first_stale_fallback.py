@@ -1,7 +1,3 @@
-from __future__ import annotations
-
-import asyncio
-
 from app.viewer import AIModelViewer
 
 
@@ -56,6 +52,8 @@ class _SearchViewer(AIModelViewer):
 
 
 def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
+    import asyncio
+
     from search.search_orchestration import build_query_key
     from search.search_orchestrator import SearchOutcome
 
