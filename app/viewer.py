@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from textual import work
 from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Input, Select
 
+from downloads.download_lifecycle import reset_results_download_state
+from downloads.download_manager import download_target_id
 from providers import get_provider_filter_labels
 from tui_app import AIModelViewer as BaseAIModelViewer
 
@@ -100,6 +103,32 @@ class AIModelViewer(BaseAIModelViewer):
         status_message = self.dl.take_poll_status_message()
         if status_message:
             self.update_status(status_message)
+
+    def delete_download_entry(self, target_id, delete_data=False):
+        """Schedule potentially blocking deletion outside Textual's UI thread."""
+        self._run_delete_download_entry_worker(str(target_id), delete_data=bool(delete_data))
+
+    @work(thread=True)
+    def _run_delete_download_entry_worker(self, target_id: str, delete_data: bool = False):
+        """Perform service/subprocess deletion work and hand the result back to the UI thread."""
+        result = self.dl.delete_entry(target_id, delete_data=delete_data)
+        self.call_from_thread(self._apply_delete_download_entry_result, result)
+
+    def _apply_delete_download_entry_result(self, result) -> None:
+        """Apply one completed delete result on the Textual UI thread."""
+        _ok, msg, keys, target_id = result
+        if keys:
+            source_key, name_key = keys
+            reset_results_download_state(
+                self.all_results,
+                target_id=target_id,
+                source_key=source_key,
+                name_key=name_key,
+                target_id_for_item=download_target_id,
+            )
+        self.refresh_table()
+        self._refresh_download_history_table_ui()
+        self.update_status(msg)
 
     def _compact_chip_text(self, shown_count: int, total: int) -> str:
         """Render compact search state using a provider-specific short tag."""
