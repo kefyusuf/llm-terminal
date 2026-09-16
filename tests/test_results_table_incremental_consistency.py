@@ -12,6 +12,10 @@ class _LayoutOnlyViewer(AIModelViewer):
         """Skip service/timer side effects; exercise the real results table only."""
         pass
 
+    def on_resize(self, _event) -> None:
+        """Avoid delayed resize callbacks after the headless test app starts shutting down."""
+        pass
+
 
 def _result(
     *,
