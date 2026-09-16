@@ -45,6 +45,32 @@ def test_search_cache_expires_old_entry(monkeypatch):
     assert cache.get("hf:llama:page0", specs) is None
 
 
+def test_search_cache_keeps_expired_entry_for_stale_fallback(monkeypatch):
+    cache = SearchCache(
+        ttl_seconds=5,
+        max_entries=5,
+        ram_threshold_gb=1.0,
+        vram_threshold_gb=1.0,
+    )
+    specs = {"has_gpu": False, "ram_free": 8.0, "vram_free": 0.0}
+    cache.set(
+        "hf:llama:page0",
+        results=[{"name": "llama"}],
+        error="",
+        has_more_pages=True,
+        specs=specs,
+    )
+
+    original_monotonic = time.monotonic
+    monkeypatch.setattr(time, "monotonic", lambda: original_monotonic() + 10)
+
+    assert cache.get("hf:llama:page0", specs) is None
+    stale = cache.get_stale("hf:llama:page0")
+    assert stale is not None
+    assert stale["results"] == [{"name": "llama"}]
+    assert stale["has_more_pages"] is True
+
+
 def test_search_cache_invalidates_when_ram_changes_beyond_threshold():
     cache = SearchCache(
         ttl_seconds=30,
@@ -62,6 +88,29 @@ def test_search_cache_invalidates_when_ram_changes_beyond_threshold():
 
     current_specs = {"has_gpu": False, "ram_free": 6.0, "vram_free": 0.0}
     assert cache.get("hf:qwen:page0", current_specs) is None
+
+
+def test_search_cache_keeps_hardware_incompatible_entry_for_stale_fallback():
+    cache = SearchCache(
+        ttl_seconds=30,
+        max_entries=5,
+        ram_threshold_gb=0.5,
+        vram_threshold_gb=1.0,
+    )
+    cache.set(
+        "hf:qwen:page0",
+        results=[{"name": "qwen"}],
+        error="",
+        has_more_pages=True,
+        specs={"has_gpu": False, "ram_free": 8.0, "vram_free": 0.0},
+    )
+
+    current_specs = {"has_gpu": False, "ram_free": 6.0, "vram_free": 0.0}
+
+    assert cache.get("hf:qwen:page0", current_specs) is None
+    stale = cache.get_stale("hf:qwen:page0")
+    assert stale is not None
+    assert stale["results"] == [{"name": "qwen"}]
 
 
 def test_search_cache_evicts_oldest_entry_when_over_capacity():
