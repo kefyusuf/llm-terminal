@@ -79,6 +79,17 @@ class AIModelViewer(BaseAIModelViewer):
             None,
         )
 
+    def _apply_resize_reflow(self, generation: int) -> None:
+        """Ignore a deferred resize callback after the results table has unmounted."""
+        if generation != self._resize_reflow_generation:
+            return
+        try:
+            self.query_one("#results-table", DataTable)
+        except NoMatches:
+            self._resize_reflow_timer = None
+            return
+        super()._apply_resize_reflow(generation)
+
     def _apply_provider_filter(self, label: str, *, sync_widget: bool) -> None:
         """Apply one provider label and keep the mounted selector synchronized."""
         if label not in self.provider_filter_labels or label == self.current_filter:
