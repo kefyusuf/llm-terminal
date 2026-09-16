@@ -107,7 +107,7 @@ Cycle themes at runtime with `t`.
 ## Requirements
 
 - Python 3.10-3.14.
-- CI currently verifies Python 3.12 and 3.14 on Ubuntu and Windows.
+- CI verifies Python 3.12 and 3.14 on Ubuntu and Windows, plus a macOS/Python 3.12 bootstrap, verify and smoke lane.
 - Internet access for live remote provider searches.
 - Ollama optional; required for Ollama local runtime/pull operations.
 - LM Studio optional; auto-detected on `localhost:1234` by default.
@@ -129,7 +129,7 @@ python scripts/dev.py smoke
 
 Use a supported Python 3.10-3.14 interpreter for bootstrap. On Windows that can be `py -3.14` or another selected interpreter. After bootstrap, prefer the project virtualenv over a random global Python on `PATH`.
 
-`scripts/dev.py bootstrap` creates or reuses `.venv` and installs from the committed platform-specific development lock file. Edit `requirements/requirements.in` and `requirements/requirements-dev.in` for dependency intent; bootstrap does not resolve or regenerate locks. Canonical lock maintenance remains explicit.
+`scripts/dev.py bootstrap` creates or reuses `.venv`. Windows and Linux install from committed platform-specific development lock files. macOS currently installs through `requirements/requirements-dev.txt`, the compatibility wrapper that resolves the human-edited dependency intent from `requirements-dev.in`, until native macOS lock files are committed. `scripts/dev.py lock` remains intentionally Windows/Linux-only rather than treating another platform's lock as a macOS lock. Edit `requirements/requirements.in` and `requirements/requirements-dev.in` for dependency intent; bootstrap does not regenerate locks.
 
 `scripts/dev.py verify` runs the required local checks: pytest, import smoke and Ruff.
 
@@ -241,7 +241,7 @@ llm-terminal/
   search/                   # Search cache/orchestration/cancellation/pagination
   results/                  # Result layout/presentation/filtering
   downloads/                # Download service, API, store, runner, client/helpers
-  requirements/             # Dependency intent + committed platform locks
+  requirements/             # Dependency intent + committed Windows/Linux locks
   scripts/                  # Dev/release/maintenance tools
   terminal_ui/              # Theme/style assets and isolated legacy internals
   tests/                    # 600+ deterministic tests + optional live tests
@@ -277,7 +277,7 @@ Current priorities:
 
 1. Ollama registry parser resilience and structured-source research,
 2. safer incremental TUI DataTable updates,
-3. explicit Windows/WSL/Linux/macOS Apple Silicon acceptance matrix,
+3. explicit WSL, real-provider and Apple Silicon/MLX acceptance beyond the basic hosted macOS lane,
 4. targeted tests for consequential weak modules as concrete changes require them.
 
 Documentation maintenance rules are in `docs/maintenance.md`.

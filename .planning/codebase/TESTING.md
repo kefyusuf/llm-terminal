@@ -75,7 +75,7 @@ Smoke is not a replacement for the full unit/contract suite.
 
 ## CI Matrix
 
-GitHub Actions `CI` contains three verification shapes:
+GitHub Actions `CI` contains four verification shapes:
 
 ### Verify matrix
 
@@ -99,6 +99,16 @@ Coverage is deliberately not repeated across all four verify environments. The p
 ### Smoke matrix
 
 Smoke runs on the same Ubuntu/Windows × Python 3.12/3.14 matrix.
+
+### macOS acceptance lane
+
+A dedicated `macos-latest` / Python 3.12 job runs:
+
+1. `python scripts/dev.py bootstrap`,
+2. `python scripts/dev.py verify`,
+3. `python scripts/dev.py smoke`.
+
+Windows and Linux bootstrap from committed platform-specific development locks. macOS currently bootstraps through `requirements/requirements-dev.txt`, which is the explicit compatibility wrapper over `requirements-dev.in`; native macOS lock generation remains unsupported until dedicated macOS lock artifacts are introduced. The hosted macOS lane proves the offline-safe install/verify/smoke contract, not real Apple Silicon/MLX runtime behavior or local-provider availability.
 
 For package-relevant changes, the path-filtered `Package` workflow also runs and must be green on the exact PR head. Documentation-only PRs do not trigger Package.
 
