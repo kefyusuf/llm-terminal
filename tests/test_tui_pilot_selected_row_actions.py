@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 
+from textual.widgets import DataTable
+
 import app.viewer as viewer_module
 import tui_app as base_module
 from app.modals import PlanModeModal
 from results.results_view import result_unique_key
-from textual.widgets import DataTable
 
 
 MODEL = {
