@@ -13,7 +13,11 @@ class _LayoutOnlyViewer(AIModelViewer):
         pass
 
     def on_resize(self, _event) -> None:
-        """Avoid delayed resize callbacks after the headless test app starts shutting down."""
+        """Avoid scheduling resize work in the headless table-only harness."""
+        pass
+
+    def _apply_resize_reflow(self, _generation: int) -> None:
+        """Neutralize callbacks already queued before the resize handler override takes effect."""
         pass
 
 
