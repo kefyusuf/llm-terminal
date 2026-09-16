@@ -18,13 +18,6 @@ click==8.3.3
     # via
     #   -r requirements/requirements.in
     #   pip-tools
-colorama==0.4.6
-    # via
-    #   build
-    #   click
-    #   loguru
-    #   pytest
-    #   tqdm
 coverage==7.13.5
     # via pytest-cov
 filelock==3.29.0
@@ -143,8 +136,6 @@ urllib3==2.7.0
     #   types-requests
 wheel==0.47.0
     # via pip-tools
-win32-setctime==1.2.0
-    # via loguru
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip

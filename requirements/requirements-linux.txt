@@ -14,11 +14,6 @@ charset-normalizer==3.4.7
     # via requests
 click==8.3.3
     # via -r requirements/requirements.in
-colorama==0.4.6
-    # via
-    #   click
-    #   loguru
-    #   tqdm
 filelock==3.29.0
     # via huggingface-hub
 fsspec==2026.4.0
@@ -94,5 +89,3 @@ uc-micro-py==2.0.0
     # via linkify-it-py
 urllib3==2.7.0
     # via requests
-win32-setctime==1.2.0
-    # via loguru
