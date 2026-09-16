@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 from textual.app import App
 
-import tui_app as app_module
-from app.modals import DownloadJobModal
+import app.viewer as viewer_module
+import tui_app as tui_module
+from app.viewer import AIModelViewer, DownloadJobModal
 
 
 class _DummyMonitor:
@@ -29,8 +31,9 @@ class _DummyMonitor:
 
 
 def _make_viewer(monkeypatch):
-    monkeypatch.setattr(app_module, "HardwareMonitor", _DummyMonitor)
-    return app_module.AIModelViewer()
+    monkeypatch.setattr(tui_module, "HardwareMonitor", _DummyMonitor)
+    monkeypatch.setattr(viewer_module, "get_provider_filter_labels", lambda: ["Ollama"])
+    return AIModelViewer()
 
 
 def test_delete_download_entry_schedules_worker_before_blocking_manager_call(monkeypatch):
@@ -46,7 +49,6 @@ def test_delete_download_entry_schedules_worker_before_blocking_manager_call(mon
         viewer,
         "_run_delete_download_entry_worker",
         lambda target_id, delete_data=False: scheduled.append((target_id, delete_data)),
-        raising=False,
     )
 
     viewer.delete_download_entry("ollama:qwen2.5:7b", delete_data=True)
@@ -90,3 +92,29 @@ def test_cancel_and_delete_delegates_single_combined_delete_operation():
             assert app.delete_calls == [("ollama:qwen2.5:7b", True)]
 
     asyncio.run(_run())
+
+
+def test_download_history_detail_row_opens_runtime_modal(monkeypatch):
+    """Download-history detail selection must use the runtime modal with single-operation delete."""
+    viewer = _make_viewer(monkeypatch)
+    target_id = "ollama:qwen2.5:7b"
+    entry = {
+        "target_id": target_id,
+        "source": "Ollama",
+        "name": "qwen2.5:7b",
+        "state": "completed",
+    }
+    viewer.dl.download_registry[target_id] = entry
+    pushed = []
+    monkeypatch.setattr(viewer, "push_screen", pushed.append)
+
+    event = SimpleNamespace(
+        data_table=SimpleNamespace(id="download-history-table", cursor_column=0),
+        row_key=SimpleNamespace(value=target_id),
+    )
+
+    viewer.on_data_table_row_selected(event)
+
+    assert len(pushed) == 1
+    assert isinstance(pushed[0], DownloadJobModal)
+    assert pushed[0].entry is entry
