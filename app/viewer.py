@@ -8,6 +8,7 @@ from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Input, Select
 
+from app.search_constants import USE_CASE_OPTIONS
 from providers import get_provider_filter_labels
 from tui_app import AIModelViewer as BaseAIModelViewer
 
@@ -36,7 +37,7 @@ def provider_compact_tag(label: str) -> str:
 
 
 class AIModelViewer(BaseAIModelViewer):
-    """Run the main viewer with one synchronized provider selector."""
+    """Run the main viewer with synchronized provider and use-case selectors."""
 
     def __init__(self):
         """Snapshot available provider labels for both mouse and keyboard selection."""
@@ -47,19 +48,52 @@ class AIModelViewer(BaseAIModelViewer):
             self.current_filter = self.provider_filter_labels[0]
 
     async def on_mount(self) -> None:
-        """Mount the compact provider selector after the base UI initializes."""
+        """Mount compact selectors after the base UI initializes."""
         super().on_mount()
-        panel = self.query_one("#provider-panel", Vertical)
-        await panel.remove_children()
-        selector = Select(
+
+        provider_panel = self.query_one("#provider-panel", Vertical)
+        await provider_panel.remove_children()
+        provider_selector = Select(
             ((label, label) for label in self.provider_filter_labels),
             value=self.current_filter,
             allow_blank=False,
             id="provider-select",
         )
-        selector.styles.width = "100%"
-        selector.styles.height = 3
-        await panel.mount(selector)
+        provider_selector.styles.width = "100%"
+        provider_selector.styles.height = 3
+        await provider_panel.mount(provider_selector)
+
+        use_case_panel = self.query_one("#use-case-panel", Vertical)
+        use_case_selector = Select(
+            ((label, key) for key, label in USE_CASE_OPTIONS),
+            value=self.use_case_filter,
+            allow_blank=False,
+            id="use-case-select",
+        )
+        use_case_selector.styles.width = "100%"
+        use_case_selector.styles.height = 3
+        await use_case_panel.mount(use_case_selector)
+        self._apply_runtime_filter_controls()
+
+    def _apply_runtime_filter_controls(self) -> None:
+        """Prefer compact runtime selectors while preserving the hidden base RadioSet state."""
+        try:
+            self.query_one("#use-case-filter").styles.display = "none"
+        except NoMatches:
+            pass
+
+        try:
+            selector = self.query_one("#use-case-select", Select)
+            selector.styles.display = "block"
+            selector.styles.width = "100%"
+            selector.styles.height = 3
+        except NoMatches:
+            pass
+
+    def _apply_ui_mode(self) -> None:
+        """Apply base mode styling, then restore runtime selector presentation."""
+        super()._apply_ui_mode()
+        self._apply_runtime_filter_controls()
 
     def _apply_provider_filter(self, label: str, *, sync_widget: bool) -> None:
         """Apply one provider label and keep the mounted selector synchronized."""
@@ -83,16 +117,37 @@ class AIModelViewer(BaseAIModelViewer):
             self.refresh_table()
             self.update_status(f"Provider filter set to {label}.")
 
+    def _set_use_case_filter(self, key: str) -> None:
+        """Apply a use-case key and synchronize hidden base state plus runtime selector."""
+        super()._set_use_case_filter(key)
+        try:
+            selector = self.query_one("#use-case-select", Select)
+            if selector.value != key:
+                selector.value = key
+        except NoMatches:
+            pass
+
     def action_cycle_provider(self) -> None:
         """Cycle through the exact provider labels displayed by the selector."""
         next_filter = cycle_provider_label(self.provider_filter_labels, self.current_filter)
         self._apply_provider_filter(next_filter, sync_widget=True)
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        """Apply provider changes made directly through the mounted selector."""
-        if event.select.id != "provider-select":
+        """Apply provider or use-case changes made through runtime selectors."""
+        if event.select.id == "provider-select":
+            self._apply_provider_filter(str(event.value), sync_widget=False)
             return
-        self._apply_provider_filter(str(event.value), sync_widget=False)
+
+        if event.select.id != "use-case-select":
+            return
+
+        key = str(event.value)
+        if key == self.use_case_filter:
+            return
+
+        self._set_use_case_filter(key)
+        self.refresh_table()
+        self.update_status(f"Use Case filter set to {self._use_case_label(key)}.")
 
     def _apply_download_poll_snapshot(self, jobs, debug, health):
         """Apply the base snapshot and surface deduplicated poll status transitions."""
