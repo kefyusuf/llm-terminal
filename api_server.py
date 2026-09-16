@@ -121,7 +121,6 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
@@ -152,9 +151,9 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
                 self._handle_providers()
             else:
                 self._error(f"Unknown endpoint: {path}", 404)
-        except Exception as exc:
-            logger.warning("API request failed: {}", exc)
-            self._error(str(exc), 500)
+        except Exception:
+            logger.exception("API request failed")
+            self._error("Internal server error.", 500)
 
     def _handle_health(self):
         self._json_response(
