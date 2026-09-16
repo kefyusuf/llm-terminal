@@ -30,11 +30,9 @@ class SearchCache:
 
         age = time.monotonic() - entry["timestamp"]
         if age > self.ttl_seconds:
-            self._entries.pop(query_key, None)
             return None
 
         if not self._is_cache_compatible(current_specs, entry.get("specs")):
-            self._entries.pop(query_key, None)
             return None
         return entry
 
