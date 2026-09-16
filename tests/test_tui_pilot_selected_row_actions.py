@@ -51,6 +51,10 @@ class _InteractionViewer(AIModelViewer):
         self._configure_results_table_columns(force=True)
         self.query_one("#results-table", DataTable).zebra_stripes = True
 
+    def on_resize(self, event) -> None:
+        """Keep this shortcut test isolated from resize-debounce behavior."""
+        _ = event
+
     def request_system_info_refresh(self, force=False) -> None:
         _ = force
 
@@ -92,6 +96,11 @@ def test_pilot_plan_and_compare_shortcuts_use_selected_result(monkeypatch):
             await pilot.click("#plan-close-btn")
             await pilot.pause()
             table.focus()
+            await pilot.pause()
+
+            selected = app._get_selected_model()
+            assert selected is not None
+            assert selected["name"] == "qwen2.5:7b"
 
             await pilot.press("c")
             await pilot.pause()
