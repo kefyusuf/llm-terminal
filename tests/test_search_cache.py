@@ -45,6 +45,33 @@ def test_search_cache_expires_old_entry(monkeypatch):
     assert cache.get("hf:llama:page0", specs) is None
 
 
+def test_expired_entry_remains_available_for_stale_fallback(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(time, "monotonic", lambda: now[0])
+
+    cache = SearchCache(
+        ttl_seconds=5,
+        max_entries=5,
+        ram_threshold_gb=1.0,
+        vram_threshold_gb=1.0,
+    )
+    specs = {"has_gpu": False, "ram_free": 8.0, "vram_free": 0.0}
+    cache.set(
+        "ollama:qwen",
+        results=[{"name": "qwen"}],
+        error="",
+        has_more_pages=False,
+        specs=specs,
+    )
+
+    now[0] = 106.0
+    assert cache.get("ollama:qwen", specs) is None
+
+    stale = cache.get_stale("ollama:qwen")
+    assert stale is not None
+    assert stale["results"] == [{"name": "qwen"}]
+
+
 def test_search_cache_invalidates_when_ram_changes_beyond_threshold():
     cache = SearchCache(
         ttl_seconds=30,
