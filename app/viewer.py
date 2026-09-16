@@ -18,7 +18,7 @@ from downloads.download_lifecycle import reset_results_download_state
 from downloads.download_manager import download_target_id
 from downloads.download_status import is_active_state
 from providers import get_provider_filter_labels
-from results.results_view import result_unique_key
+from results.results_view import filter_results_for_view, result_unique_key
 
 
 _PROVIDER_COMPACT_TAGS = {
@@ -28,6 +28,18 @@ _PROVIDER_COMPACT_TAGS = {
     "Docker": "DK",
     "MLX": "MLX",
 }
+_RENDERED_RESULT_FIELDS = (
+    "inst",
+    "source",
+    "publisher",
+    "name",
+    "params",
+    "use_case",
+    "score",
+    "quant",
+    "mode",
+    "fit",
+)
 
 
 def cycle_provider_label(labels: Sequence[str], current: str) -> str:
@@ -69,6 +81,7 @@ class AIModelViewer(BaseAIModelViewer):
             self.current_filter = self.provider_filter_labels[0]
         if self.use_case_filter not in self.use_case_filter_keys:
             self.search_state.set_use_case("all")
+        self._results_table_render_signature = None
 
     async def on_mount(self) -> None:
         """Mount compact provider and use-case selectors after the base UI initializes."""
@@ -97,6 +110,47 @@ class AIModelViewer(BaseAIModelViewer):
         use_case_selector.styles.height = 3
         await use_case_panel.mount(use_case_selector)
         self._hide_legacy_use_case_radios()
+
+    def _results_table_signature(self):
+        """Capture ordered, non-download content that determines the rendered table."""
+        filtered_results = filter_results_for_view(
+            self.all_results,
+            current_filter=self.current_filter,
+            use_case_filter=self.use_case_filter,
+            hidden_gems_only=self.hidden_gems_only,
+            sort_mode=self.sort_mode,
+            fit_filter=self.fit_filter,
+        )
+
+        seen_keys: set[str] = set()
+        row_signature = []
+        for result in filtered_results:
+            unique_key = result_unique_key(result)
+            if unique_key in seen_keys:
+                continue
+            seen_keys.add(unique_key)
+            row_signature.append(
+                (
+                    unique_key,
+                    *(str(result.get(field, "")) for field in _RENDERED_RESULT_FIELDS),
+                )
+            )
+
+        column_signature = (
+            tuple(self.results_column_keys),
+            tuple(sorted(self.results_column_widths.items())),
+        )
+        return column_signature, tuple(row_signature)
+
+    def refresh_table(self) -> None:
+        """Keep the download-only fast path only while rendered table content is unchanged."""
+        next_signature = self._results_table_signature()
+        previous_signature = self._results_table_render_signature
+        if previous_signature is not None and next_signature != previous_signature:
+            self._table_row_keys = set()
+
+        super().refresh_table()
+        self._results_table_render_signature = self._results_table_signature()
 
     def _hide_legacy_use_case_radios(self) -> None:
         """Keep the base RadioSet in the DOM for base layout code without rendering it."""
