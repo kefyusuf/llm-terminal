@@ -1,16 +1,19 @@
-"""Runtime TUI viewer extensions for provider selection."""
+"""Runtime TUI viewer extensions for provider selection and responsive download actions."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from textual import work
+from textual import on, work
 from textual.containers import Vertical
 from textual.css.query import NoMatches
-from textual.widgets import Input, Select
+from textual.widgets import Button, DataTable, Input, Select
 
+from app.modals import DownloadJobModal as BaseDownloadJobModal
+from downloads.download_history import cancel_model_payload, fallback_entry_from_target, is_external_entry
 from downloads.download_lifecycle import reset_results_download_state
 from downloads.download_manager import download_target_id
+from downloads.download_status import is_active_state
 from providers import get_provider_filter_labels
 from tui_app import AIModelViewer as BaseAIModelViewer
 
@@ -38,8 +41,20 @@ def provider_compact_tag(label: str) -> str:
     return _PROVIDER_COMPACT_TAGS.get(label, label[:3].upper() or "-")
 
 
+class DownloadJobModal(BaseDownloadJobModal):
+    """Runtime download modal that delegates cancel+delete to one manager operation."""
+
+    @on(Button.Pressed, "#job-cancel-delete-btn")
+    def cancel_and_delete(self) -> None:
+        """Let the delete-data path own cancel-before-delete for active jobs."""
+        delete_fn = getattr(self.app, "delete_download_entry", None)
+        if callable(delete_fn):
+            delete_fn(str(self.entry.get("target_id", "")), delete_data=True)
+        self.dismiss()
+
+
 class AIModelViewer(BaseAIModelViewer):
-    """Run the main viewer with one synchronized provider selector."""
+    """Run the main viewer with synchronized provider and download interactions."""
 
     def __init__(self):
         """Snapshot available provider labels for both mouse and keyboard selection."""
@@ -96,6 +111,30 @@ class AIModelViewer(BaseAIModelViewer):
         if event.select.id != "provider-select":
             return
         self._apply_provider_filter(str(event.value), sync_widget=False)
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Use the responsive runtime modal for download-history detail rows."""
+        data_table = getattr(event, "data_table", None)
+        if data_table is not None and data_table.id == "download-history-table":
+            target_id = str(event.row_key.value)
+            entry = self.dl.download_registry.get(target_id)
+            if not entry:
+                entry = fallback_entry_from_target(target_id)
+
+            if data_table.cursor_column == 5:
+                state = entry.get("state", "idle")
+                if is_external_entry(entry):
+                    self.update_status("External download; management unavailable in this app.")
+                    return
+                if is_active_state(state):
+                    self.cancel_model_download(cancel_model_payload(target_id, entry))
+                else:
+                    self.delete_download_entry(target_id, delete_data=False)
+            else:
+                self.push_screen(DownloadJobModal(entry))
+            return
+
+        super().on_data_table_row_selected(event)
 
     def _apply_download_poll_snapshot(self, jobs, debug, health):
         """Apply the base snapshot and surface deduplicated poll status transitions."""
