@@ -58,15 +58,15 @@ class DockerProvider(BaseProvider):
         model_ids: list[str] = []
         for model in models:
             if isinstance(model, str):
-                model_id = model
+                candidate = model
             elif isinstance(model, dict):
-                model_id = model.get("id", model.get("name", ""))
+                candidate = model.get("id", model.get("name", ""))
             else:
                 raise ValueError("expected model entry to be a string or object")
 
-            if not isinstance(model_id, str):
+            if not isinstance(candidate, str):
                 raise ValueError("expected model id or name to be a string")
-            model_ids.append(model_id)
+            model_ids.append(candidate)
 
         return model_ids
 
