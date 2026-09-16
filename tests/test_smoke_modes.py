@@ -1,4 +1,5 @@
 import asyncio
+import socket
 
 import api_server
 import downloads.download_service as download_service
@@ -35,6 +36,18 @@ def test_download_service_smoke_mode_exits_cleanly(monkeypatch):
 
     assert download_service.main() == 0
     assert calls == ["smoke"]
+
+
+def test_download_service_smoke_bind_does_not_resolve_fqdn(monkeypatch):
+    """Download-service loopback smoke must not depend on reverse/FQDN resolution."""
+
+    def _unexpected_getfqdn(_host: str = "") -> str:
+        raise AssertionError("download-service bind must not call socket.getfqdn")
+
+    monkeypatch.setattr(socket, "getfqdn", _unexpected_getfqdn)
+    monkeypatch.setattr(download_service, "worker_loop", lambda: None)
+
+    assert download_service.run_smoke_check() == 0
 
 
 def test_textual_app_smoke_mode_exits_in_headless_test(monkeypatch):
