@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from app.viewer import AIModelViewer
 from results.results_view import result_unique_key
-from tui_app import AIModelViewer
 
 
 def test_get_selected_model_uses_datatable_row_key_not_first_cell():
