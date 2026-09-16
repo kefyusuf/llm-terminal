@@ -4,12 +4,12 @@ import asyncio
 
 from textual.widgets import DataTable
 
-from tui_app import AIModelViewer
+from app.viewer import AIModelViewer
 
 
 class _LayoutOnlyViewer(AIModelViewer):
     def on_mount(self) -> None:
-        """Skip service/timer side effects; exercise the real results table only."""
+        """Skip service/timer side effects; exercise the shipped runtime results table only."""
         pass
 
     def on_resize(self, _event) -> None:
@@ -51,7 +51,9 @@ def _result(
     }
 
 
-def test_same_key_set_reorders_rows_when_sort_mode_changes():
+def test_same_key_set_reorders_rows_when_sort_mode_changes(monkeypatch):
+    monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ("Ollama",))
+
     async def _run() -> None:
         app = _LayoutOnlyViewer()
         async with app.run_test(size=(160, 40)) as pilot:
@@ -80,7 +82,9 @@ def test_same_key_set_reorders_rows_when_sort_mode_changes():
     asyncio.run(_run())
 
 
-def test_same_key_metadata_change_updates_non_download_cells():
+def test_same_key_metadata_change_updates_non_download_cells(monkeypatch):
+    monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ("Ollama",))
+
     async def _run() -> None:
         app = _LayoutOnlyViewer()
         async with app.run_test(size=(160, 40)) as pilot:
