@@ -5,6 +5,7 @@ import asyncio
 import app.viewer as viewer_module
 import tui_app as base_module
 from app.modals import PlanModeModal
+from results.results_view import result_unique_key
 from textual.widgets import DataTable
 
 
@@ -45,15 +46,10 @@ class _DummyMonitor:
 
 class _InteractionViewer(viewer_module.AIModelViewer):
     async def on_mount(self) -> None:
-        """Mount only deterministic UI state needed by the interaction test."""
+        """Mount deterministic widgets without starting services or polling."""
         self._apply_ui_mode()
         self._configure_results_table_columns(force=True)
-        table = self.query_one("#results-table", DataTable)
-        table.zebra_stripes = True
-        self.all_results = [MODEL.copy()]
-        self.refresh_table()
-        table.move_cursor(row=0, animate=False, scroll=False)
-        table.focus()
+        self.query_one("#results-table", DataTable).zebra_stripes = True
 
     def request_system_info_refresh(self, force=False) -> None:
         _ = force
@@ -71,6 +67,19 @@ def test_pilot_plan_and_compare_shortcuts_use_selected_result(monkeypatch):
         async with app.run_test(size=(100, 30)) as pilot:
             await pilot.pause()
             table = app.query_one("#results-table", DataTable)
+
+            app.all_results = [MODEL.copy()]
+            row_data = app._blank_result_row()
+            row_data["source"] = "Ollama"
+            row_data["name"] = MODEL["name"]
+            table.add_row(
+                *app._row_cells_for_current_layout(row_data),
+                key=result_unique_key(app.all_results[0]),
+            )
+            table.move_cursor(row=0, animate=False, scroll=False)
+            table.focus()
+            await pilot.pause()
+
             assert table.row_count == 1
             assert table.cursor_row == 0
 
