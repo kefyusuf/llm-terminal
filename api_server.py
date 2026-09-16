@@ -217,7 +217,6 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
         errors: list[str] = []
         structured_errors: list[ProviderError] = []
 
-        # Search providers
         if provider in ("all", "ollama"):
             local = get_installed_ollama_models()
             ollama_results, ollama_errors, _ = search_ollama_models(
@@ -242,13 +241,11 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
             results.extend(hf_results)
             errors.extend(hf_errors)
 
-        # Filter
         if use_case != "all":
             results = [r for r in results if r.get("use_case_key") == use_case]
         if min_fit != "all":
             results = [r for r in results if min_fit in r.get("fit", "").lower()]
 
-        # Sort
         if sort_by == "composite":
             results.sort(key=lambda r: r.get("score_composite", 0), reverse=True)
         elif sort_by == "speed":
@@ -258,7 +255,6 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
         elif sort_by == "name":
             results.sort(key=lambda r: r.get("name", "").lower())
 
-        # Serialize
         models = []
         for r in results[:limit]:
             models.append(
@@ -307,7 +303,6 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
         except (ValueError, IndexError):
             return self._error("Invalid 'limit' parameter; expected integer.", 400)
 
-        # Forward to models endpoint with composite sort
         params["sort"] = ["composite"]
         params["limit"] = [str(limit)]
         self._handle_models(params)
@@ -377,12 +372,21 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
         )
 
 
+class _SmokeHardwareMonitor:
+    """Minimal monitor used only by the transport-level API health smoke."""
+
+    def get_specs(self) -> dict:
+        return {}
+
+
 def create_server(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
+    *,
+    monitor: HardwareMonitor | None = None,
 ) -> ThreadingHTTPServer:
-    """Create and configure the API server."""
-    ModelAPIHandler.monitor = HardwareMonitor()
+    """Create and configure the API server with an injectable hardware monitor."""
+    ModelAPIHandler.monitor = monitor if monitor is not None else HardwareMonitor()
     server = ThreadingHTTPServer((host, port), ModelAPIHandler)
     return server
 
@@ -403,20 +407,22 @@ def run_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT):
 def start_server_background(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
+    *,
+    monitor: HardwareMonitor | None = None,
 ) -> tuple[ThreadingHTTPServer, threading.Thread]:
     """Start the API server in a background thread.
 
     Returns ``(server, thread)`` for later shutdown via ``server.shutdown()``.
     """
-    server = create_server(host, port)
+    server = create_server(host, port, monitor=monitor)
     thread = threading.Thread(target=server.serve_forever, daemon=True, name="api-server")
     thread.start()
     return server, thread
 
 
 def run_smoke_check() -> int:
-    """Run a bounded API health check against an ephemeral local server."""
-    server, thread = start_server_background(DEFAULT_HOST, 0)
+    """Run a bounded transport-level API health check against an ephemeral server."""
+    server, thread = start_server_background(DEFAULT_HOST, 0, monitor=_SmokeHardwareMonitor())
     port = int(server.server_address[1])
 
     try:
