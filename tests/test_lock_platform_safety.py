@@ -36,10 +36,12 @@ def test_lock_all_rejects_cross_platform_generation_before_compiling(tmp_path, m
     assert compile_calls == []
 
 
-def test_linux_locks_do_not_contain_windows_only_win32_setctime():
-    """Linux locks must not be contaminated by Windows-only Loguru dependencies."""
+def test_linux_locks_exclude_windows_only_dependencies():
+    """Linux locks must not contain dependencies whose metadata targets Windows only."""
     requirements_dir = Path(__file__).resolve().parents[1] / "requirements"
+    windows_only = ("colorama==", "win32-setctime==")
 
     for lock_name in ("requirements-linux.txt", "requirements-dev-linux.txt"):
         lock_text = (requirements_dir / lock_name).read_text(encoding="utf-8")
-        assert "\nwin32-setctime==" not in f"\n{lock_text}"
+        for requirement in windows_only:
+            assert f"\n{requirement}" not in f"\n{lock_text}"
