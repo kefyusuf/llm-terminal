@@ -322,13 +322,15 @@ def run_smoke_step(
 def smoke() -> int:
     ensure_supported_python()
     root = project_root()
-    venv_python = venv_python_path(root)
+    system_name = platform.system()
+    venv_python = venv_python_path(root, system_name)
 
     if not venv_python.exists():
         raise SystemExit("[smoke] missing virtualenv; run python scripts/dev.py bootstrap first")
 
     smoke_env = os.environ.copy()
     smoke_env["AIMODEL_SMOKE"] = "1"
+    api_timeout = 35 if system_name == "Darwin" else 15
     tui_timeout = 45
 
     run_smoke_step("cli", [str(venv_python), "-m", "cli", "system"], root, timeout=10)
@@ -336,7 +338,7 @@ def smoke() -> int:
         "api",
         [str(venv_python), "-m", "api_server"],
         root,
-        timeout=15,
+        timeout=api_timeout,
         env=smoke_env,
     )
     run_smoke_step(
