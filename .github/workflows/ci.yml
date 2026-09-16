@@ -84,6 +84,37 @@ jobs:
           path: coverage.log
           if-no-files-found: ignore
 
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bootstrap environment
+        run: python scripts/dev.py bootstrap
+
+      - name: Run mypy baseline
+        shell: bash
+        run: |
+          set -o pipefail
+          .venv/bin/python -m mypy \
+            api_server.py app cli.py config.py core downloads main.py \
+            providers results search terminal_ui tui_app.py 2>&1 | tee typecheck.log
+
+      - name: Upload typecheck logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-logs-ubuntu-py3.12
+          path: typecheck.log
+          if-no-files-found: ignore
+
   smoke:
     strategy:
       fail-fast: false
