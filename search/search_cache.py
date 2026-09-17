@@ -7,7 +7,7 @@ from typing import Any
 
 
 class SearchCache:
-    """Store cached search pages and invalidate by age or hardware drift."""
+    """Store cached search pages and validate fresh reuse by age and hardware drift."""
 
     def __init__(
         self,
@@ -30,11 +30,9 @@ class SearchCache:
 
         age = time.monotonic() - entry["timestamp"]
         if age > self.ttl_seconds:
-            self._entries.pop(query_key, None)
             return None
 
         if not self._is_cache_compatible(current_specs, entry.get("specs")):
-            self._entries.pop(query_key, None)
             return None
         return entry
 
