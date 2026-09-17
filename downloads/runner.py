@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 import time
 from typing import Any
 
@@ -64,7 +65,7 @@ def _repo_id_from_hf_command(command) -> str:
 
 
 def _target_file_from_hf_command(command) -> str:
-    """Extract the exact repository filename from an HF API command payload."""
+    """Extract the exact repository filename from an internal HF API command payload."""
     if not is_hf_api_command(command):
         return ""
     return command[2] if len(command) > 2 else ""
@@ -220,13 +221,69 @@ def run_hf_download(state, target_id: str, command) -> None:
         state.clear_process(target_id)
 
 
+def _watch_streamed_cancellation(
+    state,
+    target_id: str,
+    process,
+    stop_event: threading.Event,
+    ready_event: threading.Event,
+    started_at: float,
+) -> None:
+    """Cancel a streamed subprocess even while its stdout reader is blocked."""
+    cancel_sent_at = None
+    kill_sent = False
+    first_check = True
+
+    try:
+        while not stop_event.is_set():
+            if _cancel_requested(state, target_id):
+                if cancel_sent_at is None:
+                    cancel_sent_at = started_at if first_check else time.monotonic()
+                    if _can_terminate_process(process):
+                        try:
+                            process.terminate()
+                        except OSError:
+                            pass
+                elif not kill_sent and (time.monotonic() - cancel_sent_at) > 1.5:
+                    poll_fn = getattr(process, "poll", None)
+                    running = True
+                    if callable(poll_fn):
+                        try:
+                            running = poll_fn() is None
+                        except OSError:
+                            running = True
+                    if running:
+                        kill_fn = getattr(process, "kill", None)
+                        if callable(kill_fn):
+                            try:
+                                kill_fn()
+                            except OSError:
+                                pass
+                    kill_sent = True
+
+            first_check = False
+            ready_event.set()
+
+            poll_fn = getattr(process, "poll", None)
+            if callable(poll_fn):
+                try:
+                    if poll_fn() is not None:
+                        return
+                except OSError:
+                    return
+
+            stop_event.wait(0.1)
+    finally:
+        ready_event.set()
+
+
 def run_streamed_command(state, target_id: str, command) -> None:
     """Run a generic subprocess that streams progress on stdout.
 
     Used for ``ollama pull`` and any non-HF command. Progress is
     parsed from stdout lines via :func:`extract_download_progress`;
-    a 1-second idle heartbeat keeps ``updated_at`` fresh even when
-    no progress lines arrive.
+    cancellation is monitored independently so a silent stdout pipe
+    cannot prevent terminate/kill escalation.
     """
     process = subprocess.Popen(
         command,
@@ -242,6 +299,16 @@ def run_streamed_command(state, target_id: str, command) -> None:
     start = time.monotonic()
     last_update = start
     last_line = ""
+    cancel_stop = threading.Event()
+    cancel_ready = threading.Event()
+    cancel_watcher = threading.Thread(
+        target=_watch_streamed_cancellation,
+        args=(state, target_id, process, cancel_stop, cancel_ready, start),
+        daemon=True,
+        name=f"download-cancel-{target_id}",
+    )
+    cancel_watcher.start()
+    cancel_ready.wait()
 
     try:
         if process.stdout is not None:
@@ -249,12 +316,6 @@ def run_streamed_command(state, target_id: str, command) -> None:
                 line = raw_line.strip()
                 if line:
                     last_line = line
-
-                if _cancel_requested(state, target_id):
-                    try:
-                        process.terminate()
-                    except OSError:
-                        pass
 
                 progress = _extract_progress(line)
                 now = time.monotonic()
@@ -282,6 +343,8 @@ def run_streamed_command(state, target_id: str, command) -> None:
         cancelled = _cancel_requested(state, target_id)
         _finalize_terminal(state, target_id, return_code, cancelled, last_line=last_line)
     finally:
+        cancel_stop.set()
+        cancel_watcher.join(timeout=0.5)
         state.clear_process(target_id)
 
 
