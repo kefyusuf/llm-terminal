@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,8 +7,9 @@ name = "ai-model-explorer"
 version = "1.0.1"
 description = "Terminal UI for discovering, comparing, and downloading local LLM models"
 readme = "README.md"
-requires-python = ">=3.10"
-license = { text = "MIT" }
+requires-python = ">=3.10,<3.15"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "huggingface_hub>=0.27,<1.0",
     "psutil>=5.9,<7.0",
