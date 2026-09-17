@@ -24,6 +24,18 @@ def test_pyproject_uses_supported_setuptools_backend():
     assert data["build-system"]["build-backend"] == "setuptools.build_meta"
 
 
+def test_pyproject_uses_pep639_license_metadata():
+    """License metadata must use the supported SPDX/PEP 639 representation."""
+    import tomllib
+
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+
+    assert data["project"]["license"] == "MIT"
+    assert data["project"]["license-files"] == ["LICENSE"]
+    assert "setuptools>=77.0.3" in data["build-system"]["requires"]
+
+
 def test_bootstrap_installs_project_after_platform_lock(tmp_path, monkeypatch):
     dev = _load_dev_module()
     (tmp_path / "requirements-dev-linux.txt").write_text("pytest==8.4.2\n", encoding="utf-8")

@@ -53,7 +53,10 @@ def select_lock_targets(system_name: str | None = None) -> list[tuple[str, str]]
 
 
 def select_dev_lock(system_name: str | None = None) -> str:
-    return select_lock_targets(system_name)[1][1]
+    resolved_system = system_name or platform.system()
+    if resolved_system == "Darwin":
+        return "requirements-dev.txt"
+    return select_lock_targets(resolved_system)[1][1]
 
 
 def venv_python_path(root: Path, system_name: str | None = None) -> Path:
