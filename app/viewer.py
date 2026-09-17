@@ -1,4 +1,4 @@
-"""Runtime TUI viewer extensions for provider selection and responsive download actions."""
+"""Runtime TUI viewer extensions for compact filters and responsive download actions."""
 
 from __future__ import annotations
 
@@ -7,10 +7,11 @@ from collections.abc import Sequence
 from textual import on, work
 from textual.containers import Vertical
 from textual.css.query import NoMatches
-from textual.widgets import Button, DataTable, Input, Select
+from textual.widgets import Button, DataTable, Input, RadioSet, Select
 
 from app.modals import DownloadJobModal as BaseDownloadJobModal
 from app.responsive_modals import ModelDetailModal as ResponsiveModelDetailModal
+from app.search_constants import USE_CASE_OPTIONS
 from app.startup_viewer import AIModelViewer as BaseAIModelViewer
 from downloads.download_history import cancel_model_payload, fallback_entry_from_target, is_external_entry
 from downloads.download_lifecycle import reset_results_download_state
@@ -56,30 +57,66 @@ class DownloadJobModal(BaseDownloadJobModal):
 
 
 class AIModelViewer(BaseAIModelViewer):
-    """Run the main viewer with synchronized provider and download interactions."""
+    """Run the main viewer with synchronized compact filters and download interactions."""
 
     def __init__(self):
-        """Snapshot available provider labels for both mouse and keyboard selection."""
+        """Snapshot selector choices for mouse and keyboard interaction."""
         super().__init__()
         labels = tuple(get_provider_filter_labels())
         self.provider_filter_labels = labels or ("Ollama",)
+        self.use_case_filter_keys = tuple(key for key, _label in USE_CASE_OPTIONS)
         if self.current_filter not in self.provider_filter_labels:
             self.current_filter = self.provider_filter_labels[0]
+        if self.use_case_filter not in self.use_case_filter_keys:
+            self.search_state.set_use_case("all")
 
     async def on_mount(self) -> None:
-        """Mount the compact provider selector after the base UI initializes."""
+        """Mount compact provider and use-case selectors after the base UI initializes."""
         super().on_mount()
-        panel = self.query_one("#provider-panel", Vertical)
-        await panel.remove_children()
-        selector = Select(
+
+        provider_panel = self.query_one("#provider-panel", Vertical)
+        await provider_panel.remove_children()
+        provider_selector = Select(
             ((label, label) for label in self.provider_filter_labels),
             value=self.current_filter,
             allow_blank=False,
             id="provider-select",
         )
+        provider_selector.styles.width = "100%"
+        provider_selector.styles.height = 3
+        await provider_panel.mount(provider_selector)
+
+        use_case_panel = self.query_one("#use-case-panel", Vertical)
+        use_case_selector = Select(
+            ((label, key) for key, label in USE_CASE_OPTIONS),
+            value=self.use_case_filter,
+            allow_blank=False,
+            id="use-case-select",
+        )
+        use_case_selector.styles.width = "100%"
+        use_case_selector.styles.height = 3
+        await use_case_panel.mount(use_case_selector)
+        self._hide_legacy_use_case_radios()
+
+    def _hide_legacy_use_case_radios(self) -> None:
+        """Keep the base RadioSet in the DOM for base layout code without rendering it."""
+        try:
+            radio_set = self.query_one("#use-case-filter", RadioSet)
+        except NoMatches:
+            return
+        radio_set.styles.display = "none"
+
+    def _apply_ui_mode(self) -> None:
+        """Apply the base layout, then keep the runtime use-case selector as the visible control."""
+        super()._apply_ui_mode()
+        self._hide_legacy_use_case_radios()
+        try:
+            selector = self.query_one("#use-case-select", Select)
+        except NoMatches:
+            return
+        selector.styles.display = "block"
         selector.styles.width = "100%"
         selector.styles.height = 3
-        await panel.mount(selector)
 
     def _get_selected_model(self) -> dict | None:
         """Resolve the selected result through Textual's stable DataTable row key."""
@@ -131,16 +168,40 @@ class AIModelViewer(BaseAIModelViewer):
             self.refresh_table()
             self.update_status(f"Provider filter set to {label}.")
 
+    def _set_use_case_filter(self, key: str) -> None:
+        """Apply one use-case key and synchronize the runtime selector when mounted."""
+        if key not in self.use_case_filter_keys:
+            return
+
+        self.search_state.set_use_case(key)
+        try:
+            selector = self.query_one("#use-case-select", Select)
+        except NoMatches:
+            super()._set_use_case_filter(key)
+            return
+        if selector.value != key:
+            selector.value = key
+
     def action_cycle_provider(self) -> None:
         """Cycle through the exact provider labels displayed by the selector."""
         next_filter = cycle_provider_label(self.provider_filter_labels, self.current_filter)
         self._apply_provider_filter(next_filter, sync_widget=True)
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        """Apply provider changes made directly through the mounted selector."""
-        if event.select.id != "provider-select":
+        """Apply provider or use-case changes made through compact selectors."""
+        if event.select.id == "provider-select":
+            self._apply_provider_filter(str(event.value), sync_widget=False)
             return
-        self._apply_provider_filter(str(event.value), sync_widget=False)
+
+        if event.select.id != "use-case-select":
+            return
+
+        key = str(event.value)
+        if key not in self.use_case_filter_keys or key == self.use_case_filter:
+            return
+        self._set_use_case_filter(key)
+        self.refresh_table()
+        self.update_status(f"Use Case filter set to {self._use_case_label(key)}.")
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Use the responsive runtime modal for download-history detail rows."""
