@@ -8,9 +8,9 @@ from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import DataTable, Input, Select
 
+from app.startup_viewer import AIModelViewer as BaseAIModelViewer
 from providers import get_provider_filter_labels
 from results.results_view import result_unique_key
-from tui_app import AIModelViewer as BaseAIModelViewer
 
 
 _PROVIDER_COMPACT_TAGS = {
