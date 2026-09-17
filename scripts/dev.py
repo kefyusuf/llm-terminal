@@ -53,7 +53,10 @@ def select_lock_targets(system_name: str | None = None) -> list[tuple[str, str]]
 
 
 def select_dev_lock(system_name: str | None = None) -> str:
-    return select_lock_targets(system_name)[1][1]
+    resolved_system = system_name or platform.system()
+    if resolved_system == "Darwin":
+        return "requirements-dev.txt"
+    return select_lock_targets(resolved_system)[1][1]
 
 
 def venv_python_path(root: Path, system_name: str | None = None) -> Path:
@@ -225,6 +228,12 @@ def lock(*, check: bool = False) -> int:
             return 0
         raise SystemExit(f"[lock] regenerate committed lock files with Python {lock_label}")
 
+    if os.environ.get("AIMODEL_LOCK_ALL") == "1":
+        raise SystemExit(
+            "[lock] cross-platform lock generation is unsupported; "
+            "run lock separately on each target OS"
+        )
+
     if check:
         check_lock_targets(root, system_name)
         print(f"[lock] {system_name} lock files are fresh")
@@ -233,14 +242,6 @@ def lock(*, check: bool = False) -> int:
     for source_name, output_name in select_lock_targets(system_name):
         compile_lock(requirement_path(root, source_name), requirement_path(root, output_name), root)
         print(f"[lock] regenerated {REQUIREMENTS_DIRNAME}/{output_name}")
-
-    if os.environ.get("AIMODEL_LOCK_ALL") == "1":
-        for alt_system in ("Windows", "Linux"):
-            if alt_system == system_name:
-                continue
-            for source_name, output_name in select_lock_targets(alt_system):
-                compile_lock(requirement_path(root, source_name), requirement_path(root, output_name), root)
-                print(f"[lock] regenerated {REQUIREMENTS_DIRNAME}/{output_name}")
 
     return 0
 

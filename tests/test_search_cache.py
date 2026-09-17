@@ -45,7 +45,10 @@ def test_search_cache_expires_old_entry(monkeypatch):
     assert cache.get("hf:llama:page0", specs) is None
 
 
-def test_search_cache_keeps_expired_entry_for_stale_fallback(monkeypatch):
+def test_expired_entry_remains_available_for_stale_fallback(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(time, "monotonic", lambda: now[0])
+
     cache = SearchCache(
         ttl_seconds=5,
         max_entries=5,
@@ -54,21 +57,19 @@ def test_search_cache_keeps_expired_entry_for_stale_fallback(monkeypatch):
     )
     specs = {"has_gpu": False, "ram_free": 8.0, "vram_free": 0.0}
     cache.set(
-        "hf:llama:page0",
-        results=[{"name": "llama"}],
+        "ollama:qwen",
+        results=[{"name": "qwen"}],
         error="",
-        has_more_pages=True,
+        has_more_pages=False,
         specs=specs,
     )
 
-    original_monotonic = time.monotonic
-    monkeypatch.setattr(time, "monotonic", lambda: original_monotonic() + 10)
+    now[0] = 106.0
+    assert cache.get("ollama:qwen", specs) is None
 
-    assert cache.get("hf:llama:page0", specs) is None
-    stale = cache.get_stale("hf:llama:page0")
+    stale = cache.get_stale("ollama:qwen")
     assert stale is not None
-    assert stale["results"] == [{"name": "llama"}]
-    assert stale["has_more_pages"] is True
+    assert stale["results"] == [{"name": "qwen"}]
 
 
 def test_search_cache_invalidates_when_ram_changes_beyond_threshold():
@@ -90,7 +91,7 @@ def test_search_cache_invalidates_when_ram_changes_beyond_threshold():
     assert cache.get("hf:qwen:page0", current_specs) is None
 
 
-def test_search_cache_keeps_hardware_incompatible_entry_for_stale_fallback():
+def test_hardware_incompatible_entry_remains_available_for_stale_fallback():
     cache = SearchCache(
         ttl_seconds=30,
         max_entries=5,
@@ -106,8 +107,8 @@ def test_search_cache_keeps_hardware_incompatible_entry_for_stale_fallback():
     )
 
     current_specs = {"has_gpu": False, "ram_free": 6.0, "vram_free": 0.0}
-
     assert cache.get("hf:qwen:page0", current_specs) is None
+
     stale = cache.get_stale("hf:qwen:page0")
     assert stale is not None
     assert stale["results"] == [{"name": "qwen"}]

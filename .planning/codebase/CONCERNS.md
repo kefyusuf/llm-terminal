@@ -100,21 +100,22 @@ Result refresh still uses `DataTable.clear()` in normal/structural refresh paths
 
 ### 4. Platform acceptance is broader than hosted CI evidence
 
-Project metadata supports Python 3.10-3.14 and integrations span Windows/Linux/macOS/Apple Silicon, but hosted CI currently verifies only:
+Project metadata supports Python 3.10-3.14 and integrations span Windows/Linux/macOS/Apple Silicon. Hosted CI verifies:
 
-- Ubuntu + Windows,
-- Python 3.12 + 3.14,
-- offline-safe verify/smoke behavior,
-- canonical aggregate coverage on Ubuntu/Python 3.12.
+- Ubuntu + Windows on Python 3.12 + 3.14,
+- offline-safe verify/smoke behavior on those environments,
+- canonical aggregate coverage on Ubuntu/Python 3.12,
+- macOS/Python 3.12 bootstrap + verify + smoke through the compatibility dependency wrapper.
 
-Hosted CI does not prove:
+The hosted macOS lane closes the basic installation/testability gap, but hosted CI still does not prove:
 
 - WSL-specific behavior,
 - real NVIDIA/AMD/Intel GPU tooling,
 - actual Ollama/LM Studio/Docker Model Runner services,
-- macOS Apple Silicon/MLX filesystem behavior.
+- real Apple Silicon/MLX cache/filesystem/runtime behavior,
+- native macOS lock reproducibility; macOS currently resolves through `requirements/requirements-dev.txt` until dedicated lock artifacts exist.
 
-**Next work:** explicit automated/manual platform acceptance matrix.
+**Next work:** expand the automated/manual platform acceptance matrix where concrete platform behavior requires it, with particular focus on real Apple Silicon/MLX and local-provider integrations.
 
 ### 5. Main TUI base module remains large
 
