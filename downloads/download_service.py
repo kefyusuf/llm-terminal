@@ -28,12 +28,12 @@ import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from http.server import ThreadingHTTPServer
 from typing import Any
 
 from loguru import logger
 
 import config
+from core.http_server import LocalThreadingHTTPServer
 from downloads.runner import process_job
 from downloads.store import DownloadStore
 
@@ -200,7 +200,7 @@ def main():
     worker.start()
     STATE.worker_thread = worker
 
-    server = ThreadingHTTPServer(service_bind_address(), Handler)
+    server = LocalThreadingHTTPServer(service_bind_address(), Handler)
     STATE.server = server
     try:
         server.serve_forever(poll_interval=0.5)
@@ -222,7 +222,7 @@ def run_smoke_check() -> int:
     STATE.worker_thread = worker
 
     host, _ = service_bind_address()
-    server = ThreadingHTTPServer((host, 0), Handler)
+    server = LocalThreadingHTTPServer((host, 0), Handler)
     STATE.server = server
     thread = threading.Thread(
         target=server.serve_forever,

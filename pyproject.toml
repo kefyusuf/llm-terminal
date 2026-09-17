@@ -7,7 +7,7 @@ name = "ai-model-explorer"
 version = "1.0.1"
 description = "Terminal UI for discovering, comparing, and downloading local LLM models"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.15"
 license = "MIT"
 license-files = ["LICENSE"]
 dependencies = [
