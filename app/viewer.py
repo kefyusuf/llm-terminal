@@ -10,6 +10,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Button, DataTable, Input, Select
 
 from app.modals import DownloadJobModal as BaseDownloadJobModal
+from app.responsive_modals import ModelDetailModal as ResponsiveModelDetailModal
 from app.startup_viewer import AIModelViewer as BaseAIModelViewer
 from downloads.download_history import cancel_model_payload, fallback_entry_from_target, is_external_entry
 from downloads.download_lifecycle import reset_results_download_state
@@ -171,6 +172,10 @@ class AIModelViewer(BaseAIModelViewer):
         status_message = self.dl.take_poll_status_message()
         if status_message:
             self.update_status(status_message)
+
+    def open_model_detail_modal(self, model):
+        """Open the viewport-bounded runtime model detail modal."""
+        self.push_screen(ResponsiveModelDetailModal(model))
 
     def delete_download_entry(self, target_id, delete_data=False):
         """Schedule potentially blocking deletion outside Textual's UI thread."""
