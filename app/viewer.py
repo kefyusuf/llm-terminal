@@ -6,9 +6,10 @@ from collections.abc import Sequence
 
 from textual.containers import Vertical
 from textual.css.query import NoMatches
-from textual.widgets import Input, Select
+from textual.widgets import DataTable, Input, Select
 
 from providers import get_provider_filter_labels
+from results.results_view import result_unique_key
 from tui_app import AIModelViewer as BaseAIModelViewer
 
 
@@ -60,6 +61,34 @@ class AIModelViewer(BaseAIModelViewer):
         selector.styles.width = "100%"
         selector.styles.height = 3
         await panel.mount(selector)
+
+    def _get_selected_model(self) -> dict | None:
+        """Resolve the selected result through Textual's stable DataTable row key."""
+        table = self.query_one("#results-table", DataTable)
+        cursor_row = table.cursor_row
+        if cursor_row < 0 or cursor_row >= table.row_count:
+            return None
+
+        row_key, _column_key = table.coordinate_to_cell_key(table.cursor_coordinate)
+        row_key_value = row_key.value
+        if row_key_value is None:
+            return None
+
+        return next(
+            (item for item in self.all_results if result_unique_key(item) == row_key_value),
+            None,
+        )
+
+    def _apply_resize_reflow(self, generation: int) -> None:
+        """Ignore a deferred resize callback after the results table has unmounted."""
+        if generation != self._resize_reflow_generation:
+            return
+        try:
+            self.query_one("#results-table", DataTable)
+        except NoMatches:
+            self._resize_reflow_timer = None
+            return
+        super()._apply_resize_reflow(generation)
 
     def _apply_provider_filter(self, label: str, *, sync_widget: bool) -> None:
         """Apply one provider label and keep the mounted selector synchronized."""
