@@ -84,6 +84,39 @@ jobs:
           path: coverage.log
           if-no-files-found: ignore
 
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Bootstrap environment
+        run: python scripts/dev.py bootstrap
+
+      - name: Run staged mypy gate
+        shell: bash
+        run: |
+          set -o pipefail
+          .venv/bin/python -m mypy \
+            core downloads results terminal_ui \
+            app/search_results_state.py \
+            search/search_cache.py search/search_orchestration.py \
+            2>&1 | tee typecheck.log
+
+      - name: Upload typecheck logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: typecheck-logs-ubuntu-py3.12
+          path: typecheck.log
+          if-no-files-found: ignore
+
   smoke:
     strategy:
       fail-fast: false
