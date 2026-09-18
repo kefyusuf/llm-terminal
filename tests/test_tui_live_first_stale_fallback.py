@@ -5,8 +5,8 @@ import asyncio
 from textual.widgets import DataTable
 
 from app.viewer import AIModelViewer
-from search.search_orchestration import build_query_key
 from search.search_orchestrator import SearchOutcome
+from search.search_orchestration import build_query_key
 
 
 STALE_MODEL = {
