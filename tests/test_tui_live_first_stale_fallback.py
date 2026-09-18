@@ -6,7 +6,6 @@ from textual.widgets import DataTable
 
 from app.viewer import AIModelViewer
 
-
 STALE_MODEL = {
     "source": "Ollama",
     "publisher": "ollama",
