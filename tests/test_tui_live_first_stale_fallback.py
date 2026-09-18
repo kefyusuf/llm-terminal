@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
+from textual.widgets import DataTable
+
 from app.viewer import AIModelViewer
 from search.search_orchestration import build_query_key
 from search.search_orchestrator import SearchOutcome
-from textual.widgets import DataTable
 
 
 STALE_MODEL = {
