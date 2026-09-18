@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 
 from textual import on, work
@@ -19,6 +20,7 @@ from downloads.download_manager import download_target_id
 from downloads.download_status import is_active_state
 from providers import get_provider_filter_labels
 from results.results_view import filter_results_for_view, result_unique_key
+from search.search_orchestration import build_query_key, cache_hit_suffix, provider_display_name
 
 
 _PROVIDER_COMPACT_TAGS = {
@@ -82,6 +84,7 @@ class AIModelViewer(BaseAIModelViewer):
         if self.use_case_filter not in self.use_case_filter_keys:
             self.search_state.set_use_case("all")
         self._results_table_render_signature = None
+        self._live_first_stale_query_key: str | None = None
 
     async def on_mount(self) -> None:
         """Mount compact provider and use-case selectors after the base UI initializes."""
@@ -130,6 +133,76 @@ class AIModelViewer(BaseAIModelViewer):
         selector.styles.display = "block"
         selector.styles.width = "100%"
         selector.styles.height = 3
+
+    def _dispatch_debounced_search(self) -> None:
+        """Use fresh cache immediately, but reserve stale data for post-live fallback."""
+        self._search_debounce_timer = None
+        payload = self._pending_search_payload
+        self._pending_search_payload = None
+        if payload is None:
+            return
+
+        query, providers, page, signature = payload
+        self.current_page = page
+        self._search_inflight_signature = signature
+        self._search_inflight_started_at = time.monotonic()
+        query_key = build_query_key(providers, query, self.current_page)
+
+        current_specs = self._current_specs_for_search_ui()
+        self.last_search_error = ""
+        self.search_counter += 1
+        self.active_search_id = self.search_counter
+        table = self.query_one("#results-table", DataTable)
+        table.clear()
+        self._table_row_keys = set()
+        table.loading = True
+        self._search_progress_visible = False
+        self._update_results_meta(0)
+
+        provider_name = provider_display_name(providers)
+        self.on_search_progress(self.active_search_id, f"Searching {provider_name}: {query}")
+
+        self._live_first_stale_query_key = None
+        cached = self.search_cache.get(query_key, current_specs)
+        if cached:
+            self.all_results = [item.copy() for item in cached["results"]]
+            self.dl.ensure_download_fields(self.all_results)
+            self.last_search_error = cached["error"]
+            if "has_more_pages" in cached:
+                self.has_more_pages = cached["has_more_pages"]
+            self.on_search_completed(self.active_search_id)
+            cache_msg = cache_hit_suffix(providers, self.current_page)
+            self.update_status(f"Loaded{cache_msg}")
+            return
+
+        self._live_first_stale_query_key = query_key
+        self.run_search_worker(query, query_key, self.active_search_id, providers)
+
+    def on_search_completed(self, search_id: int) -> None:
+        """Use retained stale data only when an attempted live search fails empty."""
+        stale_query_key = self._live_first_stale_query_key
+        should_try_stale = (
+            search_id == self.active_search_id
+            and stale_query_key is not None
+            and not self.all_results
+            and bool(self.last_search_error)
+        )
+
+        if should_try_stale:
+            stale = self.search_cache.get_stale(stale_query_key)
+            if stale and stale.get("results"):
+                self.all_results = [item.copy() for item in stale["results"]]
+                self.dl.ensure_download_fields(self.all_results)
+                self.last_search_error = "Offline — showing cached results"
+                if "has_more_pages" in stale:
+                    self.has_more_pages = stale["has_more_pages"]
+                self._live_first_stale_query_key = None
+                super().on_search_completed(search_id)
+                self.update_status("Offline mode — showing cached results")
+                return
+
+        self._live_first_stale_query_key = None
+        super().on_search_completed(search_id)
 
     def _results_table_signature(self):
         """Capture ordered, non-download content that determines the rendered table."""

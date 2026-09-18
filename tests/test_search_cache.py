@@ -91,6 +91,89 @@ def test_search_cache_invalidates_when_ram_changes_beyond_threshold():
     assert cache.get("hf:qwen:page0", current_specs) is None
 
 
+def test_hardware_incompatible_entry_remains_available_for_stale_fallback():
+    cache = SearchCache(
+        ttl_seconds=30,
+        max_entries=5,
+        ram_threshold_gb=0.5,
+        vram_threshold_gb=1.0,
+    )
+    cache.set(
+        "hf:qwen:page0",
+        results=[{"name": "qwen"}],
+        error="",
+        has_more_pages=True,
+        specs={"has_gpu": False, "ram_free": 8.0, "vram_free": 0.0},
+    )
+
+    current_specs = {"has_gpu": False, "ram_free": 6.0, "vram_free": 0.0}
+    assert cache.get("hf:qwen:page0", current_specs) is None
+
+    stale = cache.get_stale("hf:qwen:page0")
+    assert stale is not None
+    assert stale["results"] == [{"name": "qwen"}]
+
+
+def test_failed_empty_search_does_not_overwrite_retained_stale_entry():
+    cache = SearchCache(
+        ttl_seconds=30,
+        max_entries=5,
+        ram_threshold_gb=1.0,
+        vram_threshold_gb=1.0,
+    )
+    specs = {"has_gpu": False, "ram_free": 8.0, "vram_free": 0.0}
+    cache.set(
+        "ollama:qwen",
+        results=[{"name": "cached-qwen"}],
+        error="",
+        has_more_pages=False,
+        specs=specs,
+    )
+
+    cache.set(
+        "ollama:qwen",
+        results=[],
+        error="Ollama search unavailable",
+        has_more_pages=False,
+        specs=specs,
+    )
+
+    stale = cache.get_stale("ollama:qwen")
+    assert stale is not None
+    assert stale["results"] == [{"name": "cached-qwen"}]
+    assert stale["error"] == ""
+
+
+def test_partial_live_results_replace_stale_entry_even_with_diagnostics():
+    cache = SearchCache(
+        ttl_seconds=30,
+        max_entries=5,
+        ram_threshold_gb=1.0,
+        vram_threshold_gb=1.0,
+    )
+    specs = {"has_gpu": False, "ram_free": 8.0, "vram_free": 0.0}
+    cache.set(
+        "all:qwen",
+        results=[{"name": "cached-qwen"}],
+        error="",
+        has_more_pages=False,
+        specs=specs,
+    )
+
+    cache.set(
+        "all:qwen",
+        results=[{"name": "live-qwen"}],
+        error="One provider unavailable",
+        has_more_pages=False,
+        specs=specs,
+    )
+
+    cached = cache.get_stale("all:qwen")
+    assert cached is not None
+    assert cached["results"] == [{"name": "live-qwen"}]
+    assert cached["error"] == "One provider unavailable"
+
+
 def test_search_cache_evicts_oldest_entry_when_over_capacity():
     cache = SearchCache(
         ttl_seconds=30,

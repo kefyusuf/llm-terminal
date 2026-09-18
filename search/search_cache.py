@@ -52,6 +52,13 @@ class SearchCache:
         has_more_pages: bool,
         specs: dict[str, Any],
     ) -> None:
+        # A failed live search must not destroy retained data that can still
+        # serve as an offline fallback. Successful empty searches (no error)
+        # and any live search with usable results keep the normal replacement
+        # semantics below.
+        if not results and error and query_key in self._entries:
+            return
+
         self._entries[query_key] = {
             "timestamp": time.monotonic(),
             "results": [item.copy() for item in results],
