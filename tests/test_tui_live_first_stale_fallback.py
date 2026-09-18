@@ -5,8 +5,6 @@ import asyncio
 from textual.widgets import DataTable
 
 from app.viewer import AIModelViewer
-from search.search_orchestrator import SearchOutcome
-from search.search_orchestration import build_query_key
 
 
 STALE_MODEL = {
@@ -58,12 +56,16 @@ class _SearchViewer(AIModelViewer):
 
 
 def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
+    from search.search_orchestration import build_query_key
+
     monkeypatch.setattr("tui_app.HardwareMonitor", _DummyMonitor)
     monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ["Ollama"])
 
     calls: list[tuple[int, str, tuple[str, ...]]] = []
 
     def _failed_search(self, *, search_id, query, providers, **_kwargs):
+        from search.search_orchestrator import SearchOutcome
+
         _ = self
         calls.append((search_id, query, tuple(providers)))
         return SearchOutcome(
