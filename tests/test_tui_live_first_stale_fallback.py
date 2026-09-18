@@ -42,6 +42,16 @@ class _DummyMonitor:
         }
 
 
+class _FailedOutcome:
+    def __init__(self, providers):
+        self.results = []
+        self.errors = ["Ollama search unavailable"]
+        self.has_more_pages = False
+        self.result_count = 0
+        self.providers = list(providers)
+        self.cancelled = False
+
+
 class _SearchViewer(AIModelViewer):
     async def on_mount(self) -> None:
         self._apply_ui_mode()
@@ -56,25 +66,15 @@ class _SearchViewer(AIModelViewer):
 
 
 def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
-    from search.search_orchestration import build_query_key
-
     monkeypatch.setattr("tui_app.HardwareMonitor", _DummyMonitor)
     monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ["Ollama"])
 
     calls: list[tuple[int, str, tuple[str, ...]]] = []
 
     def _failed_search(self, *, search_id, query, providers, **_kwargs):
-        from search.search_orchestrator import SearchOutcome
-
         _ = self
         calls.append((search_id, query, tuple(providers)))
-        return SearchOutcome(
-            results=[],
-            errors=["Ollama search unavailable"],
-            has_more_pages=False,
-            result_count=0,
-            providers=list(providers),
-        )
+        return _FailedOutcome(providers)
 
     monkeypatch.setattr("search.search_orchestrator.SearchOrchestrator.search", _failed_search)
 
@@ -84,9 +84,8 @@ def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
             specs = _DummyMonitor().get_specs()
             app.latest_specs = specs
             app.search_cache.ttl_seconds = -1
-            query_key = build_query_key(["ollama"], "qwen", 0)
             app.search_cache.set(
-                query_key,
+                "ollama:qwen",
                 results=[STALE_MODEL],
                 error="",
                 has_more_pages=False,
