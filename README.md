@@ -43,6 +43,8 @@ Runtime TUI provider detection runs in a background worker, so optional provider
 
 CPU/GPU discovery also runs in background workers. Cached hardware is displayed immediately; a cold start shows a detection placeholder while the input remains usable. Searches and model details reuse one lazily initialized monitor. Expected detection failures show a retry message instead of closing the application. See [hardware startup behavior](docs/hardware-startup.md).
 
+The opt-in [startup measurement harness](docs/startup-measurements.md) records fresh-process headless startup, input dispatch and first REST provider-list response latency with explicit local budgets and failure accounting.
+
 REST `/api/v1/providers` returns availability immediately with additive `discovery` metadata (`status`, `refreshing`, `stale`, `error`). Availability is provisional while `status` is `pending`, and last-known values are retained during stale/failed refreshes. Hugging Face's initial availability means its remote integration is configured, not that connectivity has been checked. Each API server runs at most one probe at a time and reuses results for 30 seconds. See [provider discovery behavior](docs/provider-discovery.md).
 
 ### 4-Dimension Scoring
