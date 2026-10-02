@@ -41,6 +41,8 @@ The TUI/orchestrator preserves this metadata internally. REST exposes it directl
 
 Runtime TUI provider detection runs in a background worker, so optional provider probes do not delay search input. The selector starts with Ollama/Hugging Face and updates as detection completes, preserving the active selection.
 
+CPU/GPU discovery also runs in background workers. Cached hardware is displayed immediately; a cold start shows a detection placeholder while the input remains usable. Searches and model details reuse one lazily initialized monitor. Expected detection failures show a retry message instead of closing the application. See [hardware startup behavior](docs/hardware-startup.md).
+
 REST `/api/v1/providers` returns availability immediately with additive `discovery` metadata (`status`, `refreshing`, `stale`, `error`). Availability is provisional while `status` is `pending`, and last-known values are retained during stale/failed refreshes. Hugging Face's initial availability means its remote integration is configured, not that connectivity has been checked. Each API server runs at most one probe at a time and reuses results for 30 seconds. See [provider discovery behavior](docs/provider-discovery.md).
 
 ### 4-Dimension Scoring

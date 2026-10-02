@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 
 from textual import events, work
@@ -237,7 +238,8 @@ class AIModelViewer(App):
 
     def __init__(self):
         super().__init__()
-        self.monitor = HardwareMonitor()
+        self.monitor = None
+        self._hardware_init_lock = threading.Lock()
         self.search_state = SearchResultsState(
             page_size=config.settings.hf_search_limit,
             max_pages=config.settings.hf_search_max_pages,
@@ -583,7 +585,9 @@ class AIModelViewer(App):
         cached_specs = cache_db.get_hardware_snapshot()
         if cached_specs is not None:
             self.latest_specs = cached_specs
-            self.query_one(SystemInfoWidget).update_info(cached_specs, check_ollama_running())
+            self.query_one(SystemInfoWidget).update_info(cached_specs, None)
+        else:
+            self.query_one(SystemInfoWidget).update("Detecting hardware...")
 
         self.last_download_history_refresh_at = time.monotonic()
         self.update_status(
@@ -899,12 +903,19 @@ class AIModelViewer(App):
         specs = None
         running_now = self.ollama_running
         try:
-            specs = self.monitor.get_specs()
+            specs = self._get_hardware_monitor().get_specs()
             running_now = check_ollama_running()
             cache_db.set_hardware_snapshot(specs)
         except Exception as exc:
             logger.warning("System info refresh failed: {}", exc)
         self.call_from_thread(self._apply_system_info_refresh, specs, running_now)
+
+    def _get_hardware_monitor(self):
+        """Initialize once from workers; failed construction remains retryable."""
+        with self._hardware_init_lock:
+            if self.monitor is None:
+                self.monitor = HardwareMonitor()
+            return self.monitor
 
     def _apply_system_info_refresh(self, specs, running_now):
         self._system_info_refresh_running = False
@@ -916,6 +927,10 @@ class AIModelViewer(App):
                 self.query_one(SystemInfoWidget).update_info(specs_to_render, running_now)
             except Exception:
                 pass
+        else:
+            self.query_one(SystemInfoWidget).update(
+                "Hardware detection unavailable; polling will retry."
+            )
 
         state_changed = running_now != self.ollama_running
         self.ollama_running = running_now
@@ -943,14 +958,14 @@ class AIModelViewer(App):
             self.latest_specs = cached
             return cached
         return {
-            "cpu_name": self.monitor.cpu_name,
-            "cpu_cores": self.monitor.cpu_cores,
+            "cpu_name": "Detecting hardware",
+            "cpu_cores": 0,
             "ram_free": 0.0,
             "ram_total": 0.0,
             "vram_free": 0.0,
             "vram_total": 0.0,
-            "gpu_name": self.monitor.gpu_name,
-            "has_gpu": self.monitor.nvidia_available,
+            "gpu_name": "Detecting hardware",
+            "has_gpu": False,
         }
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -1319,7 +1334,13 @@ class AIModelViewer(App):
 
     @work(thread=True)
     def open_hf_detail_worker(self, selected_model):
-        specs = self.monitor.get_specs()
+        try:
+            specs = self._get_hardware_monitor().get_specs()
+        except (OSError, ValueError, RuntimeError):
+            self.call_from_thread(
+                self.update_status, "Hardware detection unavailable. Retry model details."
+            )
+            return
         enriched = enrich_hf_model_details(
             selected_model.copy(),
             specs,
@@ -1354,8 +1375,13 @@ class AIModelViewer(App):
         if search_id != self.search_state.active_id:
             return
 
+        try:
+            monitor = self._get_hardware_monitor()
+        except (OSError, ValueError, RuntimeError):
+            self.call_from_thread(self._on_hardware_search_failed, search_id)
+            return
         orchestrator = SearchOrchestrator(
-            monitor=self.monitor,
+            monitor=monitor,
             hf_provider=self.hf_provider,
             ollama_provider=self.ollama_provider,
             on_progress=lambda sid, msg: self.call_from_thread(
@@ -1398,9 +1424,18 @@ class AIModelViewer(App):
             results=self.all_results,
             error=self.last_search_error,
             has_more_pages=self.has_more_pages,
-            specs=self.monitor.get_specs(),
+            specs=monitor.get_specs(),
         )
         self.call_from_thread(self.on_search_completed, search_id)
+
+    def _on_hardware_search_failed(self, search_id):
+        """Finish the active search without terminating the app after a probe failure."""
+        if search_id != self.active_search_id:
+            return
+        self.all_results = []
+        self.has_more_pages = False
+        self.last_search_error = "Hardware detection unavailable. Retry the search."
+        self.on_search_completed(search_id)
 
     def on_search_completed(self, search_id: int) -> None:
         if search_id != self.active_search_id:

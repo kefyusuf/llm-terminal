@@ -4,6 +4,7 @@
 
 ### Reliability and provider correctness
 
+- Deferred TUI CPU/GPU discovery to a shared worker initialization, kept cached/cold headers responsive, and handled expected hardware failures without terminating searches or model-detail interactions.
 - Moved runtime TUI optional-provider discovery off the UI thread and preserved active selection without triggering searches when selector options refresh.
 - Made REST provider listing return cached/pending availability immediately with additive discovery freshness/error metadata, single-flight refresh and retry after failed probes.
 - Added canonical provider capabilities for Ollama, Hugging Face, LM Studio, Docker Model Runner, and MLX and moved pagination/download/search decisions away from UI heuristics.

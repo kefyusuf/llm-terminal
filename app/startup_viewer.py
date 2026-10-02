@@ -10,7 +10,6 @@ from textual.widgets import DataTable
 import config
 from app.widgets import SystemInfoWidget
 from core import cache_db
-from core.hardware import check_ollama_running
 from downloads.service_client import ensure_service_running, list_jobs
 from tui_app import AIModelViewer as BaseAIModelViewer
 
@@ -49,7 +48,9 @@ class AIModelViewer(BaseAIModelViewer):
         cached_specs = cache_db.get_hardware_snapshot()
         if cached_specs is not None:
             self.latest_specs = cached_specs
-            self.query_one(SystemInfoWidget).update_info(cached_specs, check_ollama_running())
+            self.query_one(SystemInfoWidget).update_info(cached_specs, None)
+        else:
+            self.query_one(SystemInfoWidget).update("Detecting hardware...")
 
         self.last_download_history_refresh_at = time.monotonic()
         self.update_status(

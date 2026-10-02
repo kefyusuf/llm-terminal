@@ -65,7 +65,7 @@ def test_ollama_search_returns_models_with_mocked_html(monkeypatch):
         def get(self, url, headers=None, timeout=0):
             return fake_get(url, headers=headers, timeout=timeout)
 
-    monkeypatch.setattr("core.http_client.get_session", lambda: FakeSession())
+    monkeypatch.setattr("providers.ollama_provider.get_session", lambda: FakeSession())
     monkeypatch.setattr("providers.ollama_provider.get_ollama_model_metadata", lambda _name: None)
 
     search_output = search_ollama_models(

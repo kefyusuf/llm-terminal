@@ -4,7 +4,7 @@
 
 The runtime TUI mounts with the canonical Ollama and Hugging Face options. It discovers optional providers in a Textual background worker after mount and refreshes every 30 seconds. Overlapping timer requests reuse the active probe. Options are applied on the UI thread while retaining the current selection, including a selected optional provider that subsequently becomes unavailable. Programmatic option updates do not dispatch a new search. Search failures continue to use the existing provider diagnostics.
 
-The base hardware monitor still initializes during viewer construction. This change removes synchronous provider-list probes from that path; it does not establish the complete first-frame hardware/startup budget in roadmap R1.
+The hardware monitor is initialized lazily by background workers, once per viewer. Runtime startup renders cached hardware immediately, or shows a detection placeholder on a cold start. Ollama process status is checked in the metrics worker, not during cached-header rendering. See [hardware startup](hardware-startup.md) for the shared initialization, failure/retry behavior and remaining startup-budget limits.
 
 REST `/api/v1/providers` owns an availability cache per server, separate from search/model caches. The first request schedules a daemon probe and immediately returns canonical provider descriptors and additive metadata:
 

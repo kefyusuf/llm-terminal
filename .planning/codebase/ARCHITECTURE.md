@@ -232,6 +232,8 @@ TUI action
 
 ## Cross-Cutting Rules
 
+The TUI owns a lazily initialized hardware monitor protected by a per-viewer lock. Metrics, search and model-detail workers reuse the completed monitor; UI-side cache lookup never triggers detection. Cached-header rendering leaves Ollama status pending until worker polling completes. Failed initialization remains retryable and expected search/detail probe failures are applied as UI diagnostics. See [hardware startup](../../docs/hardware-startup.md).
+
 Provider discovery has surface-specific scheduling. The runtime TUI starts with the canonical Ollama/Hugging Face selectors and probes optional providers in a guarded Textual thread worker after mount, refreshing every 30 seconds. REST owns one `providers.discovery.ProviderDiscovery` snapshot per server; handlers return pending/last-known values without waiting for network detection. Freshness, refresh-in-progress and sanitized refresh-error metadata are additive. The direct registry detection helpers remain synchronous for callers that explicitly request a completed probe. See [provider discovery](../../docs/provider-discovery.md).
 
 - Public behavior is shared conceptually, but TUI/CLI/REST are not forced through one abstraction when that would break surface-specific contracts.
