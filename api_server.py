@@ -34,6 +34,7 @@ from core.utils import (
 )
 from providers import detect_available_providers
 from providers.capabilities import get_all_provider_capabilities
+from providers.discovery import ProviderDiscovery
 from providers.hf_provider import search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
 
@@ -360,13 +361,14 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
 
     def _handle_providers(self):
         """Return provider availability plus global and REST-surface metadata."""
-        availability = detect_available_providers()
+        snapshot = self.server.provider_discovery.snapshot()
         api_bases = get_provider_api_bases()
-        providers = build_provider_descriptors(availability, api_bases)
+        providers = build_provider_descriptors(snapshot["availability"], api_bases)
         self._json_response(
             {
                 "providers": providers,
                 "models_endpoint_providers": list(get_rest_model_provider_slugs()),
+                "discovery": {key: value for key, value in snapshot.items() if key != "availability"},
             }
         )
 
@@ -398,6 +400,7 @@ def create_server(
     """Create and configure the API server with an injectable hardware monitor."""
     ModelAPIHandler.monitor = monitor if monitor is not None else HardwareMonitor()
     server = _LocalThreadingHTTPServer((host, port), ModelAPIHandler)
+    server.provider_discovery = ProviderDiscovery(lambda: detect_available_providers())
     return server
 
 

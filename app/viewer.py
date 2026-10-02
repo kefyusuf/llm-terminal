@@ -18,7 +18,7 @@ from downloads.download_history import cancel_model_payload, fallback_entry_from
 from downloads.download_lifecycle import reset_results_download_state
 from downloads.download_manager import download_target_id
 from downloads.download_status import is_active_state
-from providers import get_provider_filter_labels
+from providers import get_provider_display_names, get_provider_filter_labels
 from results.results_view import filter_results_for_view, result_unique_key
 from search.search_orchestration import build_query_key, cache_hit_suffix, provider_display_name
 
@@ -76,8 +76,9 @@ class AIModelViewer(BaseAIModelViewer):
     def __init__(self):
         """Snapshot selector choices for mouse and keyboard interaction."""
         super().__init__()
-        labels = tuple(get_provider_filter_labels())
-        self.provider_filter_labels = labels or ("Ollama",)
+        names = get_provider_display_names()
+        self.provider_filter_labels = (names["ollama"], names["huggingface"])
+        self._provider_filter_refresh_running = False
         self.use_case_filter_keys = tuple(key for key, _label in USE_CASE_OPTIONS)
         if self.current_filter not in self.provider_filter_labels:
             self.current_filter = self.provider_filter_labels[0]
@@ -113,6 +114,34 @@ class AIModelViewer(BaseAIModelViewer):
         use_case_selector.styles.height = 3
         await use_case_panel.mount(use_case_selector)
         self._hide_legacy_use_case_radios()
+        if not self._smoke_mode_enabled():
+            self.request_provider_filter_refresh()
+            self.set_interval(30, self.request_provider_filter_refresh)
+
+    def request_provider_filter_refresh(self) -> None:
+        """Start one background probe without delaying search input or selection."""
+        if self._provider_filter_refresh_running:
+            return
+        self._provider_filter_refresh_running = True
+        self._run_provider_filter_refresh_worker()
+
+    @work(thread=True)
+    def _run_provider_filter_refresh_worker(self) -> None:
+        labels = tuple(get_provider_filter_labels())
+        self.call_from_thread(self._apply_provider_filter_labels, labels)
+
+    def _apply_provider_filter_labels(self, labels: tuple[str, ...]) -> None:
+        """Update options on the UI thread, preserving the user's active selection."""
+        self._provider_filter_refresh_running = False
+        if self.current_filter not in labels:
+            labels = (*labels, self.current_filter)
+        if labels == self.provider_filter_labels:
+            return
+        selector = self.query_one("#provider-select", Select)
+        self.provider_filter_labels = labels
+        with selector.prevent(Select.Changed):
+            selector.set_options((label, label) for label in labels)
+            selector.value = self.current_filter
 
     def _hide_legacy_use_case_radios(self) -> None:
         """Keep the base RadioSet in the DOM for base layout code without rendering it."""

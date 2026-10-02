@@ -4,6 +4,8 @@
 
 ### Reliability and provider correctness
 
+- Moved runtime TUI optional-provider discovery off the UI thread and preserved active selection without triggering searches when selector options refresh.
+- Made REST provider listing return cached/pending availability immediately with additive discovery freshness/error metadata, single-flight refresh and retry after failed probes.
 - Added canonical provider capabilities for Ollama, Hugging Face, LM Studio, Docker Model Runner, and MLX and moved pagination/download/search decisions away from UI heuristics.
 - Added parallel multi-provider search orchestration with bounded workers, deterministic result grouping, cancellation polling, partial-result preservation, and provider-authoritative pagination.
 - Added structured provider diagnostics (`ProviderError`) alongside legacy human-readable errors and preserved them through search orchestration.
