@@ -28,6 +28,19 @@ The report uses nearest-rank p95 (`ceil(0.95 * n)`) and retains maximums and all
 
 Do not run resource-intensive tests or other benchmarks alongside the measurement if comparing baselines. Optional runtime presence, machine load, filesystem cache and download-service reuse affect results and must be recorded. Cold application state does not mean cold OS filesystem cache. Host-specific p95 targets are not global product SLAs.
 
-## Evidence Scope
+## Recorded Windows Baseline
 
-Windows absence-case results will be recorded with a named-machine baseline and raw sanitized JSON. This does not validate an available optional-runtime scenario, Linux/macOS terminal paint budgets, or the full release roadmap. Preserve previous before/after request evidence in `provider-discovery.md` and the single-session hardware probe in `hardware-startup.md`.
+Machine: `windows-native-ryzen7500f-rtx4060ti`; Windows 11 build 26300, Python 3.12.14, Ryzen 5 7500F and RTX 4060 Ti. Both series measured source `79d8920344b3ce3c87d2278ad6120473b57f01bd`. The application code is the startup implementation from PR #120; the later evidence commit changes only documentation/data. No test suite or other benchmark ran concurrently.
+
+Completed detection before the default series reported LM Studio reachable (HTTP 200), with Ollama/Docker/MLX unavailable. In the second series, `LMSTUDIO_HOST` was directed to unreachable loopback port 65534 only in the measurement process; completed detection reported all four local providers unavailable. Other configuration was unchanged. Hugging Face remained the integrated remote source; this does not prove remote connectivity. Standard download-service state was reused rather than reset.
+
+| Scenario (20 successful repetitions each) | Startup p95 / max | Input p95 / max | REST p95 / max |
+| --- | --- | --- | --- |
+| Default endpoints; LM Studio reachable | 1,601.566 / 2,953.136 ms | 4.633 / 4.750 ms | 30.854 / 41.589 ms |
+| Configured local providers unavailable | 1,369.046 / 1,386.864 ms | 4.057 / 4.254 ms | 28.256 / 34.907 ms |
+
+Both series pass all three provisional p95 targets. All 40 inputs were handled while TUI discovery was active and all first REST snapshots were pending. The slowest default-series startup is 2.95 seconds, above the individual 2-second mark; p95 is the agreed target, not a guarantee for every repetition. No cause is established for this outlier.
+
+Raw distributions and discovery metadata: [default endpoints](evidence/startup-windows-2026-10-02.json), [configured unavailability](evidence/startup-windows-unavailable-2026-10-02.json).
+
+This establishes the named-machine Windows headless measurement gate for R1. It does not establish Linux/macOS terminal paint budgets, loaded-model/inference/version support, probe completion time, shutdown/recovery semantics or readiness for public release. No model was queried or downloaded. Previous before/after request evidence remains in `provider-discovery.md`; the single-session hardware probe remains in `hardware-startup.md`.
