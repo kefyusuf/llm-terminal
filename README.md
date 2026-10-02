@@ -275,10 +275,13 @@ The active post-hardening roadmap is in `.planning/roadmap.md`.
 
 Current priorities:
 
-1. Ollama registry parser resilience and structured-source research,
-2. safer incremental TUI DataTable updates,
-3. explicit WSL, real-provider and Apple Silicon/MLX acceptance beyond the basic hosted macOS lane,
-4. targeted tests for consequential weak modules as concrete changes require them.
+1. Transparent recommendation estimates, bounded startup/provider detection and clean package installation outside the checkout,
+2. exact model-artifact provenance and real download/cancellation/recovery acceptance,
+3. an evidence-based platform/provider support matrix,
+4. a tested package release, pilot and upgrade/recovery process,
+5. metadata-aware calibration, scriptable output and measured TUI performance improvements.
+
+The [industry comparison and release assessment](docs/industry-readiness.md) explains the rationale and proposed release gates. These are planned milestones, not claims that public-release readiness has already been achieved.
 
 Documentation maintenance rules are in `docs/maintenance.md`.
 
