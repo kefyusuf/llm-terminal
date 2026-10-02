@@ -16,6 +16,8 @@ The regression suite exercises mounted cold/cached input, a submitted search whi
 
 TDD reproduced UI-thread construction, an incorrect stopped Ollama label before a completed check, duplicate concurrent monitors, missing failure feedback, and Textual worker termination on expected hardware failure before the corresponding fixes.
 
+The mounted-search regression also covers a debounce delay longer than a single pilot pause. It waits for observable search-start and completion state with bounded deadlines and releases the blocked probe before teardown. This replaces the fixed-duration assumption that failed on Windows hosted runners; all behavioral assertions remain in place.
+
 The full suite also exposed `test_ollama_search_returns_models_with_mocked_html` patching the HTTP factory in its defining module instead of the provider's imported binding. Its corrected patch now uses the intended fake HTML without reaching the real registry.
 
 A local Windows cold-cache probe used the real runtime viewer, CPU/GPU detection, provider discovery and download-service lifecycle without requesting model weights. Construction took 0.0104 seconds and entry into the mounted headless Textual session took 0.2824 seconds. Search input accepted text, and the background snapshot identified the Ryzen 5 7500F and RTX 4060 Ti. These are one-machine headless measurements, not terminal paint timings or cross-platform guarantees.

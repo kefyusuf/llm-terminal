@@ -51,7 +51,7 @@ def test_hardware_probe_leaves_mounted_input_and_cached_header_usable(monkeypatc
         def __init__(self):
             assert threading.get_ident() != ui_thread, "hardware constructed on UI thread"
             entered.set()
-            release.wait(5)
+            release.wait(10)
 
         def get_specs(self):
             return SPECS.copy()
@@ -65,6 +65,8 @@ def test_hardware_probe_leaves_mounted_input_and_cached_header_usable(monkeypatc
 
     async def run():
         app = AIModelViewer()
+        # Exercise a scheduled search that outlives a single pilot pause.
+        app._search_debounce_delay = 0.5
 
         def search(query, specs, **kwargs):
             searches.append((query, specs.copy()))
@@ -72,45 +74,52 @@ def test_hardware_probe_leaves_mounted_input_and_cached_header_usable(monkeypatc
 
         monkeypatch.setattr(app.hf_provider, "search", search)
         async with app.run_test(size=(120, 40)) as pilot:
-            for _ in range(40):
-                if entered.is_set():
-                    break
-                await asyncio.sleep(0.01)
-            assert entered.is_set()
-            header = app.query_one(SystemInfoWidget)
-            if cached:
-                assert "Cached CPU" in str(header.render())
-                assert "checking" in str(header.render())
-                assert app._current_specs_for_search_ui()["cpu_name"] == "Cached CPU"
-            else:
-                assert "Detecting hardware" in str(header.render())
-                assert app._current_specs_for_search_ui()["cpu_name"] == "Detecting hardware"
-            search_input = app.query_one("#search-input", Input)
-            search_input.focus()
-            await pilot.press("x")
-            assert search_input.value == "x"
-            app.query_one("#provider-select", Select).value = "Hugging Face"
-            await pilot.pause()
-            await pilot.press("enter")
-            await pilot.pause(0.2)
-            assert app.search_counter == 1
-            assert app.query_one("#results-table", DataTable).loading
-            release.set()
-            for _ in range(80):
-                if (
-                    app.latest_specs == SPECS
-                    and app.ollama_running
-                    and searches
-                    and not app.query_one("#results-table", DataTable).loading
-                ):
-                    break
-                await asyncio.sleep(0.025)
-            assert app.latest_specs == SPECS
-            assert app.ollama_running is True
-            assert searches == [("x", SPECS)]
-            await pilot.pause()
-            assert not app.query_one("#results-table", DataTable).loading
-            assert "Detected GPU" in str(header.render())
+            try:
+                for _ in range(40):
+                    if entered.is_set():
+                        break
+                    await asyncio.sleep(0.01)
+                assert entered.is_set()
+                header = app.query_one(SystemInfoWidget)
+                if cached:
+                    assert "Cached CPU" in str(header.render())
+                    assert "checking" in str(header.render())
+                    assert app._current_specs_for_search_ui()["cpu_name"] == "Cached CPU"
+                else:
+                    assert "Detecting hardware" in str(header.render())
+                    assert app._current_specs_for_search_ui()["cpu_name"] == "Detecting hardware"
+                search_input = app.query_one("#search-input", Input)
+                search_input.focus()
+                await pilot.press("x")
+                assert search_input.value == "x"
+                app.query_one("#provider-select", Select).value = "Hugging Face"
+                await pilot.pause()
+                await pilot.press("enter")
+                for _ in range(120):
+                    if app.search_counter == 1:
+                        break
+                    await asyncio.sleep(0.025)
+                assert app.search_counter == 1
+                assert app.query_one("#results-table", DataTable).loading
+                release.set()
+                for _ in range(120):
+                    if (
+                        app.latest_specs == SPECS
+                        and app.ollama_running
+                        and searches
+                        and not app.query_one("#results-table", DataTable).loading
+                    ):
+                        break
+                    await asyncio.sleep(0.025)
+                assert app.latest_specs == SPECS
+                assert app.ollama_running is True
+                assert searches == [("x", SPECS)]
+                assert not app.query_one("#results-table", DataTable).loading
+                assert "Detected GPU" in str(header.render())
+            finally:
+                release.set()
+                if app._search_debounce_timer is not None:
+                    app._search_debounce_timer.stop()
 
     try:
         asyncio.run(run())
