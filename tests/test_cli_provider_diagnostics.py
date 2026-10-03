@@ -65,20 +65,22 @@ def test_search_success_emits_no_provider_warning(monkeypatch, capsys):
     assert captured.err == ""
 
 
-def test_search_surfaces_selected_provider_error_and_keeps_partial_results(
-    monkeypatch, capsys
-):
+def test_search_surfaces_selected_provider_error_and_keeps_partial_results(monkeypatch, capsys):
     """Search should warn on stderr without discarding partial provider results."""
     _patch_common(monkeypatch)
 
     def ollama_search(*_args, **_kwargs):
-        return [
-            {
-                "name": "local-model",
-                "source": "Ollama",
-                "score_composite": 50,
-            }
-        ], ["Ollama registry timeout"], False
+        return (
+            [
+                {
+                    "name": "local-model",
+                    "source": "Ollama",
+                    "score_composite": 50,
+                }
+            ],
+            ["Ollama registry timeout"],
+            False,
+        )
 
     def unexpected_hf(*_args, **_kwargs):
         raise AssertionError("Hugging Face should not run for provider=ollama")
@@ -139,6 +141,7 @@ def test_recommend_json_keeps_stdout_valid_and_warnings_on_stderr(monkeypatch, c
                     "score_fit": 80,
                     "score_context": 50,
                     "score_composite": 65,
+                    "score_provenance": {"kind": "heuristic", "measured": False},
                 }
             ],
             ["Hugging Face request degraded"],
@@ -150,7 +153,47 @@ def test_recommend_json_keeps_stdout_valid_and_warnings_on_stderr(monkeypatch, c
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
     assert [model["name"] for model in payload] == ["hf-model"]
+    assert payload[0]["score_provenance"]["measured"] is False
     assert captured.err.splitlines() == [
         "Warning: Ollama transport failed",
         "Warning: Hugging Face request degraded",
     ]
+
+
+def test_scores_explains_estimates_and_bandwidth_defaults(monkeypatch, capsys):
+    _patch_common(monkeypatch)
+    cli_module.scores.callback("llama-3-8b")
+    output = capsys.readouterr().out
+    assert "Heuristic estimates" in output
+    assert "not task benchmark results" in output
+    assert "not a context-window measurement" in output
+    assert "backend_default" in output
+
+
+def test_recommend_json_remains_valid_at_narrow_terminal_width(monkeypatch):
+    from click.testing import CliRunner
+    from rich.console import Console
+
+    from core.scoring import enrich_result_with_scores
+
+    _patch_common(monkeypatch)
+    monkeypatch.setattr(cli_module, "console", Console(width=30, color_system=None))
+    monkeypatch.setattr(
+        ollama_provider, "search_ollama_models", lambda *args, **kwargs: ([], [], False)
+    )
+    row = enrich_result_with_scores(
+        {
+            "name": "example",
+            "params": "8B",
+            "quant": "Q4_K_M",
+            "size": "4.8 GB",
+            "mode": "GPU",
+            "use_case_key": "general",
+        },
+        {},
+    )
+    monkeypatch.setattr(cli_module, "_search_hf_models", lambda *args, **kwargs: ([row], []))
+    result = CliRunner().invoke(cli_module.cli, ["recommend", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload[0]["score_provenance"]["context"]["basis"] == "model_size_proxy"

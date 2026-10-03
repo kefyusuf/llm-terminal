@@ -104,6 +104,8 @@ CLI search/fit/recommend provider failures are printed to **stderr**. `recommend
 
 Run `ai-model-explorer-cli doctor --json` for shareable storage, runtime and TLS diagnostics, or add `--offline` to skip network probes. The default total network wait budget is three seconds. See [doctor diagnostics](docs/doctor.md) for exit codes, privacy and troubleshooting.
 
+Model quality, throughput, fit and context scores are heuristic estimates. CLI `scores`, TUI comparison and additive REST/recommendation JSON provenance explain their inputs and defaults. The context score is a model-size proxy, not supported token capacity. See [score estimates](docs/score-estimates.md).
+
 ### Theming
 
 - default

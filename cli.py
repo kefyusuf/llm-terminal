@@ -296,11 +296,12 @@ def recommend(limit, use_case, output_json):
                         "context": r.get("score_context", 0),
                         "composite": r.get("score_composite", 0),
                     },
+                    "score_provenance": r.get("score_provenance"),
                 }
             )
-        console.print(json_mod.dumps(data, indent=2))
+        click.echo(json_mod.dumps(data, indent=2))
     else:
-        table = Table(title=f"Top {use_case.title()} Recommendations")
+        table = Table(title=f"Top {use_case.title()} Recommendations (heuristic estimates)")
         table.add_column("#", style="dim")
         table.add_column("Model", style="bold")
         table.add_column("Source")
@@ -387,6 +388,7 @@ def scores(model_name):
     )
 
     console.print(f"\n[bold cyan]Scores for {model_name}[/bold cyan]\n")
+    console.print("Heuristic estimates; no runtime benchmark was performed.")
     console.print(f"  Params:    {params}")
     console.print(f"  Quant:     {quant}")
     console.print(f"  Size:      ~{size_gb:.1f} GB")
@@ -403,6 +405,10 @@ def scores(model_name):
     console.print(
         f"  Composite: [bold green]{result.composite}[/bold green]/100 ({use_case_key} weights)"
     )
+    for dimension in ("quality", "speed", "fit", "context"):
+        console.print(f"  {dimension.title()}: {result.provenance[dimension]['limitation']}")
+    speed_basis = result.provenance["speed"]
+    console.print(f"  Bandwidth assumption: {speed_basis['bandwidth_gb_s']} GB/s ({speed_basis['bandwidth_source']})")
     console.print()
 
 

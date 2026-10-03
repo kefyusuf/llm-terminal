@@ -276,6 +276,7 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
                         "composite": r.get("score_composite", 0),
                         "estimated_tok_s": r.get("estimated_tok_s", 0),
                     },
+                    "score_provenance": r.get("score_provenance"),
                     "moe": {
                         "is_moe": r.get("is_moe", False),
                         "total_experts": r.get("total_experts", 0),
@@ -353,6 +354,7 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
                     "estimated_tok_s": scores.estimated_tok_s,
                 },
                 "size_gb": size_gb,
+                "score_provenance": {**scores.provenance, "size_source": "model_name_estimate"},
                 "params": params_str,
                 "quant": quant,
                 "use_case": use_case_key,

@@ -507,6 +507,11 @@ class ComparisonModal(ModalScreen):
                 f"[bold #63b3ed]Model Comparison ({len(self.models)} models)[/bold #63b3ed]",
                 id="comparison-title",
             )
+            yield Label(
+                "Heuristic estimates: quality uses parameter/quantization proxies; speed is unmeasured. "
+                "Fit uses total memory without KV/runtime overhead. Context is a size proxy, not measured context capacity.",
+                id="comparison-estimates",
+            )
 
             with Vertical(id="comparison-scrollable"):
                 names = " | ".join(m.get("name", "-")[:18] for m in self.models)
@@ -526,6 +531,7 @@ class ComparisonModal(ModalScreen):
                     ("Fit Score", lambda m: str(m.get("score_fit", "-"))),
                     ("Context", lambda m: str(m.get("score_context", "-"))),
                     ("Composite", lambda m: str(m.get("score_composite", "-"))),
+                    ("Speed basis", lambda m: (m.get("score_provenance") or {}).get("speed", {}).get("bandwidth_source", "Unknown")),
                     (
                         "Est. tok/s",
                         lambda m: (

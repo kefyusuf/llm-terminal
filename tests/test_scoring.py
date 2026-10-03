@@ -249,8 +249,8 @@ class TestScoreModel:
 
 
 class TestContextScore:
-    def test_larger_models_get_higher_context_score(self):
-        """Larger models typically support larger context windows."""
+    def test_larger_sizes_keep_legacy_context_ranking(self):
+        """Preserve size-based scores without claiming context-window capacity."""
         small = score_model(
             model_name="phi-2",
             size_gb=1.5,

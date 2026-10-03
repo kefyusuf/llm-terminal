@@ -33,6 +33,7 @@ def api_server():
             "score_context": 55,
             "score_composite": 67,
             "estimated_tok_s": 42.0,
+            "score_provenance": {"schema_version": 1, "kind": "heuristic", "measured": False},
             "is_moe": False,
             "total_experts": 0,
             "active_experts": 0,
@@ -158,6 +159,13 @@ class TestModelsEndpoint:
             assert "quality" in model["scores"]
             assert "composite" in model["scores"]
 
+    def test_models_preserve_provenance_and_missing_legacy_metadata(self, api_server):
+        _, port = api_server
+        data = _get("/api/v1/models?provider=all", port)
+        by_source = {model["source"]: model for model in data["models"]}
+        assert by_source["Ollama"]["score_provenance"]["measured"] is False
+        assert by_source["Hugging Face"]["score_provenance"] is None
+
     @pytest.mark.parametrize("provider", ["unknown", "docker", "mlx"])
     def test_models_reject_unknown_provider(self, api_server, provider):
         _, port = api_server
@@ -201,6 +209,8 @@ class TestScoresEndpoint:
         assert "scores" in data
         scores = data["scores"]
         assert all(k in scores for k in ["quality", "speed", "fit", "context", "composite"])
+        assert data["score_provenance"]["context"]["basis"] == "model_size_proxy"
+        assert data["score_provenance"]["size_source"] == "model_name_estimate"
 
 
 class TestProvidersEndpoint:

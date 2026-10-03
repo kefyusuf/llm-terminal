@@ -23,6 +23,7 @@
 
 ### REST and CLI contracts
 
+- Exposed additive heuristic score provenance in REST/CLI JSON and estimate explanations in CLI scores and TUI comparison, preserving numeric scoring and legacy rows without metadata.
 - Added explicit `doctor` diagnostics with a shared network deadline, offline mode, shareable JSON, storage/CA checks and actionable runtime/TLS failures without exporting private configuration.
 - REST `/api/v1/models` now preserves provider `errors` and additive `structured_errors`, allowing partial models and diagnostics to coexist without changing the existing HTTP-200 partial-success contract.
 - REST model/provider/limit/context/sort validation now returns bounded 400 responses for invalid inputs rather than relying on generic 500 handling.
