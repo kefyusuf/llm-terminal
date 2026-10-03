@@ -438,6 +438,39 @@ def cache_stats():
 
 
 @cli.command()
+@click.option("--offline", is_flag=True, help="Check local configuration without network access.")
+@click.option("--json", "json_output", is_flag=True, help="Emit shareable JSON diagnostics.")
+@click.option(
+    "--timeout",
+    type=click.FloatRange(min=0, max=30, min_open=True),
+    default=3.0,
+    show_default=True,
+    help="Total network wait budget in seconds.",
+)
+def doctor(offline: bool, json_output: bool, timeout: float):
+    """Diagnose storage, runtime reachability, and TLS without exposing private configuration."""
+    import json
+
+    from core.diagnostics import collect_diagnostics
+
+    report = collect_diagnostics(config.settings, offline=offline, timeout=timeout)
+    report["app_version"] = get_version()
+    if json_output:
+        click.echo(json.dumps(report, indent=2))
+    else:
+        click.echo(f"AI Model Explorer {get_version()} diagnostics: {report['status']}")
+        for item in report["checks"]:
+            details = f" (version {item['version']})" if "version" in item else ""
+            if "free_bytes" in item:
+                details += f" ({item['free_bytes'] / 1024**3:.1f} GiB free)"
+            click.echo(f"{item['name']}: {item['status']} / {item['code']}{details}")
+            if item["action"]:
+                click.echo(f"  {item['action']}")
+    if report["status"] == "error":
+        raise click.exceptions.Exit(1)
+
+
+@cli.command()
 def version():
     """Show version information."""
     console.print(f"AI Model Explorer v{get_version()}")

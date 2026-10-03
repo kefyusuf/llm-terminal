@@ -102,6 +102,8 @@ Rich terminal commands for system information, search, fit analysis, recommendat
 
 CLI search/fit/recommend provider failures are printed to **stderr**. `recommend --json` keeps stdout as valid JSON for scripting.
 
+Run `ai-model-explorer-cli doctor --json` for shareable storage, runtime and TLS diagnostics, or add `--offline` to skip network probes. The default total network wait budget is three seconds. See [doctor diagnostics](docs/doctor.md) for exit codes, privacy and troubleshooting.
+
 ### Theming
 
 - default
