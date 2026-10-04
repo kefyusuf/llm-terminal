@@ -1,26 +1,30 @@
 # Verified continuation record
 
-Date: 2026-10-04. Repository: `kefyusuf/llm-terminal`.
+Date: 2026-10-05. Repository: `kefyusuf/llm-terminal`.
 
 ## Source and delivery state
 
-Runtime/CI baseline: `6bab5a6488749e97ef6f7679fa280e5335c3ad84`, branch
-`ci/opt-in-hf-recovery`, PR #140. Full local verification passed 897 tests,
-import smoke and Ruff before the final slow-response regression; the final
-23-test calibration suite passed. Exact source, with 898 collected tests, passed
-[CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37232844033)
-and [Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37232846239),
+Runtime/CI baseline: `7df9ce6015b390c464cf5e9490fae8cf25f65f9a`, branch
+`fix/calibration-elapsed-clock`, PR #142. All 898 full local tests passed with
+import smoke and Ruff; the staged 39-file type gate and CLI/TUI/API/service
+smoke also passed. Exact runtime source passed
+[CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37234532538)
+and [Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37234535094),
 including one candidate producer and 18 consumers of the same distributions.
 These results must be refreshed for changed source; they do not imply a merge
-or publication. The subsequent documentation scope records these exact inputs.
+or publication. The final continuation-only commit records these exact runtime
+inputs; its own commit identity must be read from Git/PR and its applicable
+verification checked separately. Do not substitute this runtime baseline for
+a differently versioned or integrated release candidate.
 Get its current SHA from Git rather than this file.
 
-The subsequent full local run exposed a calibration timing bug on native
+The final full local run exposed a calibration timing bug on native
 Windows Python 3.12.14: fast responses can share a 15.625 ms monotonic tick.
-The `fix/calibration-elapsed-clock` branch uses a high-resolution elapsed counter
-while retaining deadline clocks and all validation. Its deterministic regression
-failed before the fix and the 23-test focused suite passed after it. Require
-fresh full local and exact-source CI/package results for this correction.
+The correction uses a high-resolution elapsed counter while retaining deadline
+clocks and all validation. Its deterministic regression failed before the fix;
+the 23-test focused suite, full 898-test run and exact-source CI/package gates
+passed after it. These are simulated protocol/fixture measurements, not a
+genuine inference corpus.
 
 The implementation chain remains open: #119 provider discovery, #120 hardware
 startup, #121 startup measurement, #122 doctor, #123 score provenance, #124
@@ -29,8 +33,9 @@ artifact metadata, #128 download plans, #129 process/partial recovery, #130 owne
 removal and service shutdown, #131 build-once candidate, #132 support/release
 evidence, #133 versioned exports, #134 measured table updates, #135 HF detail
 request contract, #136 child lifetime, #137 SQLite data compatibility, #138
-declared memory scenarios, #139 bounded calibration and #140 opt-in live HF CI.
-The current documentation branch adds qualified candidate restore evidence.
+declared memory scenarios, #139 bounded calibration, #140 opt-in live HF CI,
+#141 qualified candidate restore/documentation and #142 Windows elapsed-clock
+correction. The continuation-only commit belongs to the last branch.
 Each later PR targets
 the previous feature branch; merge/rebase requires source and CI reconciliation.
 Main was freshly read as `32fe324b97294d32b73795b06a12158e85abe283`.
