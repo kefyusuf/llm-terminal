@@ -131,7 +131,9 @@ def rehearse(args):
         env.pop("PYTHONPATH", None)
         env.update(AIMODEL_CACHE_DB_PATH=str(root / (label + "-cache.db")),
                    AIMODEL_DOWNLOAD_DB_PATH=str(copied), AIMODEL_HF_MODELS_DIR=str(root / (label + "-models")))
-        executable = Path(getattr(args, label + "_python")).resolve()
+        # Preserve POSIX venv/bin/python symlinks: resolving them selects the
+        # base interpreter and loses the candidate environment under -I.
+        executable = Path(getattr(args, label + "_python")).absolute()
         result = subprocess.run([str(executable), "-I", "-c", PROBE, str(copied)],
                                 cwd=root, env=env, capture_output=True, text=True, timeout=30, check=True)
         probes[label] = json.loads(result.stdout)

@@ -16,6 +16,13 @@ file can safely clear the remaining record.
 
 The TUI's HF action is labeled **Delete File**. Cancellation must be confirmed
 before requesting data removal; a pending/uncertain cancellation preserves data.
+
+Queued cancellation and worker claim are serialized by the store. Cancellation
+can terminalize an unclaimed queued job immediately; a claimed running job stays
+active even before its child process is registered. Only the worker can acknowledge
+that cancellation as terminal. Both HF and streamed workers check cancellation
+before launch and treat a missing record as cancelled. Deletion/requeue therefore
+cannot race an unregistered claimed worker into an invisible new download.
 Old services cannot silently ignore the new flag: the client requires protocol
 2.1, preserving the existing protection against upgrading an active service.
 Ollama's explicit removal still goes through its CLI and has separate runtime

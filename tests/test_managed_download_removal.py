@@ -120,8 +120,8 @@ def test_claimed_cancel_before_process_registration_remains_active(tmp_path, mon
     from urllib.request import Request, urlopen
 
     import config
-    from downloads.api import _make_handler
     from downloads import runner
+    from downloads.api import _make_handler
 
     root = tmp_path / "models"
     monkeypatch.setattr(config.settings, "hf_models_dir", root)

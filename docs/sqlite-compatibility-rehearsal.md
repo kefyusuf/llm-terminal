@@ -15,3 +15,10 @@ The report retains only aggregate counts, integrity results and hashes of canoni
 The [Windows trial](evidence/sqlite-candidate-compatibility-windows-2026-10-04.json) restored one real completed HF job from the forced-service-stop/retry trial. Exact build-once wheels for `cf0ca4d` and `5d65b5f` were downloaded from their green Package runs and installed into separate Python 3.12.14 environments; both passed dependency checks. Store integrity, record count and canonical contract matched, and the immutable backup was unchanged. Both distributions are development version 1.0.1; their wheel hashes differ and are individually checked. Ordinary tests additionally cover committed WAL content, active-job refusal, existing-destination preservation and malformed/mismatched receipts/contracts.
 
 This is previous-candidate data-read compatibility only. The older candidate lacks the new child-lifetime guard and must not resume active acquisitions in shared destinations. No production downgrade, file restore, old-worker execution, host/power-loss recovery, release withdrawal or publication was performed. Requalify every actual rollback target and its runtime behavior before enabling workers.
+
+Interpreter launch preserves the supplied absolute venv path without resolving
+its executable symlink. Resolving POSIX `venv/bin/python` would select the base
+interpreter under `-I`. A real POSIX venv identity regression covers this boundary;
+it substitutes only the contract probe and does not represent a Linux candidate
+data-restore trial. The separate [installed-worker/file rehearsal](qualified-candidate-restore.md)
+extends the actual Windows restore evidence with a qualified previous worker.

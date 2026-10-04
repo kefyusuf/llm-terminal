@@ -53,6 +53,7 @@
 
 ### Download service and local security boundary
 
+- Serialized queued cancellation against worker claim and kept claimed jobs active until worker acknowledgement, preventing cancellation/deletion from orphaning an unregistered download; both worker types check cancellation before launch.
 - Added service-owned terminal HF selected-file removal with shared/cache preservation, protocol 2.1 gating and confirmed cancellation; fixed module-launched API/worker state separation and propagated graceful shutdown to active children.
 - Refactored download service responsibilities across API, store, runner, service client, and lifecycle/state helpers.
 - Added bounded parallel download workers controlled by `AIMODEL_DOWNLOAD_MAX_WORKERS` (default `2`).
