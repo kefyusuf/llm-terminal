@@ -16,4 +16,11 @@ Reports retain CPU/GPU/RAM observations, runtime/version, selected model name/di
 
 Prediction uses the existing bandwidth heuristic with runtime disk size as an explicitly labeled proxy and a fit-derived, estimated mode. Actual offload/allocation is not measured. Signed error on median generation throughput is `(prediction - observed median) / observed median * 100`; positive means overprediction. A sequential workload and a few repetitions do not establish general model-quality ranking, concurrency scaling or universal accuracy. No scoring coefficient is changed.
 
+HTTP sample duration uses `time.perf_counter()` independently from the monotonic
+deadline clock. The native Windows Python 3.12.14 runtime reported a 15.625 ms
+`GetTickCount64` resolution for `monotonic`, which can return identical ticks
+around a fast local response; its `QueryPerformanceCounter` resolution was
+100 ns. A deterministic coarse-clock regression verifies that this does not
+invalidate a successful sample or bypass the subsequent identity check.
+
 The schema-1 report's `model_facts` can feed [saved-facts memory scenarios](metadata-memory-scenarios.md). Archive actual reports by hardware/runtime/model digest and workload before evaluating prediction errors across a real corpus. CI tests use simulated metrics and a real local HTTP fixture to verify request/JSON/deadline boundaries; they are not inference measurements. No genuine Ollama benchmark has been collected on the current host because a prepared runtime/model is unavailable.

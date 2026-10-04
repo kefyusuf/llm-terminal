@@ -91,8 +91,10 @@ def test_protocol_uses_exact_installed_model_and_preserves_identity(monkeypatch,
         raise AssertionError("unexpected API operation")
 
     monkeypatch.setattr(calibration, "request_json", request)
-    ticks = iter(range(1000))
-    monkeypatch.setattr(calibration.time, "monotonic", lambda: next(ticks) * .01)
+    # A Windows monotonic clock can have identical ticks around a fast response.
+    monkeypatch.setattr(calibration.time, "monotonic", lambda: 100)
+    elapsed_ticks = iter(range(1000))
+    monkeypatch.setattr(calibration.time, "perf_counter", lambda: next(elapsed_ticks) * .005)
     monkeypatch.setattr(calibration, "hardware_specs", lambda: {"cpu_name": "fixture", "cpu_cores": 1,
                        "ram_total": 8, "ram_free": 8, "gpu_name": "fixture", "has_gpu": False,
                        "vram_free": 0, "vram_total": 0, "gpu_vendor": "none", "backend": "cpu"})
@@ -106,6 +108,7 @@ def test_protocol_uses_exact_installed_model_and_preserves_identity(monkeypatch,
     assert report["kind"] == "runtime_calibration"
     assert report["model_facts"]["model_digest"] == "a" * 64
     assert len(report["samples"]) == 2
+    assert all(sample["wall_seconds"] == pytest.approx(.005) for sample in report["samples"])
     assert len([path for path, _ in calls if path == "/api/generate"]) == 3  # warmup + samples
     assert all(body["stream"] is False and body["options"]["num_predict"] == 8
                for path, body in calls if path == "/api/generate")

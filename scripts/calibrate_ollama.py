@@ -179,11 +179,11 @@ def run_trial(args):
     samples = []
     warmup = None
     for index in range(args.repetitions + 1):
-        start = time.monotonic()
+        start = time.perf_counter()
         response = request("/api/generate", payload)
         if response.get("model") != args.model:
             raise CalibrationError("runtime generation model identity changed")
-        sample = sample_metrics(response, wall_seconds=time.monotonic() - start, max_tokens=args.tokens)
+        sample = sample_metrics(response, wall_seconds=time.perf_counter() - start, max_tokens=args.tokens)
         if index == 0:
             warmup = sample
         else:

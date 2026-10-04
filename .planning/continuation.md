@@ -15,6 +15,13 @@ These results must be refreshed for changed source; they do not imply a merge
 or publication. The subsequent documentation scope records these exact inputs.
 Get its current SHA from Git rather than this file.
 
+The subsequent full local run exposed a calibration timing bug on native
+Windows Python 3.12.14: fast responses can share a 15.625 ms monotonic tick.
+The `fix/calibration-elapsed-clock` branch uses a high-resolution elapsed counter
+while retaining deadline clocks and all validation. Its deterministic regression
+failed before the fix and the 23-test focused suite passed after it. Require
+fresh full local and exact-source CI/package results for this correction.
+
 The implementation chain remains open: #119 provider discovery, #120 hardware
 startup, #121 startup measurement, #122 doctor, #123 score provenance, #124
 isolated package verification, #125 revision pinning, #126 path preflight, #127

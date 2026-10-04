@@ -4,6 +4,7 @@
 
 ### Reliability and provider correctness
 
+- Measured calibration HTTP elapsed time with a high-resolution counter so fast local responses do not fail on coarse Windows monotonic clock ticks; retained independent deadlines and token/identity validation.
 - Added a bounded, opt-in local Ollama calibration tool with exact installed identity, cloud-disabled checks, excluded warmup, separate timing metrics and prediction-error reports; genuine inference evidence remains pending and existing scoring is unchanged.
 - Added saved-runtime metadata memory scenarios with explicit context, concurrency, weight split, cache placement and provenance; retained existing scores and rejected unsupported cache layouts without fabricated estimates.
 - Bound service-owned HF children to the parent pipe lifetime, tested normal interpreter shutdown and forced parent death, and verified a Windows partial-download crash/restart/retry with exact byte/digest completion.
