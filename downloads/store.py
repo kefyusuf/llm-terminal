@@ -317,7 +317,12 @@ class DownloadStore:
         now = time.time()
         with self.lock, self._connect() as conn:
             conn.execute(
-                "UPDATE jobs SET cancel_requested = 1, updated_at = ? WHERE target_id = ?",
+                """UPDATE jobs SET cancel_requested = 1, updated_at = ?,
+                    status = CASE WHEN status = 'queued' THEN 'cancelled' ELSE status END,
+                    detail = CASE WHEN status = 'queued' THEN 'Canceled'
+                                  WHEN status = 'running' THEN 'Cancel requested' ELSE detail END,
+                    progress = CASE WHEN status = 'queued' THEN '' ELSE progress END
+                    WHERE target_id = ?""",
                 (now, target_id),
             )
             row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()

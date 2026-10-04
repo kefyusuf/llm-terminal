@@ -172,17 +172,6 @@ def _make_handler(state, auth_token: str | None = None):
                 elif process is not None:
                     process = None
 
-                if job.get("status") in {"queued", "running"} and process is None:
-                    job = state.store.update_job(
-                        target_id, status="cancelled", detail="Canceled", progress=""
-                    )
-                elif job.get("status") == "running":
-                    job = state.store.update_job(
-                        target_id,
-                        status="running",
-                        detail="Cancel requested",
-                    )
-
                 self._json_response(200, {"job": job})
                 return
 

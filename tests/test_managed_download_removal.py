@@ -112,6 +112,77 @@ def test_legacy_service_cannot_silently_ignore_data_removal(monkeypatch):
     assert not sent
 
 
+@pytest.mark.parametrize("worker", ["hf", "streamed"])
+def test_claimed_cancel_before_process_registration_remains_active(tmp_path, monkeypatch, worker):
+    import json
+    from http.server import ThreadingHTTPServer
+    from urllib.error import HTTPError
+    from urllib.request import Request, urlopen
+
+    import config
+    from downloads.api import _make_handler
+    from downloads import runner
+
+    root = tmp_path / "models"
+    monkeypatch.setattr(config.settings, "hf_models_dir", root)
+    store = DownloadStore(tmp_path / "jobs.db")
+    job = queued(store, root)
+    command = store.get_command(job["target_id"])
+    assert store.claim_next_queued()["status"] == "running"
+    selected = Path(job["download_plan"]["destination"])
+    selected.parent.mkdir(parents=True)
+    selected.write_bytes(b"0123456789")
+    state = SimpleNamespace(store=store, get_process=lambda *_: None,
+                            set_process=lambda *_: None, clear_process=lambda *_: None,
+                            stop_event=threading.Event())
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(state, auth_token="test-only"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    def post(path, data):
+        request = Request(f"http://127.0.0.1:{server.server_port}{path}",
+                          data=json.dumps(data).encode(),
+                          headers={"Authorization": "Bearer test-only"})
+        with urlopen(request, timeout=3) as response:
+            return json.load(response)
+
+    launched = []
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **kw: launched.append(a))
+    try:
+        cancelled = post("/jobs/cancel", {"target_id": job["target_id"]})["job"]
+        assert cancelled["status"] == "running" and cancelled["cancel_requested"]
+        with pytest.raises(HTTPError) as error:
+            post("/jobs/delete", {"target_id": job["target_id"], "delete_data": True})
+        assert error.value.code == 409
+        assert selected.read_bytes() == b"0123456789"
+        if worker == "hf":
+            runner.run_hf_download(state, job["target_id"], command)
+        else:
+            runner.run_streamed_command(state, job["target_id"], ["ollama", "pull", "fixture"])
+        assert not launched
+        assert store.get_job_by_target(job["target_id"])["status"] == "cancelled"
+        assert post("/jobs/delete", {"target_id": job["target_id"], "delete_data": True}) == {"ok": True}
+        assert not selected.exists()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(2)
+
+
+def test_queued_cancel_is_atomic_with_worker_claim(tmp_path):
+    store = DownloadStore(tmp_path / "jobs.db")
+    job = queued(store, tmp_path / "models")
+    cancelled = store.mark_cancel_requested(job["target_id"])
+    assert cancelled["status"] == "cancelled"
+    assert store.claim_next_queued() is None
+
+
+def test_missing_job_is_a_worker_cancellation(tmp_path):
+    from downloads.runner import _cancel_requested
+
+    assert _cancel_requested(SimpleNamespace(store=DownloadStore(tmp_path / "jobs.db")), "deleted")
+
+
 def test_authenticated_http_removal_uses_server_owned_root(tmp_path, monkeypatch):
     import json
     from http.server import ThreadingHTTPServer

@@ -1,8 +1,9 @@
 # Release evidence and promotion gates
 
-Reviewed on 2026-10-04 against the unmerged implementation stack through
-`6bab5a6488749e97ef6f7679fa280e5335c3ad84` (PR #140). Main is not implied to
-contain this stack. The release roadmap proposal is PR #118; the current
+Reviewed on 2026-10-05. Integration PR #143 incorporates the research roadmap
+#118 and implementation stack #119–#142, including the Windows calibration
+elapsed-clock correction. Until that PR is merged and main is verified, main
+delivery remains pending. The current
 [continuation record](../.planning/continuation.md) separates done and pending work.
 
 | Gate | Current evidence | Status |

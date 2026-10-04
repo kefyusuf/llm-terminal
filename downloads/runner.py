@@ -99,7 +99,7 @@ def _cancel_requested(state, target_id: str) -> bool:
     if stop_event is not None and stop_event.is_set():
         return True
     latest = state.store.get_job_by_target(target_id)
-    return bool(latest and latest.get("cancel_requested"))
+    return latest is None or bool(latest.get("cancel_requested"))
 
 
 def _read_stderr_tail(process) -> str:
@@ -204,8 +204,7 @@ def run_hf_download(state, target_id: str, command) -> None:
         )
         return
 
-    stop_event = getattr(state, "stop_event", None)
-    if stop_event is not None and stop_event.is_set():
+    if _cancel_requested(state, target_id):
         _finalize_terminal(state, target_id, None, cancelled=True)
         return
 
@@ -370,6 +369,9 @@ def run_streamed_command(state, target_id: str, command) -> None:
     cancellation is monitored independently so a silent stdout pipe
     cannot prevent terminate/kill escalation.
     """
+    if _cancel_requested(state, target_id):
+        _finalize_terminal(state, target_id, None, cancelled=True)
+        return
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,

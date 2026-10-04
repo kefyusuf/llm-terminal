@@ -277,7 +277,7 @@ def test_hf_download_failure_uses_last_stderr_line(tmp_path, monkeypatch):
 def test_hf_download_cancel_escalates_from_terminate_to_kill(tmp_path, monkeypatch):
     _install_fake_config(monkeypatch, tmp_path / "models")
     process = _HFProcess([None, None, -9])
-    store = _Store(cancel_values=[True])
+    store = _Store(cancel_values=[False, True])
     state = _State(store)
     monotonic_values = iter([10.0, 12.0])
 
@@ -335,7 +335,7 @@ def test_streamed_command_reports_progress_heartbeat_and_completion(monkeypatch)
 
 def test_streamed_command_cancel_terminates_and_finalizes_cancelled(monkeypatch):
     process = _StreamProcess(["cancel requested\n"], return_code=-15)
-    store = _Store(cancel_values=[True])
+    store = _Store(cancel_values=[False, True])
     state = _State(store)
     monotonic_values = iter([0.0, 0.1])
 

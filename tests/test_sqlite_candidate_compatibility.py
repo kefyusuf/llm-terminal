@@ -1,5 +1,9 @@
 """Backup snapshots and installed-candidate receipts fail closed."""
+import json
+import os
 import sqlite3
+import venv
+from types import SimpleNamespace
 
 import pytest
 
@@ -66,3 +70,36 @@ def test_matching_malformed_contracts_do_not_pass(change):
     contract = {"integrity": "ok", "job_count": 1, "record_sha256": "a" * 64, **change}
     with pytest.raises(ValueError, match="contract"):
         compare_contracts(contract, contract)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX venv interpreter symlinks")
+def test_rehearsal_preserves_the_selected_venv_interpreter(tmp_path, monkeypatch):
+    from scripts import verify_sqlite_compatibility as rehearsal
+
+    environment = tmp_path / "candidate-env"
+    venv.EnvBuilder(with_pip=False, symlinks=True).create(environment)
+    executable = environment / "bin/python"
+    assert executable.is_symlink()
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    manifest = {"source_sha": "a" * 40, "version": "1.0.1",
+                "artifacts": [{"kind": "wheel", "sha256": "b" * 64}]}
+    (candidate / "candidate-manifest.json").write_text(json.dumps(manifest))
+    source = tmp_path / "jobs.db"
+    with sqlite3.connect(source) as conn:
+        conn.execute("CREATE TABLE jobs(status TEXT)")
+        conn.execute("INSERT INTO jobs VALUES ('completed')")
+    monkeypatch.setattr(rehearsal, "verify_manifest", lambda *_: None)
+    # Exercise the real isolated interpreter launch while replacing the package
+    # contract probe with an environment-identity check, not receipt validation.
+    monkeypatch.setattr(rehearsal, "PROBE", f"""
+import json, sys
+assert sys.prefix == {str(environment)!r}, (sys.prefix, sys.executable)
+print(json.dumps({{'version':'1.0.1','wheel_sha256':{'b' * 64!r},
+ 'integrity':'ok','job_count':1,'record_sha256':{'c' * 64!r}}}))
+""")
+    args = SimpleNamespace(database=source, work_dir=tmp_path / "rehearsal",
+        previous_dist=candidate, current_dist=candidate,
+        previous_python=executable, current_python=executable,
+        previous_source="a" * 40, current_source="a" * 40)
+    assert rehearsal.rehearse(args)["status"] == "passed"

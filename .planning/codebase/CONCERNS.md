@@ -5,9 +5,11 @@
 
 This file lists **current, verified concerns**. Resolved mapper findings are retained only in the historical summary so completed work is not accidentally re-planned.
 
-## Release Assessment Addendum — 2026-10-02
+## Historical Release Assessment — 2026-10-02
 
-The [industry/release assessment](../../docs/industry-readiness.md) and [updated roadmap](../roadmap.md) supersede the older priority order below. Newly checked gaps:
+The [industry/release assessment](../../docs/industry-readiness.md) established
+the release priorities. The findings below describe the pre-implementation
+baseline; their current disposition is recorded immediately afterward.
 
 - Recommendation evidence: `core/scoring.py` derives quality from heuristics and context score from size. These must be visibly distinguished from benchmark quality and actual context metadata before release.
 - Installed-package isolation: `.github/workflows/package.yml` installs a wheel but runs checks in the checkout, allowing source imports to mask missing installed contents. Test from an unrelated directory and fresh environment.
@@ -16,6 +18,22 @@ The [industry/release assessment](../../docs/industry-readiness.md) and [updated
 - Public-release operations: current workflows include deterministic, package and scheduled external checks; no registry-publishing workflow or documented pilot/withdrawal process was found. External PyPI/account and remote CI state were not verified.
 
 Historical coverage percentages below remain prior canonical CI evidence, not a new 2026-10-02 coverage measurement.
+
+### Integration disposition — 2026-10-05
+
+PR #143 incorporates the research roadmap and implementation stack #119–#142.
+Explicit estimate provenance, isolated installed-package qualification, pinned
+artifact metadata/plans and nonblocking detection are implemented and tested.
+They must not be re-planned as missing features from the historical bullets.
+Build-once candidate manifests, support/security/withdrawal guidance and isolated
+backup/previous-worker restore evidence also exist. See
+[release gates](../../docs/release-readiness.md) for their bounded operation scope.
+
+Genuine Ollama acquisition/inference/calibration, optional prepared-runtime UX,
+participant pilot and publisher/version/environment configuration remain
+unverified. Catalog HTML drift and filesystem-delete/SQLite-commit atomicity
+remain explicit limits. Integration review and current-source checks are gates
+before main delivery; publication is a separate authorization.
 
 ## Priority 1
 
