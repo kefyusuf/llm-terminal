@@ -59,6 +59,12 @@ before permitting it to process jobs. Keep old workers away from active/shared
 destinations during the rehearsal. No previous-version downgrade rehearsal is
 claimed by the additive-column tests.
 
+The [bounded store rehearsal](sqlite-compatibility-rehearsal.md) now demonstrates
+terminal-job data-read compatibility between the exact `cf0ca4d` and `5d65b5f`
+candidates on Windows. It does not qualify older workers for shared destinations
+or establish a production downgrade. Use a fresh backup and independent runtime
+qualification for the actual rollback target.
+
 For a bad release, suspend promotion, document the affected source/artifacts and
 prepare a tested hotfix. An approved PyPI yank is index metadata, not an automatic
 client rollback; exact pins may still select yanked files. Follow the official
