@@ -106,6 +106,11 @@ Run `ai-model-explorer-cli doctor --json` for shareable storage, runtime and TLS
 
 Model quality, throughput, fit and context scores are heuristic estimates. CLI `scores`, TUI comparison and additive REST/recommendation JSON provenance explain their inputs and defaults. The context score is a model-size proxy, not supported token capacity. See [score estimates](docs/score-estimates.md).
 
+Search and hardware planning expose additive schema-1 JSON; saved-search
+comparison preserves recorded identity, scores and errors without another
+network search. See [model exports and exact artifact handoff](docs/model-exports.md).
+The existing `recommend --json` array remains compatible.
+
 Hugging Face downloads carry the selected file's resolved commit when metadata is available. Legacy requests report an unknown revision. See [download identity](docs/hf-download-identity.md) for the contract and remaining preflight work.
 
 ### Theming

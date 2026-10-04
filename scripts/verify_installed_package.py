@@ -47,7 +47,7 @@ distribution = metadata.distribution("ai-model-explorer")
 recorded = {Path(distribution.locate_file(item)).resolve() for item in distribution.files or []}
 modules = (
     "main", "cli", "api_server", "config", "tui_app", "app.viewer", "app.startup_viewer",
-    "app.modals", "core.scoring", "core.diagnostics", "core.hardware",
+    "app.modals", "core.scoring", "core.diagnostics", "core.hardware", "core.exports",
     "downloads.service_client", "downloads.download_service", "providers.hf_provider",
     "providers.ollama_provider", "providers.lmstudio_provider", "providers.docker_provider",
     "providers.mlx_provider", "results.results_presenter", "search.search_orchestration", "terminal_ui",
@@ -155,6 +155,26 @@ def run_step(name: str, command: list[str], cwd: Path, env: dict[str, str], time
     return result.stdout
 
 
+def verify_cli_exports(executable: Path, cwd: Path, env: dict[str, str]) -> None:
+    plan = json.loads(run_step("installed hardware-plan JSON",
+                               [str(executable), "plan", "sample-7b", "--json"], cwd, env, 15))
+    if (plan.get("schema_version") != 1 or plan.get("kind") != "hardware_plan"
+        or plan.get("artifact_metadata") is not None or not plan.get("plans")):
+        raise ValueError("installed hardware-plan export contract failed")
+    saved = cwd / "saved-search.json"
+    saved.write_text(json.dumps({"schema_version": 1, "kind": "search", "models": [
+        {"id": "one", "name": "one", "source": "Hugging Face", "scores": {"composite": 1}},
+        {"id": "two", "name": "two", "source": "Ollama", "scores": {"composite": 2}}],
+        "errors": []}), encoding="utf-8")
+    comparison = json.loads(run_step("installed saved comparison JSON",
+                                     [str(executable), "compare", "--input", str(saved),
+                                      "two", "one", "--json"], cwd, env, 15))
+    if (comparison.get("schema_version") != 1 or comparison.get("kind") != "comparison"
+        or [model.get("id") for model in comparison.get("models", [])] != ["two", "one"]
+        or comparison["models"][0].get("scores", {}).get("composite") != 2):
+        raise ValueError("installed comparison export contract failed")
+
+
 def verify_package(artifact: Path, checkout: Path) -> dict:
     artifact, checkout = artifact.resolve(), checkout.resolve()
     with tempfile.TemporaryDirectory(prefix="ai-model-installed-") as temporary:
@@ -212,6 +232,7 @@ def verify_package(artifact: Path, checkout: Path) -> dict:
         )
         if doctor.get("offline") is not True or doctor.get("status") == "error":
             raise ValueError("installed offline doctor failed")
+        verify_cli_exports(scripts / ("ai-model-explorer-cli" + suffix), cwd, env)
         run_step(
             "installed TUI entry point",
             [str(scripts / ("ai-model-explorer" + suffix))],
@@ -248,6 +269,8 @@ def verify_package(artifact: Path, checkout: Path) -> dict:
                 "module_origins",
                 "cli_entry",
                 "offline_doctor",
+                "hardware_plan_json",
+                "saved_comparison_json",
                 "tui_entry",
                 "rest_health",
                 "download_service_health_jobs",

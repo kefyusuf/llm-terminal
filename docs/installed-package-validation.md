@@ -12,7 +12,7 @@ The verifier checks:
 
 1. `pip check` for dependency consistency.
 2. Required entry modules and each application package import from within the new environment and are listed in the installed distribution's files, with no checkout origins. The import probe uses Python isolated mode (`-I`).
-3. Both installed console scripts: CLI version/offline doctor and a headless TUI mount/exit.
+3. Both installed console scripts: CLI version/offline doctor, schema-1 hardware-plan/saved-comparison JSON and a headless TUI mount/exit.
 4. The installed REST health endpoint on an ephemeral loopback port.
 5. The installed download service's health and authenticated jobs endpoints, with isolated empty state and no model downloads.
 6. The real installed download-service client launcher. A recording wrapper delegates to the actual `Popen`, asserts the installed interpreter path, waits for the bounded service smoke subprocess and cleans up its owned handle. Windows exercises the existing `pythonw.exe` launch path; other platforms exercise the existing detached Python launch path.

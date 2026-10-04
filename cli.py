@@ -1,9 +1,12 @@
+import json
+from contextlib import nullcontext
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 
 import click
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 import config
 from core import cache_db
@@ -45,6 +48,14 @@ def _emit_provider_errors(errors: list[str]) -> None:
     """Emit provider diagnostics on stderr without contaminating command stdout."""
     for error in errors:
         click.echo(f"Warning: {error}", err=True)
+
+
+def _emit_json(payload):
+    try:
+        value = json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise click.ClickException("export contains non-finite or unsupported JSON values") from exc
+    click.echo(value)
 
 
 def get_version() -> str:
@@ -127,7 +138,8 @@ def system_info():
     type=click.Choice(["composite", "speed", "quality", "name"]),
     default="composite",
 )
-def search(query, provider, limit, sort):
+@click.option("--json", "json_output", is_flag=True, help="Emit a schema-1 search export")
+def search(query, provider, limit, sort, json_output=False):
     """Search for models matching QUERY."""
     from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
 
@@ -136,7 +148,7 @@ def search(query, provider, limit, sort):
     results = []
     errors: list[str] = []
 
-    with console.status(f"Searching for '{query}'..."):
+    with nullcontext() if json_output else console.status(f"Searching for '{query}'..."):
         if provider in ("all", "ollama"):
             local = get_installed_ollama_models()
             ollama_results, ollama_errors, _ = search_ollama_models(
@@ -160,6 +172,14 @@ def search(query, provider, limit, sort):
         results.sort(key=lambda r: r.get("score_quality", 0), reverse=True)
     elif sort == "name":
         results.sort(key=lambda r: r.get("name", "").lower())
+
+    if json_output:
+        from core.exports import export_model
+
+        _emit_json({"schema_version": 1, "kind": "search", "query": query,
+                    "provider": provider, "limit": limit, "sort": sort,
+                    "models": [export_model(model) for model in results[:limit]], "errors": errors})
+        return
 
     table = Table(title=f"Search: {query}")
     table.add_column("Model", style="bold")
@@ -330,12 +350,23 @@ def recommend(limit, use_case, output_json):
 
 @cli.command()
 @click.argument("model_name")
-@click.option("--context", "-c", default=4096, help="Target context length")
-def plan(model_name, context):
+@click.option("--context", "-c", type=click.IntRange(min=1), default=4096, help="Target context length")
+@click.option("--json", "json_output", is_flag=True, help="Emit a schema-1 heuristic plan")
+def plan(model_name, context, json_output=False):
     """Show hardware requirements for MODEL_NAME across quantization levels."""
     from core.model_intelligence import plan_hardware_for_model
 
     plans = plan_hardware_for_model(model_name, target_context=context)
+
+    if json_output:
+        _emit_json({"schema_version": 1, "kind": "hardware_plan", "model_name": model_name,
+                    "requested_context": context, "artifact_metadata": None, "plans": plans,
+                    "estimate_provenance": {
+                        "kind": "heuristic", "weight_size": "model_name_estimate",
+                        "context_overhead": "legacy_context_formula",
+                        "offload_fraction": 0.7,
+                        "limitation": "Requested context is not supported context; no runtime allocation or benchmark was measured."}})
+        return
 
     table = Table(title=f"Hardware Plan: {model_name} (context={context})")
     table.add_column("Quant", style="bold")
@@ -356,6 +387,34 @@ def plan(model_name, context):
 
     console.print(table)
     console.print()
+
+
+@cli.command()
+@click.argument("identities", nargs=-1)
+@click.option("--input", "input_path", type=click.Path(exists=True, dir_okay=False), required=True)
+@click.option("--json", "json_output", is_flag=True, help="Emit a schema-1 comparison")
+def compare(identities, input_path, json_output):
+    """Compare model IDs from a saved search export without discovery or rescoring."""
+    from core.exports import comparison_export, read_search_export
+
+    try:
+        payload = comparison_export(read_search_export(input_path), identities)
+    except (OSError, ValueError, TypeError, UnicodeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    _emit_provider_errors(payload["errors"])
+    if json_output:
+        _emit_json(payload)
+        return
+    table = Table(title="Saved model comparison (heuristic estimates)")
+    table.add_column("Model")
+    table.add_column("Source")
+    table.add_column("Composite")
+    table.add_column("Revision")
+    for model in payload["models"]:
+        table.add_row(Text(str(model.get("name") or model.get("id"))),
+                      Text(str(model.get("source") or "Unknown")),
+                      str(model["scores"]["composite"]), Text(str(model.get("resolved_revision") or "Unknown")))
+    console.print(table)
 
 
 @cli.command()
