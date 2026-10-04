@@ -68,7 +68,7 @@ def test_start_service_process_uses_platform_specific_detached_launch(monkeypatc
 def test_wait_for_service_retries_until_healthy_compatible_response(monkeypatch):
     """Transient health failures and incompatible versions should be retried within the deadline."""
     health_calls = []
-    responses = [URLError("booting"), {"ok": True, "version": "1.7"}, {"ok": True, "version": "2.0"}]
+    responses = [URLError("booting"), {"ok": True, "version": "1.7"}, {"ok": True, "version": "2.1"}]
 
     def _health():
         health_calls.append(True)
@@ -151,7 +151,7 @@ def test_ensure_service_running_reuses_compatible_service(monkeypatch):
     """A healthy compatible service should be reused without restart."""
     actions = []
     monkeypatch.setattr(service_client, "is_service_running", lambda: True)
-    monkeypatch.setattr(service_client, "get_service_health", lambda: {"ok": True, "version": "2.0"})
+    monkeypatch.setattr(service_client, "get_service_health", lambda: {"ok": True, "version": "2.1"})
     monkeypatch.setattr(service_client, "stop_service", lambda: actions.append("stop"))
     monkeypatch.setattr(service_client, "_start_service_process", lambda: actions.append("start"))
     monkeypatch.setattr(service_client, "_wait_for_service", lambda **_kwargs: actions.append("wait"))

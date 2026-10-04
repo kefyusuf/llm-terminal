@@ -373,15 +373,37 @@ class DownloadStore:
             return []
         return json.loads(row[0])
 
-    def delete_job(self, target_id):
+    def delete_job(self, target_id, *, delete_data=False, models_dir=None):
         with self.lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
-                "SELECT status FROM jobs WHERE target_id = ?", (target_id,)
+                "SELECT * FROM jobs WHERE target_id = ?", (target_id,)
             ).fetchone()
             if row is None:
                 return False, "not_found"
             if row["status"] in {"queued", "running"}:
                 return False, "active"
+            if delete_data:
+                job = self._row_to_dict(row)
+                plan = job.get("download_plan")
+                artifact = job.get("artifact")
+                if models_dir is None or not plan or not artifact:
+                    return False, "unsafe_data"
+                try:
+                    selected = {"source": "Hugging Face", "id": artifact["repository"],
+                                "target_file": artifact["filename"],
+                                "resolved_revision": artifact["revision"],
+                                "artifact_metadata": job.get("artifact_metadata")}
+                    current = plan_hf_download(selected, models_dir, allow_unknown_size=True)
+                    if current["status"] in {"unsafe_destination", "disk_unavailable"} or any(
+                        plan.get(key) != current[key]
+                        for key in ("model_root", "model_directory", "destination")
+                    ):
+                        return False, "unsafe_data"
+                    # Never recursively remove the namespace or SDK auxiliary files.
+                    Path(current["destination"]).unlink(missing_ok=True)
+                except (OSError, RuntimeError, ValueError):
+                    return False, "unsafe_data"
             conn.execute("DELETE FROM jobs WHERE target_id = ?", (target_id,))
         return True, "deleted"
 

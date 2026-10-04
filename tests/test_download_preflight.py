@@ -194,7 +194,8 @@ def test_preflight_requires_new_service_protocol():
     from downloads.service_client import is_service_compatible
 
     assert not is_service_compatible({"version": "1.8"})
-    assert is_service_compatible({"version": "2.0"})
+    assert not is_service_compatible({"version": "2.0"})
+    assert is_service_compatible({"version": "2.1"})
 
 
 def test_unusable_configured_root_blocks_plan(tmp_path, monkeypatch):

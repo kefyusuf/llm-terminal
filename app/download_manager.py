@@ -373,10 +373,18 @@ class DownloadManager:
         if should_cancel_before_delete(delete_data, state):
             try:
                 cancel_job(target_id)
-                time.sleep(1)
+                deadline = time.monotonic() + 4
+                while True:
+                    latest = next((job for job in list_jobs(limit=1000, timeout=0.5)
+                                   if job.get("target_id") == target_id), None)
+                    if latest and latest.get("status") not in {"queued", "running"}:
+                        break
+                    if time.monotonic() >= deadline:
+                        return False, "Cancellation is still pending; data was preserved.", None, None
+                    time.sleep(0.1)
                 messages.append(f"Download canceled: {model_name}")
             except Exception as e:
-                messages.append(f"Could not cancel download: {e}")
+                return False, f"Could not confirm cancellation: {e}", None, None
 
         if should_delete_ollama_data(delete_data, source, model_name):
             import subprocess
@@ -407,7 +415,10 @@ class DownloadManager:
                 messages.append(f"Delete model data error: {e!s}")
 
         try:
-            delete_job(target_id)
+            if delete_data and source == "hugging face":
+                delete_job(target_id, delete_data=True)
+            else:
+                delete_job(target_id)
         except HTTPError as exc:
             return False, delete_error_detail_from_http_error(exc), None, None
         except Exception as exc:
@@ -415,4 +426,7 @@ class DownloadManager:
 
         deleted_entry = self.download_registry.pop(target_id, None)
         source_key, name_key = entry_identity_keys(deleted_entry)
-        return True, "Download entry deleted.", (source_key, name_key), target_id
+        message = "Download entry deleted."
+        if delete_data and source == "hugging face":
+            message = "Selected managed file and entry deleted; SDK cache files were retained."
+        return True, message, (source_key, name_key), target_id

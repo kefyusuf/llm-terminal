@@ -203,6 +203,13 @@ class TestStartDownload:
 
 
 class TestDeleteEntry:
+    def test_hf_data_removal_is_owned_by_service(self, manager):
+        manager.download_registry["test-id"] = {"state": "completed", "source": "Hugging Face"}
+        with patch("app.download_manager.delete_job") as remove:
+            ok, _, _, _ = manager.delete_entry("test-id", delete_data=True)
+        assert ok
+        remove.assert_called_once_with("test-id", delete_data=True)
+
     def test_deletes_idle_entry(self, manager):
         manager.download_registry["test-id"] = {"state": "completed", "source": "Ollama", "name": "llama3"}
         with patch("app.download_manager.delete_job"):

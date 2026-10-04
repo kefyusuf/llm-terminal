@@ -13,7 +13,7 @@ try:
 except ImportError:  # pragma: no cover - exercised only in lightweight envs
     psutil = None
 
-MIN_SERVICE_VERSION = "2.0"
+MIN_SERVICE_VERSION = "2.1"
 _NO_PROXY_OPENER = build_opener(ProxyHandler({}))
 _owned_service_process = None
 
@@ -232,15 +232,20 @@ def cancel_job(target_id):
     return _request("POST", "/jobs/cancel", payload={"target_id": target_id}, timeout=2.0)
 
 
-def delete_job(target_id, _retry=True):
+def delete_job(target_id, _retry=True, *, delete_data=False):
     """Delete the job record for *target_id* from the service.
 
     Automatically restarts an incompatible service and retries once if the
     initial request returns 404.
     """
+    if delete_data and not ensure_service_running():
+        raise RuntimeError("managed data removal requires a compatible service")
     try:
-        return _request("POST", "/jobs/delete", payload={"target_id": target_id}, timeout=2.0)
+        payload = {"target_id": target_id}
+        if delete_data:
+            payload["delete_data"] = True
+        return _request("POST", "/jobs/delete", payload=payload, timeout=2.0)
     except HTTPError as exc:
         if exc.code == 404 and _retry and ensure_service_running():
-            return delete_job(target_id, _retry=False)
+            return delete_job(target_id, _retry=False, delete_data=delete_data)
         raise

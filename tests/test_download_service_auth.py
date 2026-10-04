@@ -137,7 +137,7 @@ def test_service_client_bypasses_environment_proxies(monkeypatch):
     try:
         assert service_client.get_service_health(timeout=2) == {
             "ok": True,
-            "version": "2.0",
+            "version": "2.1",
         }
     finally:
         server.shutdown()

@@ -328,10 +328,12 @@ class DownloadJobModal(ModalScreen):
             with Horizontal(id="job-button-row"):
                 if is_active:
                     yield Button("Cancel", id="job-cancel-btn")
-                    yield Button("Cancel & Delete", id="job-cancel-delete-btn")
+                    yield Button("Cancel & Delete File" if self.entry.get("source", "").lower() == "hugging face"
+                                 else "Cancel & Delete", id="job-cancel-delete-btn")
                 else:
                     yield Button("Delete", id="job-delete-btn")
-                    yield Button("Delete All", id="job-delete-all-btn")
+                    yield Button("Delete File" if self.entry.get("source", "").lower() == "hugging face"
+                                 else "Delete All", id="job-delete-all-btn")
                 yield Button("Close", id="job-close-btn")
 
     @on(Button.Pressed, "#job-cancel-btn")

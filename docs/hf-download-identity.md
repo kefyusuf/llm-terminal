@@ -98,7 +98,7 @@ environment's HF CLI module. Shell quoting supports PowerShell and POSIX shells.
 Manual execution bypasses the application's queue reservations and completion
 guard; inspect the plan and license before using it.
 
-Service protocol 2.0 is required for plan-aware clients. Automatic upgrade does
+Service protocol 2.1 is required for current plan/removal-aware clients. Automatic upgrade does
 not stop an incompatible service with active jobs or uncertain job history.
 Graceful shutdown addresses only the configured service; fallback force-stop
 is limited to the process launched by this client, never a system-wide scan.
@@ -116,7 +116,8 @@ is limited to the process launched by this client, never a system-wide scan.
   model weights. The separate [Windows real SDK trial](evidence/hf-download-windows-2026-10-04.json)
   verified early cancellation, reopen, retry and exact bytes/SHA-256. The later
   [reproducible recovery trial](hf-recovery-acceptance.md) also observed partial
-  cancellation and successful retry. Forced service restart and Ollama remain
+  cancellation and successful retry. [Managed removal and controlled restart](managed-download-removal.md)
+  also have Windows evidence. Forced process/host crashes and Ollama remain
   separate M1-D2 gates.
 
 These are artifact identity and preflight slices of the proposed roadmap in

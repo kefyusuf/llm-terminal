@@ -92,6 +92,9 @@ def _hf_download_script() -> str:
 
 
 def _cancel_requested(state, target_id: str) -> bool:
+    stop_event = getattr(state, "stop_event", None)
+    if stop_event is not None and stop_event.is_set():
+        return True
     latest = state.store.get_job_by_target(target_id)
     return bool(latest and latest.get("cancel_requested"))
 
@@ -196,6 +199,11 @@ def run_hf_download(state, target_id: str, command) -> None:
             progress="",
             return_code=1,
         )
+        return
+
+    stop_event = getattr(state, "stop_event", None)
+    if stop_event is not None and stop_event.is_set():
+        _finalize_terminal(state, target_id, None, cancelled=True)
         return
 
     state.store.update_job(
