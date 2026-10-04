@@ -2,8 +2,11 @@
 
 Reviewed on 2026-10-05. Integration PR #143 incorporates the research roadmap
 #118 and implementation stack #119–#142, including the Windows calibration
-elapsed-clock correction. Until that PR is merged and main is verified, main
-delivery remains pending. The current
+elapsed-clock correction. It squash-merged as
+`93395de47aaa0817d21b9b736a075f75cafeef5e`; actual main CI passed 11/11 and its
+Package qualification passed 19/19. Independent review's claimed-cancellation
+and POSIX interpreter findings were fixed before merge. Original PRs are closed
+as superseded, with history retained. The current
 [continuation record](../.planning/continuation.md) separates done and pending work.
 
 | Gate | Current evidence | Status |
@@ -31,8 +34,8 @@ release/prerelease version and qualify that version before publishing. Verify
 PyPI/TestPyPI account and name ownership, protected GitHub environment reviewers,
 Trusted Publisher and attestations. No token or account value belongs in this
 repository. [Build-once candidates](build-once-candidates.md) describes the input
-boundary and official publishing references. Publication and merge are separate
-actions from preparing PRs; neither has happened in this work.
+boundary and official publishing references. Main integration is complete;
+publication has not occurred and remains subject to the gates above.
 
 ## Pilot evidence
 

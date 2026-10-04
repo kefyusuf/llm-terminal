@@ -9,8 +9,8 @@ This roadmap retains the completed hardening baseline and replaces the older act
 
 ## Implementation and remaining acceptance
 
-Reviewed on 2026-10-05. The integration candidate incorporates the roadmap and
-implementation PRs #118–#142; see [continuation](continuation.md) for exact source
+Reviewed on 2026-10-05. Integration PR #143 delivered the roadmap and
+implementation PRs #118–#142 onto main; see [continuation](continuation.md) for exact source
 and evidence. This is not a publication or inference-readiness claim.
 
 | Contract | Implemented/verified | Remaining work |
