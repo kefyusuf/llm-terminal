@@ -1362,7 +1362,12 @@ class AIModelViewer(App):
                     self.all_results[idx] = enriched_model
                     break
             self.refresh_table()
-        self.update_status("Detailed metadata loaded.")
+        if enriched_model.get("metadata_fetch_status") == "available":
+            self.update_status("Detailed metadata loaded.")
+        elif enriched_model.get("metadata_fetch_status") == "cached":
+            self.update_status("Showing cached detailed metadata.")
+        else:
+            self.update_status("Detailed metadata unavailable. Showing retained facts and estimates.")
         self.open_model_detail_modal(enriched_model)
 
     @work(thread=True)

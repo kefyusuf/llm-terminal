@@ -105,7 +105,7 @@ def test_enrichment_carries_revision_and_caches_it(monkeypatch, cached):
         sha=REVISION, siblings=[SimpleNamespace(rfilename="model.gguf", size=None)]
     )
     monkeypatch.setattr(
-        hf_provider, "HfApi", lambda: SimpleNamespace(model_info=lambda *a, **kw: info)
+        hf_provider, "HfApi", lambda **_: SimpleNamespace(model_info=lambda *a, **kw: info)
     )
     selected = model()
     selected.pop("resolved_revision")
@@ -126,7 +126,7 @@ def test_cached_other_variant_does_not_replace_selected_file(monkeypatch):
         sha=REVISION, siblings=[SimpleNamespace(rfilename="model.gguf", size=None)]
     )
     monkeypatch.setattr(
-        hf_provider, "HfApi", lambda: SimpleNamespace(model_info=lambda *a, **kw: info)
+        hf_provider, "HfApi", lambda **_: SimpleNamespace(model_info=lambda *a, **kw: info)
     )
     selected = model()
     selected.pop("resolved_revision")
@@ -135,14 +135,19 @@ def test_cached_other_variant_does_not_replace_selected_file(monkeypatch):
     assert result["resolved_revision"] == REVISION
 
 
-def test_legacy_cached_metadata_clears_stale_revision(monkeypatch):
+def test_legacy_cached_metadata_cannot_clear_selected_revision(monkeypatch):
     monkeypatch.setattr(
         hf_provider.cache_db,
         "get_model_cache",
         lambda *_: {"target_file": "model.gguf", "size_gb": None},
     )
+    info = SimpleNamespace(sha=REVISION, siblings=[SimpleNamespace(rfilename="model.gguf", size=None)])
+    monkeypatch.setattr(
+        hf_provider, "HfApi", lambda **_: SimpleNamespace(model_info=lambda *a, **kw: info)
+    )
+    monkeypatch.setattr(hf_provider.cache_db, "set_model_cache", lambda *_: None)
     selected = model()
-    assert hf_provider.enrich_hf_model_details(selected, None, {})["resolved_revision"] is None
+    assert hf_provider.enrich_hf_model_details(selected, None, {})["resolved_revision"] == REVISION
 
 
 def test_terminal_job_can_be_requeued_at_new_revision(tmp_path):

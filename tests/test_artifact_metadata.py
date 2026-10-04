@@ -28,7 +28,7 @@ def test_hf_details_cache_and_queue_keep_declared_facts(tmp_path, monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        hf_provider, "HfApi", lambda: SimpleNamespace(model_info=lambda *a, **kw: info)
+        hf_provider, "HfApi", lambda **_: SimpleNamespace(model_info=lambda *a, **kw: info)
     )
     monkeypatch.setattr(hf_provider, "calculate_fit", lambda *a: ("Fit", "CPU", None))
     model = {"source": "Hugging Face", "id": "owner/repo", "target_file": "model.gguf"}

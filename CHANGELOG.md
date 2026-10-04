@@ -4,7 +4,8 @@
 
 ### Reliability and provider correctness
 
-- Drained HF child stderr concurrently with a bounded tail to prevent pipe-buffer stalls; added an opt-in pinned-file recovery acceptance tool and Windows evidence for early/partial cancellation, reopen, retry and digest verification.
+- Bound HF detail requests to the selected commit and a 10-second request timeout, used configured credentials, rejected mismatched metadata and reported cached/unavailable detail state without exposing exception text.
+- Avoided unchanged download-cell writes; measured 100/1000-row headless table refresh costs and verified selection/scroll preservation in narrow and wide layouts.
 - Drained HF child stderr concurrently with a bounded tail to prevent pipe-buffer stalls; added an opt-in pinned-file recovery acceptance tool and Windows evidence for early/partial cancellation, reopen, retry and digest verification.
 - Added read-only HF download plans, transactionally reserved known disk bytes, repository/revision destinations, auxiliary-tree checks and completion byte/digest validation; preserved active jobs during service upgrades and limited fallback termination to client-owned processes.
 - Carried versioned upstream artifact/license/byte/digest metadata through HF search/detail cache, durable jobs and REST/CLI JSON; displayed declarations in the scrollable TUI detail screen without implying permission or parsing metadata markup.
