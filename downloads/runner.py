@@ -26,6 +26,7 @@ from typing import Any
 from loguru import logger
 
 from core.utils import extract_download_progress
+from downloads.download_manager import prepare_hf_destination
 
 
 def _service_popen_kwargs() -> dict[str, Any]:
@@ -149,8 +150,17 @@ def run_hf_download(state, target_id: str, command) -> None:
         )
         return
 
-    models_dir = config.settings.hf_models_dir
-    models_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        models_dir = prepare_hf_destination(config.settings.hf_models_dir, target_file)
+    except (OSError, RuntimeError, ValueError):
+        state.store.update_job(
+            target_id,
+            status="failed",
+            detail="Hugging Face target file or destination is unsafe or unavailable",
+            progress="",
+            return_code=1,
+        )
+        return
 
     state.store.update_job(
         target_id,

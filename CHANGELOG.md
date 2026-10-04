@@ -4,6 +4,7 @@
 
 ### Reliability and provider correctness
 
+- Rejected unsafe Hugging Face filenames before queue writes and checked the resolved selected-file destination before spawning a download, including existing symlink/junction escapes and legacy commands.
 - Pinned Hugging Face single-file jobs to resolved commit metadata when available, preserved identity through cache/queue restart, and exposed explicit unknown revisions for legacy requests.
 - Added an opt-in fresh-process startup measurement harness with bounded collection, nearest-rank p95 budgets, explicit failure accounting and preserved Windows raw samples.
 - Deferred TUI CPU/GPU discovery to a shared worker initialization, kept cached/cold headers responsive, and handled expected hardware failures without terminating searches or model-detail interactions.
