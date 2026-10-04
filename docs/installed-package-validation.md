@@ -25,6 +25,10 @@ The Package matrix runs wheel installation on Linux, Windows and macOS for all P
 
 Each job uploads `package-report.json`, including status, artifact name/SHA-256, Python/platform, package version, installed module origins relative to the environment, resolved dependency versions and completed checks. Reports contain no machine-specific temporary paths or token values. A failed rerun replaces an old success with a failed report; an interrupted run remains incomplete. Logs and job status remain necessary for failure diagnosis. Build/setup failures before the verifier starts can have no report.
 
+The current workflow now [builds one candidate](build-once-candidates.md) before
+the matrix and verifies the same wheel/sdist inputs in every consumer. The extra
+candidate job makes 19 workflow jobs while retaining 18 installation lanes.
+
 The native Windows Python **3.12.14** wheel and sdist checks passed for package version **1.0.1** on 2026-10-04. Their exact artifacts and resolved dependencies are recorded in [wheel evidence](evidence/package-windows-wheel-2026-10-04.json) and [sdist evidence](evidence/package-windows-sdist-2026-10-04.json). These are pre-commit local candidate reports, not a release or evidence for other machines. CI uploads fresh reports for its own artifacts and commit.
 
 ## Running locally

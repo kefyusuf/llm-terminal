@@ -57,6 +57,7 @@
 
 ### Packaging, CI, and verification
 
+- Built each CI package candidate once, recorded source/metadata/SHA-256 identity and verified the same wheel/sdist inputs across all 18 installation lanes; preserved the candidate for later authorized release qualification.
 - Strengthened Package CI with fresh wheel/sdist installations outside the checkout, installed-distribution origin checks, both console entry points, REST/download-service/client subprocess smoke and dependency-resolution evidence across the supported OS/Python matrix.
 - Standardized development workflow around `scripts/dev.py bootstrap`, `verify`, and `smoke` with committed platform-specific dependency locks.
 - Expanded supported runtime metadata to Python 3.10-3.14 and CI verification to Ubuntu/Windows on Python 3.12 and 3.14.
