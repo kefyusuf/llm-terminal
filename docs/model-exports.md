@@ -1,5 +1,8 @@
 # Versioned model exports and offline comparison
 
+Saved runtime facts can add an independent [metadata memory scenario](metadata-memory-scenarios.md)
+to `plan --json`; existing quantization plans and recommendation scoring remain unchanged.
+
 `ai-model-explorer-cli search QUERY --provider huggingface --json` adds a schema-1
 object without changing the existing search table or `recommend --json` array.
 Fields include `kind: search`, query/provider/limit/sort, selected model records

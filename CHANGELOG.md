@@ -4,6 +4,7 @@
 
 ### Reliability and provider correctness
 
+- Added saved-runtime metadata memory scenarios with explicit context, concurrency, weight split, cache placement and provenance; retained existing scores and rejected unsupported cache layouts without fabricated estimates.
 - Bound service-owned HF children to the parent pipe lifetime, tested normal interpreter shutdown and forced parent death, and verified a Windows partial-download crash/restart/retry with exact byte/digest completion.
 - Bound HF detail requests to the selected commit and a 10-second request timeout, used configured credentials, rejected mismatched metadata and reported cached/unavailable detail state without exposing exception text.
 - Avoided unchanged download-cell writes; measured 100/1000-row headless table refresh costs and verified selection/scroll preservation in narrow and wide layouts.

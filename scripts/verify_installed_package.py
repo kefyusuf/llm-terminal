@@ -47,7 +47,7 @@ distribution = metadata.distribution("ai-model-explorer")
 recorded = {Path(distribution.locate_file(item)).resolve() for item in distribution.files or []}
 modules = (
     "main", "cli", "api_server", "config", "tui_app", "app.viewer", "app.startup_viewer",
-    "app.modals", "core.scoring", "core.diagnostics", "core.hardware", "core.exports",
+    "app.modals", "core.scoring", "core.diagnostics", "core.hardware", "core.exports", "core.model_facts",
     "downloads.service_client", "downloads.download_service", "downloads.parent_lifetime", "providers.hf_provider",
     "providers.ollama_provider", "providers.lmstudio_provider", "providers.docker_provider",
     "providers.mlx_provider", "results.results_presenter", "search.search_orchestration", "terminal_ui",
@@ -161,6 +161,17 @@ def verify_cli_exports(executable: Path, cwd: Path, env: dict[str, str]) -> None
     if (plan.get("schema_version") != 1 or plan.get("kind") != "hardware_plan"
         or plan.get("artifact_metadata") is not None or not plan.get("plans")):
         raise ValueError("installed hardware-plan export contract failed")
+    facts = cwd / "saved-facts.json"
+    facts.write_text(json.dumps({"schema_version": 1, "kind": "model_facts", "model": "sample-7b",
+             "model_digest": "a" * 64, "architecture": "llama", "declared_supported_context": 8192,
+             "layers": 32, "kv_heads": 8, "key_head_dim": 128, "value_head_dim": 128,
+             "disk_size_bytes": 4 * 1024**3, "special_cache_layout": False}), encoding="utf-8")
+    metadata_plan = json.loads(run_step("installed saved-facts memory scenario",
+                               [str(executable), "plan", "sample-7b", "--facts", str(facts), "--json"], cwd, env, 15))
+    scenario = metadata_plan.get("metadata_plan") or {}
+    if (scenario.get("status") != "estimated" or scenario.get("components", {}).get("kv_cache_bytes") != 512 * 1024**2
+        or scenario.get("facts_provenance", {}).get("revalidated") is not False):
+        raise ValueError("installed metadata memory scenario contract failed")
     saved = cwd / "saved-search.json"
     saved.write_text(json.dumps({"schema_version": 1, "kind": "search", "models": [
         {"id": "one", "name": "one", "source": "Hugging Face", "scores": {"composite": 1}},
@@ -270,6 +281,7 @@ def verify_package(artifact: Path, checkout: Path) -> dict:
                 "cli_entry",
                 "offline_doctor",
                 "hardware_plan_json",
+                "saved_facts_memory_scenario",
                 "saved_comparison_json",
                 "tui_entry",
                 "rest_health",

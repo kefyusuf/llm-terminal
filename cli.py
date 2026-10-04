@@ -352,15 +352,35 @@ def recommend(limit, use_case, output_json):
 @click.argument("model_name")
 @click.option("--context", "-c", type=click.IntRange(min=1), default=4096, help="Target context length")
 @click.option("--json", "json_output", is_flag=True, help="Emit a schema-1 heuristic plan")
-def plan(model_name, context, json_output=False):
+@click.option("--facts", "facts_path", type=click.Path(exists=True, dir_okay=False), help="Saved schema-1 model facts or calibration report")
+@click.option("--concurrency", type=click.IntRange(1, 16), default=1)
+@click.option("--gpu-weight-percent", type=click.IntRange(0, 100), default=100)
+@click.option("--kv-type", type=click.Choice(["fp16", "fp32"]), default="fp16")
+@click.option("--kv-device", type=click.Choice(["gpu", "cpu"]), default="gpu")
+@click.option("--overhead-mib", type=click.IntRange(0, 4096), default=256)
+def plan(model_name, context, json_output=False, facts_path=None, concurrency=1,
+         gpu_weight_percent=100, kv_type="fp16", kv_device="gpu", overhead_mib=256):
     """Show hardware requirements for MODEL_NAME across quantization levels."""
     from core.model_intelligence import plan_hardware_for_model
 
     plans = plan_hardware_for_model(model_name, target_context=context)
+    metadata_plan = None
+    if facts_path:
+        from core.model_facts import memory_scenario, read_model_facts
+
+        try:
+            metadata_plan = memory_scenario(read_model_facts(facts_path, model_name), requested_context=context,
+                                           concurrency=concurrency, gpu_weight_percent=gpu_weight_percent,
+                                           kv_type=kv_type, kv_device=kv_device, overhead_mib=overhead_mib)
+        except (OSError, ValueError, TypeError) as exc:
+            raise click.ClickException(str(exc)) from exc
+    elif (concurrency, gpu_weight_percent, kv_type, kv_device, overhead_mib) != (1, 100, "fp16", "gpu", 256):
+        raise click.ClickException("Memory scenario assumptions require --facts.")
 
     if json_output:
         _emit_json({"schema_version": 1, "kind": "hardware_plan", "model_name": model_name,
                     "requested_context": context, "artifact_metadata": None, "plans": plans,
+                    "metadata_plan": metadata_plan,
                     "estimate_provenance": {
                         "kind": "heuristic", "weight_size": "model_name_estimate",
                         "context_overhead": "legacy_context_formula",
@@ -386,6 +406,11 @@ def plan(model_name, context, json_output=False):
         )
 
     console.print(table)
+    if metadata_plan:
+        console.print(f"Saved metadata scenario: {metadata_plan['status']}; runtime allocation was not measured.")
+        if metadata_plan["estimated_gpu_bytes"] is not None:
+            console.print(f"GPU estimate: {metadata_plan['estimated_gpu_bytes'] / 1024**3:.2f} GiB; "
+                          f"CPU estimate: {metadata_plan['estimated_cpu_bytes'] / 1024**3:.2f} GiB")
     console.print()
 
 
@@ -415,8 +440,6 @@ def compare(identities, input_path, json_output):
                       Text(str(model.get("source") or "Unknown")),
                       str(model["scores"]["composite"]), Text(str(model.get("resolved_revision") or "Unknown")))
     console.print(table)
-
-
 @cli.command()
 @click.argument("model_name")
 def scores(model_name):
