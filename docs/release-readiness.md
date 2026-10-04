@@ -34,8 +34,8 @@ release/prerelease version and qualify that version before publishing. Verify
 PyPI/TestPyPI account and name ownership, protected GitHub environment reviewers,
 Trusted Publisher and attestations. No token or account value belongs in this
 repository. [Build-once candidates](build-once-candidates.md) describes the input
-boundary and official publishing references. Publication and merge are separate
-actions from preparing PRs; neither has happened in this work.
+boundary and official publishing references. Main integration is complete;
+publication has not occurred and remains subject to the gates above.
 
 ## Pilot evidence
 
