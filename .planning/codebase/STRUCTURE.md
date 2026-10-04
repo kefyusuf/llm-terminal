@@ -5,6 +5,10 @@
 
 This document describes the current repository layout. It replaces the older mapper output that referenced a root `app.py` monolith and outdated file/test counts.
 
+Continuation reviewed on 2026-10-04 against unmerged source `6bab5a6` through
+PR #140. The original baseline above is historical; exact delivery/evidence
+state is maintained in [continuation](../continuation.md).
+
 ## Top-Level Layout
 
 ```text
@@ -49,7 +53,9 @@ Creates `app.viewer.AIModelViewer`. `app/viewer.py` subclasses the base `AIModel
 
 Installed script: `ai-model-explorer-cli`
 
-Commands include system information, search, fit, recommend, plan, scores, and cache operations.
+Commands include system information, search, fit, recommend, plan, scores,
+offline saved-search compare, doctor and cache operations. Search/plan have
+versioned JSON exports; saved runtime facts can augment planning.
 
 ### `api_server.py`
 
@@ -119,6 +125,10 @@ Contains:
 - structured provider error types,
 - logging and utility functions.
 
+`artifacts.py` validates public pinned artifact declarations; `exports.py`
+owns bounded saved-result contracts; `model_facts.py` owns filtered runtime
+facts and explicitly assumed memory scenarios. These do not change scoring.
+
 `core/` should remain independent of Textual UI details.
 
 ## `results/` — View Logic
@@ -142,12 +152,22 @@ Important modules include:
 - `api.py` — service HTTP API handling,
 - `store.py` — persistent download-job SQLite store,
 - `runner.py` — job execution/process handling,
+- `preflight.py` — authoritative HF path/disk plans and byte/digest verification,
+- `parent_lifetime.py` — EOF guard for the service-owned HF child,
 - `service_client.py` — TUI/client requests and service compatibility handling,
 - `download_history.py`, `download_lifecycle.py`, `download_status.py` — reusable state helpers,
 - `download_manager.py` — command/payload helpers,
 - `hf_downloader.py` — focused Hugging Face downloader entry path.
 
 The worker pool is bounded and configurable; download state is persisted independently of the TUI process.
+
+Relevant qualification tools include `scripts/package_candidate.py` (one
+manifest/wheel/sdist input), `verify_installed_package.py` (installed origin and
+entrypoints), `verify_hf_recovery.py` (opt-in pinned sample),
+`verify_sqlite_compatibility.py` (read-only candidate backup compatibility),
+`benchmark_results_table.py` (bounded headless refresh costs) and
+`calibrate_ollama.py` (prepared local runtime only). Operational evidence is
+linked from `docs/release-readiness.md`.
 
 ## `tests/` — Verification
 

@@ -3,6 +3,9 @@
 **Baseline date:** 2026-09-07  
 **Baseline revision:** `f371cbf357731db729345d1cd29bc663bfb6edf7`
 
+Continuation reviewed on 2026-10-04 against unmerged source `6bab5a6` through
+PR #140; see [continuation](../continuation.md) for revision-bound evidence.
+
 ## Overview
 
 AI Model Explorer is a terminal-first local application with three user-facing surfaces over shared core logic:
@@ -144,7 +147,10 @@ Hugging Face also uses `huggingface_hub` APIs for search/download-specific opera
 - text alignment/truncation,
 - filtering/sorting/view selection.
 
-The main TUI still performs full DataTable rebuilds in important refresh paths. Incremental updates are a planned performance improvement, not a correctness requirement.
+Structural result/order/column changes rebuild the DataTable. Download-only
+refresh updates changed visible cells and skips identical values; measured
+headless costs and selection/scroll contracts are recorded in
+`docs/results-table-measurements.md`. These are refresh costs, not end-to-end FPS.
 
 ### 8. Download Layer
 
@@ -167,6 +173,15 @@ The service runs on loopback (default `127.0.0.1:8765`) and persists jobs in SQL
 
 The service supports an optional bearer token for non-health endpoints. Non-loopback bind/client hosts are rejected until authenticated TLS transport is implemented.
 
+HF plans are computed by the service/store from selected public artifact identity,
+with repository/revision namespaces, safe destination checks, bounded tree scans
+and transactionally reserved known bytes. The worker verifies declared final
+size/digest. A parent-owned pipe bounds its HF helper lifetime. Protocol 2.1
+gates managed selected-file removal and preserves active incompatible services.
+Deletion preserves auxiliary/shared data; filesystem deletion and SQLite commit
+are not one atomic operation. Candidate restore evidence is isolated and must
+not be generalized to production downgrade or shared active destinations.
+
 ### 9. REST API
 
 `api_server.py` exposes localhost programmatic access on `127.0.0.1:8787` by default.
@@ -186,6 +201,12 @@ Request validation returns 400 for invalid provider/limit/context/sort inputs ra
 - hardware planning,
 - scoring,
 - cache helpers.
+
+`core/exports.py` supplies versioned JSON and bounded offline comparison;
+`core/model_facts.py` supplies saved runtime declarations and explicit full-attention
+memory assumptions. The separate local calibration script requires a prepared
+cloud-disabled loopback Ollama and records repeated timing metrics without
+changing scores. Simulated protocol tests are not inference evidence.
 
 Provider errors are surfaced on stderr. JSON recommendation output remains stdout-only JSON for scripting compatibility.
 

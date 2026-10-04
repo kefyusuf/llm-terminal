@@ -4,6 +4,7 @@
 
 ### Reliability and provider correctness
 
+- Added a bounded, opt-in local Ollama calibration tool with exact installed identity, cloud-disabled checks, excluded warmup, separate timing metrics and prediction-error reports; genuine inference evidence remains pending and existing scoring is unchanged.
 - Added saved-runtime metadata memory scenarios with explicit context, concurrency, weight split, cache placement and provenance; retained existing scores and rejected unsupported cache layouts without fabricated estimates.
 - Bound service-owned HF children to the parent pipe lifetime, tested normal interpreter shutdown and forced parent death, and verified a Windows partial-download crash/restart/retry with exact byte/digest completion.
 - Bound HF detail requests to the selected commit and a 10-second request timeout, used configured credentials, rejected mismatched metadata and reported cached/unavailable detail state without exposing exception text.
@@ -61,6 +62,7 @@
 
 ### Packaging, CI, and verification
 
+- Added default-off pinned public HF recovery acceptance on Linux/Windows CI and archived real partial cancellation/retry/digest reports; rehearsed isolated terminal-job and selected-file restoration with two qualified installed candidate workers.
 - Built each CI package candidate once, recorded source/metadata/SHA-256 identity and verified the same wheel/sdist inputs across all 18 installation lanes; preserved the candidate for later authorized release qualification.
 - Strengthened Package CI with fresh wheel/sdist installations outside the checkout, installed-distribution origin checks, both console entry points, REST/download-service/client subprocess smoke and dependency-resolution evidence across the supported OS/Python matrix.
 - Standardized development workflow around `scripts/dev.py bootstrap`, `verify`, and `smoke` with committed platform-specific dependency locks.

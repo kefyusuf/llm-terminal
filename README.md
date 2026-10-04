@@ -111,7 +111,17 @@ comparison preserves recorded identity, scores and errors without another
 network search. See [model exports and exact artifact handoff](docs/model-exports.md).
 The existing `recommend --json` array remains compatible.
 
-Hugging Face downloads carry the selected file's resolved commit when metadata is available. Legacy requests report an unknown revision. See [download identity](docs/hf-download-identity.md) for the contract and remaining preflight work.
+Saved runtime declarations can drive explicit context/concurrency/placement
+scenarios through `plan --facts`; these retain unknowns and estimate assumptions.
+See [memory scenarios](docs/metadata-memory-scenarios.md). Developers can collect
+bounded repeated measurements from an already prepared dedicated local Ollama
+with the [calibration tool](docs/runtime-calibration.md); no runtime or model is
+downloaded by that tool, and no genuine calibration corpus is bundled.
+
+Hugging Face downloads preserve the selected file's resolved commit when available,
+use server-owned disk/path plans and validate declared byte/digest identity on
+completion. Legacy unknowns remain explicit. See
+[download identity and plans](docs/hf-download-identity.md) for the acquisition contract.
 
 ### Theming
 
