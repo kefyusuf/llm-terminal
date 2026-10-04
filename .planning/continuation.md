@@ -4,33 +4,37 @@ Date: 2026-10-05. Repository: `kefyusuf/llm-terminal`.
 
 ## Source and delivery state
 
-Integration checkpoint: branch `integration/release-readiness-stack` combines
-the verified implementation chain with the separate research roadmap. Its
-single main-target PR preserves the original PR references and uses the
-repository's squash-merge rule. The user authorized main integration on
-2026-10-05. Require independent review, fresh candidate CI/package gates and
-post-merge main verification before claiming delivery. Publication remains
-unauthorized and requires the external gates below.
+Main delivery: [integration PR #143](https://github.com/kefyusuf/llm-terminal/pull/143)
+squash-merged the researched roadmap and implementation stack on 2026-10-05
+with user authorization. Actual merge source is
+`93395de47aaa0817d21b9b736a075f75cafeef5e`. Its complete tracked file tree
+matches reviewed candidate `ca86b0daf912306183bec30ee819560d133cad28`.
+Original PRs #118–#142 are closed as superseded by #143, not individually merged;
+their descriptions, branches and review/test history are retained.
 
-Runtime/CI baseline: `7df9ce6015b390c464cf5e9490fae8cf25f65f9a`, branch
-`fix/calibration-elapsed-clock`, PR #142. All 898 full local tests passed with
-import smoke and Ruff; the staged 39-file type gate and CLI/TUI/API/service
-smoke also passed. Exact runtime source passed
-[CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37234532538)
-and [Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37234535094),
+The candidate's full local collection contained 903 tests: 902 passed and one
+POSIX-only venv test was skipped on Windows; that regression passed on Linux
+and macOS CI. Imports/Ruff, the staged 39-file type gate and main CLI/TUI/API/service
+smoke passed. Independent review found and confirmed fixes for claimed-job
+cancel/delete races and POSIX venv interpreter resolution before merge.
+
+Actual main source passed
+[CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37236972922)
+and [Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37236975704),
 including one candidate producer and 18 consumers of the same distributions.
-These results must be refreshed for changed source; they do not imply a merge
-or publication. The final continuation-only commit records these exact runtime
-inputs; its own commit identity must be read from Git/PR and its applicable
-verification checked separately. Do not substitute this runtime baseline for
-a differently versioned or integrated release candidate.
-Get its current SHA from Git rather than this file.
+[Candidate live HF CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37236560256)
+also passed on Linux/Windows with pinned cancellation/retry and size/digest proof.
+This follow-up records those inputs without changing runtime behavior. Read its
+current Git/PR commit and applicable verification separately. Requalify changed
+runtime, version or release artifacts rather than treating old evidence as current.
+No model inference, participant pilot, registry publication or live-release
+readiness is claimed; external gates remain below.
 
 The final full local run exposed a calibration timing bug on native
 Windows Python 3.12.14: fast responses can share a 15.625 ms monotonic tick.
-The correction uses a high-resolution elapsed counter while retaining deadline
+The merged correction uses a high-resolution elapsed counter while retaining deadline
 clocks and all validation. Its deterministic regression failed before the fix;
-the 23-test focused suite, full 898-test run and exact-source CI/package gates
+the 23-test focused suite, historical full 898-test run and exact-source CI/package gates
 passed after it. These are simulated protocol/fixture measurements, not a
 genuine inference corpus.
 
@@ -43,15 +47,11 @@ evidence, #133 versioned exports, #134 measured table updates, #135 HF detail
 request contract, #136 child lifetime, #137 SQLite data compatibility, #138
 declared memory scenarios, #139 bounded calibration, #140 opt-in live HF CI,
 #141 qualified candidate restore/documentation and #142 Windows elapsed-clock
-correction. The continuation-only commit belongs to the last branch.
-Each later PR targets
-the previous feature branch; merge/rebase requires source and CI reconciliation.
+correction. These are historical scope references; their combined delivery is #143.
 Pre-integration main was freshly read as `32fe324b97294d32b73795b06a12158e85abe283`.
-The independent roadmap proposal #118 is incorporated in the integration branch;
+The independent roadmap proposal #118 is incorporated on main;
 the historical mainline roadmap must not replace that research-informed scope.
-After merge, read main and the integration PR's actual merge commit from GitHub.
-Close superseded original PRs only after their changes are verified on main,
-and record the integration PR link without claiming individual squash merges.
+Read main and the integration PR's actual merge commit from GitHub on continuation.
 
 Preserve the pre-existing untracked `ai_model_explorer.egg-info/`; do not add or
 delete it. Build future local candidates from fresh exported source to avoid

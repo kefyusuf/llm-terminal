@@ -62,3 +62,15 @@ exact final size/digest. The [Linux report](evidence/hf-recovery-ci-linux-2026-1
 and [Windows report](evidence/hf-recovery-ci-windows-2026-10-04.json) retain their
 full CI source identity. This gate uses a fixed public sample and is disabled by
 default; it does not certify GPU inference or every HF artifact.
+
+The integrated candidate `ca86b0d` was requalified after the claimed-job
+cancel/delete fix in [live CI run 37236560256](https://github.com/kefyusuf/llm-terminal/actions/runs/37236560256),
+all 11 jobs passed. [Linux](evidence/hf-recovery-integration-linux-2026-10-05.json)
+observed 4 MiB and [Windows](evidence/hf-recovery-integration-windows-2026-10-05.json)
+10 MiB partial output before cancellation; both reopened/retried and verified
+the same pinned final bytes/digest. This candidate's tracked file tree exactly
+matches actual squash-merged main source `93395de`, which independently passed
+[main CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37236972922)
+and [main Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37236975704).
+The earlier previous-worker restore report retains its original named candidates;
+the new integration qualification is not a new production rollback rehearsal.
