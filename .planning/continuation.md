@@ -90,9 +90,11 @@ previous-worker execution after server-side plan rebinding. See
    acceptance supports a formula change. See `docs/runtime-calibration.md`.
 2. Qualify prepared Ollama acquisition/recovery with isolated stores and explicit
    size/time limits. HF Linux/Windows and forced-service child-lifetime evidence
-   are now recorded. Ollama CLI/API unavailable
-   locally; official Windows x64 portable asset metadata was 1.47 GB, not an
-   installed runtime. Do not substitute the smaller arm64 binary on x64.
+   are now recorded. The refreshed 2026-10-05 host probe found an installed
+   Ollama client 0.35.0, but the default loopback API was unavailable and the
+   local model store contained zero manifests. The earlier 1.47 GB Windows x64
+   portable asset metadata is not installation or inference evidence. A dedicated
+   running server and an explicitly budgeted model are still required.
 3. SQLite data compatibility and isolated previous-worker/file restore passed
    for the named candidates. Requalify the actual release/rollback target after
    integration or version changes; additive migrations alone are not downgrade proof.

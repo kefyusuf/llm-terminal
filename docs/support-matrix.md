@@ -23,11 +23,13 @@ RTX 4060 Ti with 16 GB VRAM/CUDA classification. Detection is not allocation,
 throughput, driver compatibility or inference evidence. Available RAM/VRAM is
 a changing snapshot, not a stable model capacity promise.
 
-Ollama CLI and localhost API were unavailable on the development host. Official
+The refreshed 2026-10-05 development-host probe found the installed Ollama client
+0.35.0. The default loopback API was unavailable and the local model store had
+zero manifests. This supersedes the earlier CLI-unavailable observation. Official
 release metadata for v0.35.1 listed a 1,471,094,402-byte Windows amd64 portable
-archive; checking that metadata did not install the runtime. A prepared runtime,
-isolated model store and declared artifact/time budget are still needed for the
-Ollama acceptance gate. An arm64 package is not a substitute on this x64 host.
+archive; checking that metadata did not install the runtime. A dedicated running
+server, isolated model store and declared model artifact/time budget are still
+needed for the Ollama acceptance gate. No model was downloaded or executed.
 
 Stable promotion must not advertise untested inference/backend combinations.
 A restricted prerelease can label optional runtimes/platform operations
