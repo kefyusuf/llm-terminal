@@ -1,5 +1,8 @@
 # Metadata memory scenarios
 
+The opt-in [runtime calibration tool](runtime-calibration.md) records the declarations
+used by this scenario and separates observed throughput from assumptions.
+
 `plan MODEL --facts snapshot.json --json` adds `metadata_plan` to the schema-1 plan envelope while retaining the existing heuristic quantization plans and numerical scoring. The input is a schema-1 `model_facts` snapshot, or the `model_facts` field of a schema-1 runtime calibration report. Exact model name and full Ollama digest must match. Inputs are bounded to 64 KiB and finite JSON. Saved declarations are not revalidated against a live runtime by this command.
 
 Snapshots distinguish runtime-reported architecture, supported context, quantization, capabilities, disk size and dimensions from derived head dimensions. A head dimension can be derived only by exact embedding-length / attention-head-count division when the explicit field is absent; invalid explicit fields remain unknown. The source observation/version is retained by the snapshot. [Ollama show](https://docs.ollama.com/api-reference/show-model-details) supplies model declarations; [tags](https://docs.ollama.com/api/tags) supplies the local model digest and disk-size declaration. A digest identifies the runtime model, not an HF file/repository commit or usage permission.
