@@ -96,6 +96,19 @@ def _cancel_requested(state, target_id: str) -> bool:
     return bool(latest and latest.get("cancel_requested"))
 
 
+def _read_stderr_tail(process) -> str:
+    """Drain a child pipe while retaining at most 4096 characters."""
+    tail = ""
+    if process.stderr is None:
+        return tail
+    try:
+        while chunk := process.stderr.read(4096):
+            tail = (tail + chunk)[-4096:]
+    except (OSError, ValueError):
+        pass
+    return tail
+
+
 def _finalize_terminal(state, target_id: str, return_code, cancelled: bool, *, last_line: str = "") -> None:
     """Write the terminal state of a job (completed / failed / cancelled)."""
     if cancelled:
@@ -212,6 +225,11 @@ def run_hf_download(state, target_id: str, command) -> None:
     )
     state.set_process(target_id, process)
     cancel_sent_at = None
+    stderr_tail: list[str] = []
+    stderr_reader = threading.Thread(
+        target=lambda: stderr_tail.append(_read_stderr_tail(process)), daemon=True
+    )
+    stderr_reader.start()
 
     try:
         while True:
@@ -234,14 +252,15 @@ def run_hf_download(state, target_id: str, command) -> None:
             time.sleep(0.25)
 
         cancelled = _cancel_requested(state, target_id)
+        stderr_reader.join(timeout=2)
         if cancelled:
             _finalize_terminal(state, target_id, return_code, cancelled=True)
         elif return_code == 0:
             _finalize_terminal(state, target_id, 0, cancelled=False)
         else:
             failure_detail = "hugging face download failed"
-            if process.stderr is not None:
-                err_text = process.stderr.read().strip()
+            if stderr_tail:
+                err_text = stderr_tail[0].strip()
                 if err_text:
                     failure_detail = err_text.splitlines()[-1][:180]
             state.store.update_job(
@@ -262,6 +281,9 @@ def run_hf_download(state, target_id: str, command) -> None:
             return_code=1,
         )
     finally:
+        stderr_reader.join(timeout=0.5)
+        if not stderr_reader.is_alive() and process.stderr is not None:
+            process.stderr.close()
         state.clear_process(target_id)
 
 

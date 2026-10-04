@@ -114,8 +114,10 @@ is limited to the process launched by this client, never a system-wide scan.
 - Tests exercise enrichment, cached metadata, SQLite restart/duplicate/requeue,
   the worker's child arguments and the generated SDK call without downloading
   model weights. The separate [Windows real SDK trial](evidence/hf-download-windows-2026-10-04.json)
-  verified early cancellation, reopen, retry and exact bytes/SHA-256. Partial-file
-  resumption, forced service restart and Ollama trials remain M1-D2 gates.
+  verified early cancellation, reopen, retry and exact bytes/SHA-256. The later
+  [reproducible recovery trial](hf-recovery-acceptance.md) also observed partial
+  cancellation and successful retry. Forced service restart and Ollama remain
+  separate M1-D2 gates.
 
 These are artifact identity and preflight slices of the proposed roadmap in
-PR #118. They are not evidence of production readiness or real recovery trials.
+PR #118. These checks and bounded trials do not establish production readiness.
