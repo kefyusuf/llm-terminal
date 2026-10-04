@@ -79,7 +79,8 @@ def _hf_download_script() -> str:
         "hf_hub_download("
         "repo_id=sys.argv[1], "
         "filename=sys.argv[2], "
-        "local_dir=sys.argv[3]"
+        "local_dir=sys.argv[3], "
+        "revision=(sys.argv[4] or None) if len(sys.argv) > 4 else None"
         ")"
     )
 
@@ -158,7 +159,15 @@ def run_hf_download(state, target_id: str, command) -> None:
         progress="",
     )
     process = subprocess.Popen(
-        [sys.executable, "-c", _hf_download_script(), repo_id, target_file, str(models_dir)],
+        [
+            sys.executable,
+            "-c",
+            _hf_download_script(),
+            repo_id,
+            target_file,
+            str(models_dir),
+            command[3] if len(command) > 3 else "",
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,

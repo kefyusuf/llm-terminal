@@ -407,7 +407,8 @@ def enrich_hf_model_details(model, specs, model_info_cache):
     target = model.get("target_file")
 
     cached = cache_db.get_model_cache("huggingface", repo_id)
-    if cached is not None:
+    if cached is not None and (not target or target == cached.get("target_file")):
+        model["resolved_revision"] = cached.get("resolved_revision")
         size = cached.get("size_gb")
         if size is not None:
             fit_str, mode_str, _ = calculate_fit(size, specs)
@@ -437,6 +438,7 @@ def enrich_hf_model_details(model, specs, model_info_cache):
             return model
 
         metadata = next((item for item in siblings if item.rfilename == target), None)
+        model["resolved_revision"] = getattr(info, "sha", None) if metadata else None
         size = None
         if metadata and metadata.size:
             size = metadata.size / (1024**3)
@@ -455,7 +457,11 @@ def enrich_hf_model_details(model, specs, model_info_cache):
         cache_db.set_model_cache(
             "huggingface",
             repo_id,
-            {"size_gb": size, "target_file": target},
+            {
+                "size_gb": size,
+                "target_file": target,
+                "resolved_revision": model.get("resolved_revision"),
+            },
         )
     except (HfHubHTTPError, RequestException, OSError, ValueError, TypeError):
         return model

@@ -36,6 +36,7 @@ class ModelResult(TypedDict, total=False):
 
     # -- Download state --
     target_file: str  # Target filename for HF file downloads
+    resolved_revision: str | None  # Resolved HF commit SHA; unknown metadata stays explicit
     download_state: str  # "idle" | "queued" | "downloading" | "completed" | "failed" | "cancelled"
     download_label: str  # Human-readable download state label
     download_detail: str  # Extra detail: progress %, elapsed time, or error message

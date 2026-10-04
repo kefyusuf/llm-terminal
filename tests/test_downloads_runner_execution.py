@@ -180,6 +180,19 @@ def test_hf_download_success_sets_running_then_completed(tmp_path, monkeypatch):
     assert state.clear_calls == ["hf:success"]
 
 
+def test_hf_download_passes_persisted_revision_to_child(tmp_path, monkeypatch):
+    _install_fake_config(monkeypatch, tmp_path / "models")
+    process = _HFProcess([0])
+    captured = []
+    monkeypatch.setattr(
+        runner.subprocess, "Popen", lambda args, **kw: captured.append(args) or process
+    )
+    runner.run_hf_download(
+        _State(_Store()), "hf:pinned", ["hf_api_download", "owner/repo", "model.gguf", "a" * 40]
+    )
+    assert captured[0][-1] == "a" * 40
+
+
 def test_hf_download_failure_uses_last_stderr_line(tmp_path, monkeypatch):
     _install_fake_config(monkeypatch, tmp_path / "models")
     process = _HFProcess([2], stderr="first line\nremote failed hard\n")

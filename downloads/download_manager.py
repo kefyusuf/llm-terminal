@@ -1,3 +1,6 @@
+import re
+
+
 def normalize_target_id(value):
     """Normalise *value* into a lowercase ``"source:identifier"`` string.
 
@@ -26,7 +29,13 @@ def build_download_command(model):
         target_file = model.get("target_file")
         if not target_file:
             raise ValueError("missing Hugging Face target file")
-        return ["hf_api_download", repo_id, target_file]
+        command = ["hf_api_download", repo_id, target_file]
+        revision = model.get("resolved_revision")
+        if revision is not None:
+            if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", revision):
+                raise ValueError("Hugging Face resolved revision must be a full commit SHA")
+            command.append(revision)
+        return command
 
     if source == "Ollama":
         model_name = model.get("name")

@@ -146,6 +146,19 @@ class DownloadStore:
     def _row_to_dict(self, row):
         if row is None:
             return None
+        artifact = None
+        try:
+            command = json.loads(row["command_json"])
+            if isinstance(command, list) and len(command) >= 3 and command[0] == "hf_api_download":
+                revision = command[3] if len(command) > 3 else None
+                artifact = {
+                    "repository": command[1],
+                    "filename": command[2],
+                    "revision": revision,
+                    "revision_status": "pinned" if revision else "unknown",
+                }
+        except (TypeError, ValueError):
+            pass
         return {
             "id": row["id"],
             "target_id": row["target_id"],
@@ -159,6 +172,7 @@ class DownloadStore:
             "updated_at": row["updated_at"],
             "cancel_requested": bool(row["cancel_requested"]),
             "return_code": row["return_code"],
+            "artifact": artifact,
         }
 
     def list_jobs(self, limit=50):
