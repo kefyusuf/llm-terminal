@@ -93,8 +93,14 @@ previous-worker execution after server-side plan rebinding. See
    are now recorded. The refreshed 2026-10-05 host probe found an installed
    Ollama client 0.35.0, but the default loopback API was unavailable and the
    local model store contained zero manifests. The earlier 1.47 GB Windows x64
-   portable asset metadata is not installation or inference evidence. A dedicated
-   running server and an explicitly budgeted model are still required.
+   portable asset metadata is not installation or inference evidence.
+   A subsequent owned-server preflight on source `5906e79` passed: version 0.35.0,
+   a separate loopback port, cloud explicitly disabled through `/api/status`,
+   zero installed models, and owned-process cleanup. The server created only
+   empty `blobs`/`manifests` directories. See the archived
+   `docs/evidence/ollama-runtime-preflight-windows-2026-10-05.json`.
+   Real acquisition/recovery and inference still require an explicitly budgeted
+   model; this empty-server readiness probe does not satisfy those gates.
 3. SQLite data compatibility and isolated previous-worker/file restore passed
    for the named candidates. Requalify the actual release/rollback target after
    integration or version changes; additive migrations alone are not downgrade proof.

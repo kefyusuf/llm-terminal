@@ -29,7 +29,14 @@ zero manifests. This supersedes the earlier CLI-unavailable observation. Officia
 release metadata for v0.35.1 listed a 1,471,094,402-byte Windows amd64 portable
 archive; checking that metadata did not install the runtime. A dedicated running
 server, isolated model store and declared model artifact/time budget are still
-needed for the Ollama acceptance gate. No model was downloaded or executed.
+needed for the Ollama acceptance gate. A subsequent [owned-server preflight](evidence/ollama-runtime-preflight-windows-2026-10-05.json)
+on source `5906e79` started runtime 0.35.0 on a separate loopback port with a
+dedicated store and process-only `OLLAMA_NO_CLOUD=1`. The real `/api/status`
+confirmed cloud disabled, `/api/tags` returned zero models, and the owned process
+was stopped. Only empty `blobs`/`manifests` directories were created. Default
+server unavailability is distinct from this successful dedicated-server startup.
+No model was downloaded or executed; acquisition/recovery and inference remain
+unqualified. See the official [local-only configuration](https://docs.ollama.com/faq#how-do-i-disable-ollama-cloud-features).
 
 Stable promotion must not advertise untested inference/backend combinations.
 A restricted prerelease can label optional runtimes/platform operations
