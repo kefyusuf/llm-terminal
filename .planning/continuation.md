@@ -4,21 +4,22 @@ Date: 2026-10-04. Repository: `kefyusuf/llm-terminal`.
 
 ## Source and delivery state
 
-Runtime/CI baseline: `b28f4fac5080d9fae0fe0ca1b5838db4b93ada8c`, branch
-`ci/build-once-package-candidates`, PR #131. Full local verification passed
-836 tests, import smoke and Ruff. Exact source passed
-[CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37225998926)
-and [Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37226000691),
+Runtime/CI baseline: `0208eaa7bb3e49e0d5764dbbf4a1bd7fa964c97a`, branch
+`feat/versioned-model-exports`, PR #133. Full local verification passed
+843 tests, import smoke and Ruff. Exact source passed
+[CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37228182547)
+and [Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37228184832),
 including one candidate producer and 18 consumers of the same distributions.
 These results must be refreshed for changed source; they do not imply a merge
-or publication. The documentation branch `docs/support-and-release-evidence`
-is based on this source. Get its current SHA from Git rather than this file.
+or publication. The subsequent table measurement scope is based on this source.
+Get its current SHA from Git rather than this file.
 
 The implementation chain remains open: #119 provider discovery, #120 hardware
 startup, #121 startup measurement, #122 doctor, #123 score provenance, #124
 isolated package verification, #125 revision pinning, #126 path preflight, #127
 artifact metadata, #128 download plans, #129 process/partial recovery, #130 owned
-removal and service shutdown, #131 build-once candidate. Each later PR targets
+removal and service shutdown, #131 build-once candidate, #132 support/release
+evidence, #133 versioned exports. Each later PR targets
 the previous feature branch; merge/rebase requires source and CI reconciliation.
 The independent roadmap proposal #118 targets main. Do not overwrite that
 proposal with the historical mainline roadmap or claim the stack is merged.
@@ -45,8 +46,10 @@ forced-host-crash proof. SDK auxiliary/partial caches are retained by deletion.
 ## Next work and external gates
 
 1. Continue narrow TDD-led M2 contracts: authoritative metadata/assumptions and
-   calibration inputs, additive versioned search/comparison output and measured
-   100/1000-row structural versus download-only table costs. Preserve numerical
+   calibration inputs. Versioned search/plan/comparison outputs are implemented;
+   the table scope measures 100/1000-row structural versus download-only costs
+   and avoids unchanged download-cell writes. See `docs/results-table-measurements.md`.
+   Preserve numerical
    scoring until measured acceptance supports a formula change.
 2. Qualify forced-crash/orphan recovery and prepared Ollama/Linux acquisition
    with isolated stores and explicit size/time limits. Ollama CLI/API unavailable

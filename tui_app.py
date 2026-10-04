@@ -1511,7 +1511,8 @@ class AIModelViewer(App):
                     dl_width = max(3, self.results_column_widths.get("download", 4) - 1)
                     download_markup = self._download_cell_markup(download_text, dl_width)
                     try:
-                        table.update_cell(key, "download", download_markup)
+                        if table.get_cell(key, "download") != download_markup:
+                            table.update_cell(key, "download", download_markup)
                     except Exception:
                         pass
                 return
