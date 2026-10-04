@@ -24,6 +24,22 @@ The timeout applies to each owned download attempt, with bounded cleanup; SDK
 metadata uses a request timeout. The file-size limit is not an aggregate network
 traffic quota because retries can transfer bytes again.
 
+## Opt-in CI acquisition
+
+The existing CI workflow has a manual `live_hf_recovery` boolean input, disabled
+by default. Enabling it runs the fixed public 19 MB sample above in the Linux
+and Windows Python 3.12 verification lanes after ordinary tests pass. The sample
+identity is not caller-controlled. Each attempt has a 120-second deadline and
+64 MiB file limit; the step has a six-minute limit within the ten-minute job.
+No inference or model usage occurs. Network failure or a transfer too fast to
+observe partial cancellation fails acceptance rather than synthesizing proof.
+
+The JSON-only `hf-recovery-<os>-<source>` artifacts are retained for 30 days;
+downloaded model/SDK files are not uploaded. Reports include the CI source SHA
+when available. Run `gh workflow run ci.yml --ref EXACT_BRANCH -f live_hf_recovery=true`
+only for the source being qualified, and reconcile report identity with the
+actual run head. Normal push/PR/manual runs perform no model acquisition.
+
 The [Windows report](evidence/hf-recovery-windows-2026-10-04.json) observed a
 10 MiB incomplete file before cancellation and validated the complete 19,077,344
 byte artifact. This proves application cancellation/retry and persisted identity;

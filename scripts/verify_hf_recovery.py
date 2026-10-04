@@ -142,6 +142,7 @@ def run_trial(args):
     state.store.upsert_job(model, models_dir=root / "models")
     completed, _ = download()
     report = {"schema_version": 1, "platform": platform.system(),
+              "ci_source_sha": os.environ.get("GITHUB_SHA"),
               "python_version": platform.python_version(),
               "huggingface_hub_version": huggingface_hub.__version__, "repository": args.repository,
               "filename": args.filename, "revision": args.revision, "size_bytes": metadata["size_bytes"],

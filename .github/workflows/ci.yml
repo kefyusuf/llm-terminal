@@ -2,6 +2,12 @@ name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      live_hf_recovery:
+        description: "Acquire the pinned 19 MB public HF sample for bounded recovery acceptance (no inference)"
+        type: boolean
+        required: false
+        default: false
   push:
     branches:
       - master
@@ -50,6 +56,32 @@ jobs:
           name: verify-logs-${{ matrix.os }}-py${{ matrix.python-version }}
           path: verify.log
           if-no-files-found: ignore
+
+      - name: Run opt-in pinned HF recovery acceptance
+        if: github.event_name == 'workflow_dispatch' && inputs.live_hf_recovery && matrix.python-version == '3.12'
+        timeout-minutes: 6
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            recovery_python=".venv/Scripts/python.exe"
+          else
+            recovery_python=".venv/bin/python"
+          fi
+          "$recovery_python" scripts/verify_hf_recovery.py \
+            ggml-org/models-moved tinyllamas/stories15M-q4_0.gguf \
+            --revision 499bc8821c6b12b4e53c5bffcb21ec206f212d81 \
+            --work-dir .venv/hf-recovery-live \
+            --output .venv/hf-recovery-live-report.json \
+            --max-bytes 67108864 --timeout 120
+
+      - name: Preserve opt-in recovery report
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.live_hf_recovery && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v6
+        with:
+          name: hf-recovery-${{ matrix.os }}-${{ github.sha }}
+          path: .venv/hf-recovery-live-report.json
+          if-no-files-found: warn
+          retention-days: 30
 
   coverage:
     runs-on: ubuntu-latest
