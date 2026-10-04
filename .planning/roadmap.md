@@ -1,5 +1,10 @@
 # AI Model Explorer — Active Roadmap
 
+Release-readiness work is proposed in PR #118. Consult the
+[verified continuation record](continuation.md) for the current unmerged
+implementation stack, exact-source evidence and remaining gates; the historical
+baseline below is not a claim that those later PRs have merged.
+
 **Baseline date:** 2026-09-07  
 **Baseline revision:** `d2c8913f3623eaaab8087a3c9d427b0a2686b375`  
 **Status:** post-hardening baseline; active roadmap only

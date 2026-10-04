@@ -153,6 +153,15 @@ Use a supported Python 3.10-3.14 interpreter for bootstrap. On Windows that can 
 
 Package CI verifies wheel installations on Linux/Windows/macOS with Python 3.10–3.14 and sdist installations on each OS with Python 3.12, using fresh environments outside the checkout. It checks installed module origins, console scripts, REST and download-service startup and records resolved dependencies. See [installed package validation](docs/installed-package-validation.md) for the checks, local evidence and limits.
 
+The [operation-specific support matrix](docs/support-matrix.md) separates tested
+installation/startup from live download recovery and unverified inference.
+[HF download plans](docs/hf-download-identity.md) preview exact identity,
+destination and known disk budget before queueing; [managed file removal](docs/managed-download-removal.md)
+preserves unrelated models and SDK caches. Current CI [builds one candidate](docs/build-once-candidates.md)
+for all installation consumers. [Release readiness](docs/release-readiness.md)
+records the remaining runtime, pilot, downgrade and publication gates; a green
+package build is not a stable-release or model-inference certification.
+
 The current verify baseline contains **600+ tests**.
 
 ## Run
