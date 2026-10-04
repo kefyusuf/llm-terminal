@@ -149,6 +149,8 @@ Use a supported Python 3.10-3.14 interpreter for bootstrap. On Windows that can 
 
 `scripts/dev.py smoke` runs bounded/offline-safe smoke checks for the CLI, REST API, TUI startup path and download service.
 
+Package CI verifies wheel installations on Linux/Windows/macOS with Python 3.10–3.14 and sdist installations on each OS with Python 3.12, using fresh environments outside the checkout. It checks installed module origins, console scripts, REST and download-service startup and records resolved dependencies. See [installed package validation](docs/installed-package-validation.md) for the checks, local evidence and limits.
+
 The current verify baseline contains **600+ tests**.
 
 ## Run

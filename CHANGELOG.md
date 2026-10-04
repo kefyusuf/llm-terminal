@@ -50,6 +50,7 @@
 
 ### Packaging, CI, and verification
 
+- Strengthened Package CI with fresh wheel/sdist installations outside the checkout, installed-distribution origin checks, both console entry points, REST/download-service/client subprocess smoke and dependency-resolution evidence across the supported OS/Python matrix.
 - Standardized development workflow around `scripts/dev.py bootstrap`, `verify`, and `smoke` with committed platform-specific dependency locks.
 - Expanded supported runtime metadata to Python 3.10-3.14 and CI verification to Ubuntu/Windows on Python 3.12 and 3.14.
 - Added/expanded separate CI verify, smoke, and Package gates used as exact-head merge evidence.
