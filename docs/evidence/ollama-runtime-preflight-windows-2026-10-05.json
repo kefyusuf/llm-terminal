@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "source_sha": "5906e792a33e6b5299662e2ea6d8d03fcd892ba2",
+  "scope": "owned loopback server readiness; no acquisition or inference",
+  "cloud_disabled": true,
+  "model_count": 0,
+  "owned_server_stopped": true,
+  "runtime_version": "0.35.0",
+  "status": "passed",
+  "elapsed_seconds": 7.734,
+  "store_empty_after_probe": false,
+  "post_probe_filesystem_observation": {
+    "directories": ["blobs", "manifests"],
+    "regular_file_count": 0,
+    "explanation": "The server created two empty store directories; no model files exist."
+  },
+  "limits": [
+    "No model pull, import, generation or deletion was requested.",
+    "No signing-key or global-configuration change was requested.",
+    "No acquisition, recovery, GPU allocation or inference qualification is claimed.",
+    "Process termination only establishes cleanup of this owned empty-server probe."
+  ]
+}
