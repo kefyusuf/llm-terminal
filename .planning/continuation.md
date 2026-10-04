@@ -4,14 +4,15 @@ Date: 2026-10-04. Repository: `kefyusuf/llm-terminal`.
 
 ## Source and delivery state
 
-Runtime/CI baseline: `0208eaa7bb3e49e0d5764dbbf4a1bd7fa964c97a`, branch
-`feat/versioned-model-exports`, PR #133. Full local verification passed
-843 tests, import smoke and Ruff. Exact source passed
-[CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37228182547)
-and [Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37228184832),
+Runtime/CI baseline: `6bab5a6488749e97ef6f7679fa280e5335c3ad84`, branch
+`ci/opt-in-hf-recovery`, PR #140. Full local verification passed 897 tests,
+import smoke and Ruff before the final slow-response regression; the final
+23-test calibration suite passed. Exact source, with 898 collected tests, passed
+[CI, 11 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37232844033)
+and [Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37232846239),
 including one candidate producer and 18 consumers of the same distributions.
 These results must be refreshed for changed source; they do not imply a merge
-or publication. The subsequent table measurement scope is based on this source.
+or publication. The subsequent documentation scope records these exact inputs.
 Get its current SHA from Git rather than this file.
 
 The implementation chain remains open: #119 provider discovery, #120 hardware
@@ -19,8 +20,13 @@ startup, #121 startup measurement, #122 doctor, #123 score provenance, #124
 isolated package verification, #125 revision pinning, #126 path preflight, #127
 artifact metadata, #128 download plans, #129 process/partial recovery, #130 owned
 removal and service shutdown, #131 build-once candidate, #132 support/release
-evidence, #133 versioned exports. Each later PR targets
+evidence, #133 versioned exports, #134 measured table updates, #135 HF detail
+request contract, #136 child lifetime, #137 SQLite data compatibility, #138
+declared memory scenarios, #139 bounded calibration and #140 opt-in live HF CI.
+The current documentation branch adds qualified candidate restore evidence.
+Each later PR targets
 the previous feature branch; merge/rebase requires source and CI reconciliation.
+Main was freshly read as `32fe324b97294d32b73795b06a12158e85abe283`.
 The independent roadmap proposal #118 targets main. Do not overwrite that
 proposal with the historical mainline roadmap or claim the stack is merged.
 
@@ -43,20 +49,30 @@ completion and selected-file removal with sibling preservation. See the linked
 JSON reports in `docs/evidence/`. This is not inference, usage permission or
 forced-host-crash proof. SDK auxiliary/partial caches are retained by deletion.
 
+The later forced-service-stop trial observed the owned HF child exit and a
+successful retry. Exact-source Linux/Windows CI at `6bab5a6` independently
+observed 10 MiB partial cancellation and final byte/digest verification.
+Installed build-once candidates `6bab5a6` and `5d65b5f` completed a terminal-job
+SQLite backup and selected-file restore rehearsal in separate roots, including
+previous-worker execution after server-side plan rebinding. See
+`docs/qualified-candidate-restore.md`; these are bounded operation proofs.
+
 ## Next work and external gates
 
-1. Continue narrow TDD-led M2 contracts: authoritative metadata/assumptions and
-   calibration inputs. Versioned search/plan/comparison outputs are implemented;
-   the table scope measures 100/1000-row structural versus download-only costs
-   and avoids unchanged download-cell writes. See `docs/results-table-measurements.md`.
-   Preserve numerical
-   scoring until measured acceptance supports a formula change.
-2. Qualify forced-crash/orphan recovery and prepared Ollama/Linux acquisition
-   with isolated stores and explicit size/time limits. Ollama CLI/API unavailable
+1. M2 exports, saved comparisons, declared memory scenarios and bounded runtime
+   calibration tooling are implemented. Table evidence covers 100/1000-row
+   structural versus download-only costs and avoids unchanged cell writes.
+   Genuine calibration requires a dedicated prepared local Ollama runtime and
+   real repeated inference samples. Preserve numerical scoring until measured
+   acceptance supports a formula change. See `docs/runtime-calibration.md`.
+2. Qualify prepared Ollama acquisition/recovery with isolated stores and explicit
+   size/time limits. HF Linux/Windows and forced-service child-lifetime evidence
+   are now recorded. Ollama CLI/API unavailable
    locally; official Windows x64 portable asset metadata was 1.47 GB, not an
    installed runtime. Do not substitute the smaller arm64 binary on x64.
-3. Rehearse SQLite backup/previous-candidate data compatibility and qualified
-   runtime handoff. Additive migrations alone are not downgrade proof.
+3. SQLite data compatibility and isolated previous-worker/file restore passed
+   for the named candidates. Requalify the actual release/rollback target after
+   integration or version changes; additive migrations alone are not downgrade proof.
 4. Keep TestPyPI/PyPI account/name, publisher/protected environment, chosen new
    version, attestations, genuine participant pilot and actual promotion as
    explicit gates. Do not fabricate human outcomes, send unapproved messages or

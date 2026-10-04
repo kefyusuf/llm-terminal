@@ -1,7 +1,7 @@
 # Release evidence and promotion gates
 
 Reviewed on 2026-10-04 against the unmerged implementation stack through
-`b28f4fac5080d9fae0fe0ca1b5838db4b93ada8c` (PR #131). Main is not implied to
+`6bab5a6488749e97ef6f7679fa280e5335c3ad84` (PR #140). Main is not implied to
 contain this stack. The release roadmap proposal is PR #118; the current
 [continuation record](../.planning/continuation.md) separates done and pending work.
 
@@ -9,12 +9,13 @@ contain this stack. The release roadmap proposal is PR #118; the current
 |---|---|---|
 | M0 startup, diagnosis, estimate explanations, isolated installs | PRs #119–#124; startup reports and installed smoke; heuristic provenance remains explicit | Implemented; historical startup timing is not a new candidate timing sample |
 | M1-D1 HF identity/license/path/disk plan | PRs #125–#128; durable pinned identity, metadata, known-byte reservation and explicit unknowns | Implemented and tested; no license permission inferred |
-| M1-D2 Windows HF acceptance | PRs #129–#130; real partial cancellation/retry, controlled service restart, bytes/digest and selected-file removal | Verified bounded Windows operation; forced crash/Ollama/Linux acquisition still pending |
+| M1-D2 HF acceptance | PRs #129–#130/#136/#140; Windows controlled/forced service stop, child exit, selected-file removal; Linux/Windows CI partial cancellation/retry and bytes/digest | Bounded HF operations verified; Ollama acquisition and host/power-loss proof pending |
 | M1-P1 declared operation support | [Support matrix](support-matrix.md); hosted package reports and native Windows trials | Packaging verified; optional inference/backend combinations experimental |
 | M1-O1 catalog source decision | [ADR 0001](adr/0001-ollama-catalog-source.md), parser fixtures and observable shape errors | Decision recorded; no undocumented global API migration |
 | M3-L1 single release input | PR #131 exact source passed 11 CI jobs and 19 Package jobs; manifest and one preserved wheel/sdist pair | Candidate qualification implemented; no TestPyPI/PyPI publication |
 | M3-L2 security/support | [Private report route](../SECURITY.md) enabled; issue tracker for non-sensitive defects | Route verified; no support SLA or completed pilot claimed |
-| M2 selection/calibration/export/table cost | Existing heuristic provenance and HF plan JSON are partial foundations | Remaining development/evidence; not represented as complete |
+| M2 selection/calibration/export/table cost | PRs #133–#139; versioned exports, saved comparisons, declared full-attention memory scenarios, measured table update costs and bounded local calibration tool | Implemented and tested; genuine inference/calibration corpus pending; numerical scoring unchanged |
+| Previous-candidate restore | [Installed worker/file rehearsal](qualified-candidate-restore.md) with exact CI candidates `6bab5a6` and `5d65b5f` | Isolated terminal-job/file restore verified; no production rollback claim |
 
 ## Candidate review and publication
 
@@ -64,6 +65,14 @@ terminal-job data-read compatibility between the exact `cf0ca4d` and `5d65b5f`
 candidates on Windows. It does not qualify older workers for shared destinations
 or establish a production downgrade. Use a fresh backup and independent runtime
 qualification for the actual rollback target.
+
+The subsequent [installed-worker rehearsal](qualified-candidate-restore.md)
+qualified `5d65b5f` against data written by `6bab5a6`: a terminal-job backup and
+selected model file were restored into separate roots, the previous server
+recomputed its plan before requeue, and both workers completed with matching
+bytes/digest. Both original files and immutable backups retained their hashes.
+This extends the read-only evidence without authorizing production rollback or
+claiming arbitrary version compatibility.
 
 For a bad release, suspend promotion, document the affected source/artifacts and
 prepare a tested hotfix. An approved PyPI yank is index metadata, not an automatic

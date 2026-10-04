@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "platform": "Windows",
+  "python_version": "3.12.14",
+  "current": {
+    "source_sha": "6bab5a6488749e97ef6f7679fa280e5335c3ad84",
+    "version": "1.0.1",
+    "wheel_sha256": "5c2f257321fa166c86c3ad99c4223a76a32f2f846923b157593afb2fbd93588f",
+    "installed_origin_verified": true,
+    "completed": true,
+    "restored_terminal_records": 0,
+    "server_plan_rebound_to_isolated_root": true,
+    "verified_bytes_and_sha256": true,
+    "controlled_shutdown_exit_zero": true
+  },
+  "previous": {
+    "source_sha": "5d65b5fcaf0997290e7df9fcdf4dd5df31ed334c",
+    "version": "1.0.1",
+    "wheel_sha256": "a5253c5b224b04ddc72cc92ba99ef53867291c7ec10d2597d8c73c3aacda89f9",
+    "installed_origin_verified": true,
+    "completed": true,
+    "restored_terminal_records": 1,
+    "server_plan_rebound_to_isolated_root": true,
+    "verified_bytes_and_sha256": true,
+    "controlled_shutdown_exit_zero": true
+  },
+  "backup": {
+    "integrity": "ok",
+    "job_count": 1,
+    "backup_sha256": "eb7f1dee729aa0c355db46c2e29041a790c1d48a950cbe59a4a7dac66358cada"
+  },
+  "repository": "ggml-org/models-moved",
+  "filename": "tinyllamas/stories15M-q4_0.gguf",
+  "revision": "499bc8821c6b12b4e53c5bffcb21ec206f212d81",
+  "size_bytes": 19077344,
+  "sha256": "66967fbece6dbe97886593fdbb73589584927e29119ec31f08090732d1861739",
+  "immutable_backups_and_original_files_unchanged": true,
+  "limits": [
+    "Isolated candidate rehearsal, not a production downgrade or published release",
+    "One terminal HF job and one selected file; no active-job or auxiliary-cache restore",
+    "No inference, usage permission, host/power-loss or transfer-reuse proof"
+  ]
+}
