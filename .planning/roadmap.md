@@ -1,15 +1,31 @@
 # AI Model Explorer — Active Roadmap
 
-Release-readiness work is proposed in PR #118. Consult the
-[verified continuation record](continuation.md) for the current unmerged
-implementation stack, exact-source evidence and remaining gates; the historical
-baseline below is not a claim that those later PRs have merged.
+**Baseline date:** 2026-10-02
 
-**Baseline date:** 2026-09-07  
-**Baseline revision:** `d2c8913f3623eaaab8087a3c9d427b0a2686b375`  
-**Status:** post-hardening baseline; active roadmap only
+**Baseline revision:** `32fe324b97294d32b73795b06a12158e85abe283`
+**Status:** research-informed local-product release roadmap; release gates not yet complete
 
-This roadmap replaces the 2026-06-09 mapper plan. Completed work stays documented here only as a baseline summary; it is not an active backlog.
+This roadmap retains the completed hardening baseline and replaces the older active backlog with priorities derived from the 2026-10-02 industry/release assessment. See [research and comparison](../docs/industry-readiness.md) and [local runtime evidence](../docs/runtime-validation.md). Completed work is not an active backlog.
+
+## Implementation and remaining acceptance
+
+Reviewed on 2026-10-05. The integration candidate incorporates the roadmap and
+implementation PRs #118–#142; see [continuation](continuation.md) for exact source
+and evidence. This is not a publication or inference-readiness claim.
+
+| Contract | Implemented/verified | Remaining work |
+|---|---|---|
+| M0 R1/R2/R3 | Nonblocking discovery/hardware startup, measured startup, doctor, transparent estimates and installed wheel/sdist entrypoints | Requalify the integrated release/version; prepared optional-runtime UX evidence |
+| M1 D1 | Pinned selected artifact, public metadata, server-owned destination/disk plans and final byte/digest checks | Unknown upstream facts and license permission remain explicit |
+| M1 D2/P1 | Windows/Linux HF cancellation/retry, Windows service stop/child exit, managed removal and operation-specific support matrix | Prepared Ollama acquisition/recovery; optional native inference/backend evidence |
+| M1 O1 | Recorded catalog-source ADR, fixture-backed parsing and actionable drift diagnostics | No catalog migration without a verified supported replacement |
+| M2 S1/A1/U1 | Saved runtime memory scenarios, bounded calibration tool, versioned exports/offline comparison and measured incremental table refresh | Genuine repeated local inference corpus before accuracy claims or scoring changes |
+| M3 L1 | Build-once candidate pair, source/byte manifest and 18 isolated consumers | Authorized new version, publisher/account/name, protected environment, TestPyPI/attestation and promotion |
+| M3 L2 | Security/support route, terminal-job backup and isolated previous-worker/file restore rehearsal | Real participant pilot; requalify actual release/rollback candidate and authorize promotion |
+
+The milestone definitions below preserve the acceptance contracts. Implemented
+items in this table are not new feature TODOs; only the remaining evidence and
+release gates form the active work.
 
 ## Delivery Principles
 
@@ -60,95 +76,136 @@ The following items from the old roadmap are already implemented and should not 
 - Sanitized fixture-backed Ollama parser contracts pin supported search-anchor and model-detail table/card shapes, including ordering, dedupe, filtering, pull counts, size parsing, preferred variants, and genuine zero-result behavior.
 - Ollama search structural-failure detection distinguishes the verified `No models found.` zero-result marker from unsupported HTTP-200 page shapes and emits aligned legacy plus non-retryable structured `parse_error` diagnostics instead of silent false success.
 
-## P1 — Quality Baseline
+- Later merged work also includes asynchronous runtime service startup/deletion, narrow-terminal/modal fixes, table-content consistency guards, REST response hardening, packaging/lock fixes, and a staged mypy gate.
+- Local 2026-10-02 evidence: 682 tests plus imports/Ruff, the scoped 32-file mypy check, all smoke surfaces, actual hardware detection, normal REST/service transport, and two real HF results rendered in the runtime TUI. HTTPS required a temporary Windows trusted-CA bundle; no TLS bypass was used.
+- Coverage figures above are prior canonical CI evidence, not a new measurement on this Windows run.
 
-### Q1. Targeted coverage when consequential weak seams are touched
+## Product and Release Scope
 
-The staged aggregate coverage goal and the residual silent-failure audit are complete. Coverage remains a merge gate and should continue to improve when concrete work touches weak boundaries; there is no active generic “raise the percentage” or “remove every broad catch” task.
+First supported public product: a local terminal application for discovering, comparing, selecting and downloading exact model artifacts across runtimes, with scriptable CLI and localhost REST. Distribution target: versioned Python package with pipx instructions. A hosted multi-user service is a separate decision.
 
-Remaining lower-coverage modules include:
+Differentiation hypothesis: trustworthy hardware-aware selection across providers, transparent estimates, keyboard workflow, and reliable acquisition. Validate it with pilot users. Chat/RAG/agents, billing, team administration and an inference engine are deferred.
 
-- `app/modals.py` — 25%,
-- `tui_app.py` — 38%,
-- `downloads/api.py` — 46%,
-- `core/hardware.py` — 52%,
-- `app/viewer.py` — 57%.
+Release dependency order: M0 -> M1 -> M3 pilot/promotion. M3 artifact/installation work starts in M0 and proceeds alongside M1 after the baseline is established. M2 calibration/automation is subsequent product work and can ship after a restricted prerelease; it is not required to add every feature before gathering user feedback.
 
-Do not create percentage-only PRs indefinitely. Add focused tests when these modules are changed for a concrete correctness, resilience, performance, or platform goal. Future aggregate gate increases should be evidence-driven and should not use new production exclusions or weaker assertions.
+## M0 — Accurate Product Contract and Runnable Candidate
 
-## P1 — Ollama Registry Resilience
+### R1. Measure and bound startup/provider detection
 
-Ollama remote discovery still depends on `ollama.com` HTML structure. Fixture-backed parser contracts and search structural-failure detection are complete; the remaining P1 work is evaluating a supported structured source that could reduce or replace HTML scraping.
+- Trace detection in viewer construction, startup and REST provider listing; measure repetitions with optional runtimes absent and present.
+- Avoid repeated synchronous network detection on the UI/request path; represent pending/unavailable/failed states honestly and bound cached snapshots.
+- Preserve capability-authoritative behavior, cancellation and visible failure semantics.
+- Provisional local targets: first usable TUI frame p95 <= 2s and input response <= 100ms while probes run; provider-list response <= 2s using cached/pending availability. Collect a named-machine baseline with at least 20 runs before accepting or revising these budgets. These are local UX targets, not upstream API SLAs.
 
-### O3. Structured-source/API research
+Exit: measured before/after evidence plus focused absence/timeout/recovery tests; slow provider detection cannot prevent search input use.
 
-With deterministic fixture coverage and observable search-shape failure detection in place, research whether Ollama exposes a supported structured registry/search source suitable for replacing or reducing HTML scraping. Do not migrate until compatibility, pagination, metadata quality, and rate-limit behavior are understood.
+### R2. Explain estimates and provide network diagnostics
 
-## P2 — TUI Results Performance
+- Label quality, throughput, fit and fallback context as estimates with assumptions/source; preserve existing public scoring fields until additive metadata is available.
+- Do not describe model-size-derived context score as measured context capacity or parameter-count quality as benchmark quality.
+- Add a user-invoked doctor/diagnostic command for runtime reachability, versions, model paths, free disk, TLS/custom CA and configuration. Redact tokens and sensitive paths/headers in shareable output.
+- Document REQUESTS_CA_BUNDLE/custom trust troubleshooting; keep certificate validation enabled. Make no machine-specific trust changes in package defaults.
 
-The TUI still clears/rebuilds result table rows in important refresh paths.
+Exit: estimates are visibly distinct from facts; missing runtime and CA failures produce actionable bounded diagnostics without exposing tokens. Documentation accurately describes what is inferred.
 
-### U1. Measure before changing
+### R3. Prove installation outside the source tree
 
-- Add a repeatable benchmark/test harness for row refresh at representative result counts.
-- Separate column-layout rebuilds from ordinary row-state updates.
+- Strengthen Package CI: fresh environment, wheel install, working directory outside checkout, no source-tree PYTHONPATH; verify imported modules resolve to installation paths.
+- Verify both console entry points, installed TUI startup, REST and download-service subprocess launch; separately build/install sdist to prove source completeness.
+- Include macOS packaging checks if it is claimed as supported; validate claimed Python 3.10-3.14 install/import compatibility or deliberately narrow support metadata/docs.
+- Record dependency-resolution behavior as well as committed development locks; those locks do not constrain all users' package installations.
 
-### U2. Incremental updates where safe
+Exit: candidate wheel/sdist work without repository files and the supported installation instructions are tested.
 
-- Use stable row keys and `DataTable.update_cell()`/row updates for download/progress/state changes that do not require full re-sort/re-filter.
-- Keep full rebuilds for structural column changes or result-order changes when simpler and safer.
-- Preserve cursor/scroll position and compact/comfortable layout behavior.
+## M1 — Reliable Model Acquisition and Explicit Support
 
-## P2 — Platform Acceptance Matrix
+### D1. Artifact identity, license and preflight
 
-CI currently verifies Ubuntu and Windows on Python 3.12/3.14. Runtime support remains Python 3.10-3.14, but provider/platform acceptance needs clearer evidence.
+- Carry provider/repository, exact file/variant, resolved revision/digest where available, source/model-card/license links, size and metadata timestamp.
+- Persist resolved identity on queued jobs. Model unknowns explicitly; do not infer permission from the application MIT license or a model's download count.
+- Show destination and known required bytes before queueing; check disk budget and path containment. Never silently acquire every quantization variant.
+- Current HF SDK 0.36.2 supports revision but not upstream's newer dry_run API: use supported metadata or a separately validated dependency change.
 
-Build an explicit matrix for:
+Exit: selected and downloaded artifacts have consistent immutable identity where supported; low-disk/unavailable-metadata behavior is explicit; license/source information survives across TUI/CLI/REST where those surfaces expose the model.
 
-- Windows native,
-- WSL/Linux,
-- Linux native,
-- macOS Apple Silicon.
+### D2. Real download, cancellation and recovery acceptance
 
-For each platform record:
+- Reuse existing single-file HF download, worker pool, cancellation escalation, SQLite state and orphan recovery rather than rebuilding them.
+- Run bounded, opt-in acquisition checks against a small pinned HF artifact and a small Ollama model on a prepared host with disk/time limits.
+- Cover cancel, interrupted transfer, restart, retry, completion validation, duplicate jobs and safe deletion of managed versus shared files. Record which behavior belongs to the SDK and which is guaranteed by this application.
+- Exercise TUI/service independence and record the downloaded location plus runtime handoff instructions.
 
-- bootstrap + package install,
-- CLI smoke,
-- REST smoke,
-- TUI startup smoke,
-- cache/download data paths,
-- provider detection behavior,
-- relevant runtime integrations (Ollama, LM Studio, Docker Model Runner, MLX).
+Exit: actual HF/Ollama success and interruption/recovery evidence, focused regressions for newly changed boundaries, and no false completed status for absent/invalid artifacts. Stable release requires this evidence; existing mocked tests alone do not satisfy it.
 
-Automate only where runners and services make the result reliable; keep clearly documented manual acceptance where hosted CI cannot represent the real runtime.
+### P1. Publish an evidence-based compatibility matrix
 
-## P3 — Provider and Runtime Edge Cases
+- Track OS, Python, GPU/backend, provider/runtime version and supported operation: discovery, installed-list, download, runtime handoff.
+- Validate Windows native and Linux native for the first supported release. Add WSL/macOS Apple Silicon/MLX evidence when prepared environments are available; mark unvalidated combinations experimental.
+- Distinguish hosted bootstrap/verify/smoke from actual GPU and runtime acceptance. Do not block a narrowly scoped prerelease on every optional runtime.
 
-Address these only after P1 work unless a concrete user-facing defect is found:
+Exit: every advertised supported combination has recorded evidence; unavailable environments remain an explicit gap rather than assumed success.
 
-- MLX `list_installed()` filesystem I/O containment parity with MLX search.
-- LM Studio metadata helper response-shape containment if/when it has a production caller.
-- Docker/LM Studio/MLX limit and installed-list edge cases not reachable through current user-facing limits.
-- Further type tightening around provider duck-typed interfaces.
+### O1. Keep Ollama catalog discovery resilient
 
-## P3 — Maintainability and Product Work
+- Retain fixture-backed parsing and observable shape failures.
+- The researched official index exposes local model management; no supported global catalog-search replacement was established. Record an architecture decision before changing the remote discovery source.
+- Use local structured model details for enrichment where available; do not confuse local tags with a global registry API.
 
-Candidate work after the quality/resilience baseline:
+Exit: a documented source decision and actionable drift diagnostics. Migration is conditional on a verified supported source, not a release prerequisite.
 
-- More scriptable structured CLI output without breaking existing JSON contracts.
-- REST/provider surface convergence where it materially improves users rather than adding abstraction for its own sake.
-- Additional cache/offline behavior beyond the existing TUI stale-cache fallback, if CLI/REST offline workflows become a product requirement.
-- Packaging/release automation improvements once release cadence requires them.
+## M2 — Better Selection and Automation
+
+### S1. Metadata-aware hardware planning and calibration
+
+- Prefer authoritative context/architecture/quantization/capability data, retaining explicit fallback provenance.
+- Model context/KV-cache, offload and concurrency assumptions; distinguish supported context from requested context and runtime allocation.
+- Add a bounded opt-in benchmark/calibration path with hardware/runtime/model revision, workload, repetitions and dispersion. Separate prompt throughput, generation throughput and end-to-end latency.
+- Publish prediction error on measured samples before promising accuracy. No universal model-quality ranking from file size.
+
+Exit: fact/estimate/measurement are distinguishable; a repeatable calibration corpus evaluates prediction error without hiding unsupported cases.
+
+### A1. Scriptable output and runtime handoff
+
+- Add versioned additive JSON/export contracts for search/plan/comparison where users need them; preserve existing recommend stdout and diagnostics contracts.
+- Include exact artifact identity, score provenance and errors; do not require UI scraping.
+- Provide supported handoff/import instructions; converge REST/provider scope only for a demonstrated user workflow.
+
+Exit: schema/compatibility tests and documented examples work from the installed package.
+
+### U1. Measure remaining table costs
+
+- Download-only incremental updates and render-signature guards already exist.
+- Benchmark representative counts (e.g. 100/1,000 rows), structural versus download-only refresh, cursor/scroll and narrow layouts.
+- Expand incremental updates only after evidence shows a material cost, retaining full rebuilds for layout/order changes where safer.
+
+Exit: measured benefit plus selection/order/content regressions; no generic TUI rewrite.
+
+## M3 — Controlled Public Release and Maintenance
+
+### L1. Build-once candidate and publishing pipeline
+
+- Produce versioned wheel/sdist, metadata checks, hashes and provenance from the candidate revision; preserve artifacts for install tests and publication.
+- Rehearse a prerelease on TestPyPI with controlled dependency sourcing. Configure protected publishing environments and PyPI OIDC Trusted Publishing; capture attestations.
+- Existing package workflow builds/tests but does not publish. External publisher/account/project-name availability and current remote CI remain prerequisites to verify during release work.
+
+Exit: tested artifacts match publish inputs; exact-source applicable CI is green; trusted publisher/environment setup and release authorization exist before publication. This roadmap does not authorize a deployment by itself.
+
+### L2. Pilot, promotion and recovery
+
+- Give a small pilot group the actual package installation instructions. Track installation, model selection, download and recovery outcomes; collect only user-submitted redacted diagnostics.
+- Publish tested/experimental support, known limits, versioned release notes and upgrade/uninstall instructions.
+- Establish job-data backup/migration compatibility, previous-version installation and a hotfix/withdrawal procedure. PyPI yanking is not automatic client rollback; exact pins can still install a yanked version.
+- Preserve existing daily external search checks, make provider-drift failures actionable, and distinguish upstream outages from deterministic merge failures.
+- Define an issue/security-reporting route, dependency maintenance owner and a release evidence record.
+
+Exit: pilot blockers resolved, M0/M1 mandatory gates passed, rollback/data compatibility exercised and release notes describe actual support. Stable promotion is based on evidence rather than a target calendar date.
+
+## Release Decision
+
+A restricted prerelease may expose experimental platforms/providers honestly. Stable public distribution requires clean installation, usable startup, transparent estimates, actual HF/Ollama acquisition and recovery evidence, safe managed-file deletion, declared compatibility and an operational release/upgrade process.
+
+Historical 67.44% coverage is not new exact-head proof. Keep the 60% gate and add focused tests as consequential seams change; do not create percentage-only work or weaken exclusions/assertions. Remaining platform/runtime edge cases enter the relevant milestone only when their promised operation needs them.
 
 ## Documentation Sync Policy
 
-`docs/maintenance.md` is the operational rule for keeping documentation current.
-
-At every successful merge, review at minimum:
-
-- `README.md` for user-facing behavior/configuration,
-- `CHANGELOG.md` for release-significant behavior,
-- this roadmap for completed/changed priorities,
-- `.planning/codebase/` when architecture, integrations, testing, stack, or known concerns changed.
-
-A merged implementation is not considered fully documented if it leaves a known active document materially false.
+Follow docs/maintenance.md. Update README, CHANGELOG, this roadmap and affected codebase references when behavior changes; record release evidence against the exact source/artifact. Distinguish researched recommendation, implemented behavior, local test evidence and remote release evidence.

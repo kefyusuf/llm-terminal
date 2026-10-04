@@ -4,6 +4,14 @@ Date: 2026-10-05. Repository: `kefyusuf/llm-terminal`.
 
 ## Source and delivery state
 
+Integration checkpoint: branch `integration/release-readiness-stack` combines
+the verified implementation chain with the separate research roadmap. Its
+single main-target PR preserves the original PR references and uses the
+repository's squash-merge rule. The user authorized main integration on
+2026-10-05. Require independent review, fresh candidate CI/package gates and
+post-merge main verification before claiming delivery. Publication remains
+unauthorized and requires the external gates below.
+
 Runtime/CI baseline: `7df9ce6015b390c464cf5e9490fae8cf25f65f9a`, branch
 `fix/calibration-elapsed-clock`, PR #142. All 898 full local tests passed with
 import smoke and Ruff; the staged 39-file type gate and CLI/TUI/API/service
@@ -26,7 +34,7 @@ the 23-test focused suite, full 898-test run and exact-source CI/package gates
 passed after it. These are simulated protocol/fixture measurements, not a
 genuine inference corpus.
 
-The implementation chain remains open: #119 provider discovery, #120 hardware
+The original implementation PRs are: #119 provider discovery, #120 hardware
 startup, #121 startup measurement, #122 doctor, #123 score provenance, #124
 isolated package verification, #125 revision pinning, #126 path preflight, #127
 artifact metadata, #128 download plans, #129 process/partial recovery, #130 owned
@@ -38,9 +46,12 @@ declared memory scenarios, #139 bounded calibration, #140 opt-in live HF CI,
 correction. The continuation-only commit belongs to the last branch.
 Each later PR targets
 the previous feature branch; merge/rebase requires source and CI reconciliation.
-Main was freshly read as `32fe324b97294d32b73795b06a12158e85abe283`.
-The independent roadmap proposal #118 targets main. Do not overwrite that
-proposal with the historical mainline roadmap or claim the stack is merged.
+Pre-integration main was freshly read as `32fe324b97294d32b73795b06a12158e85abe283`.
+The independent roadmap proposal #118 is incorporated in the integration branch;
+the historical mainline roadmap must not replace that research-informed scope.
+After merge, read main and the integration PR's actual merge commit from GitHub.
+Close superseded original PRs only after their changes are verified on main,
+and record the integration PR link without claiming individual squash merges.
 
 Preserve the pre-existing untracked `ai_model_explorer.egg-info/`; do not add or
 delete it. Build future local candidates from fresh exported source to avoid
