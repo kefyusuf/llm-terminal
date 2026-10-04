@@ -4,8 +4,8 @@ from downloads.service_client import is_service_compatible
 
 
 def test_service_compatibility_true_for_current_version():
-    """The authenticated 1.8 service protocol must be accepted."""
-    assert is_service_compatible({"version": "1.8"}) is True
+    """Managed removal requires the 2.1 service protocol."""
+    assert is_service_compatible({"version": "2.1"}) is True
 
 
 def test_service_compatibility_false_for_pre_auth_version():

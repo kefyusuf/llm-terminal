@@ -34,6 +34,7 @@ from core.utils import (
 )
 from providers import detect_available_providers
 from providers.capabilities import get_all_provider_capabilities
+from providers.discovery import ProviderDiscovery
 from providers.hf_provider import search_hf_models
 from providers.ollama_provider import get_installed_ollama_models, search_ollama_models
 
@@ -275,6 +276,8 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
                         "composite": r.get("score_composite", 0),
                         "estimated_tok_s": r.get("estimated_tok_s", 0),
                     },
+                    "score_provenance": r.get("score_provenance"),
+                    "artifact_metadata": r.get("artifact_metadata"),
                     "moe": {
                         "is_moe": r.get("is_moe", False),
                         "total_experts": r.get("total_experts", 0),
@@ -352,6 +355,7 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
                     "estimated_tok_s": scores.estimated_tok_s,
                 },
                 "size_gb": size_gb,
+                "score_provenance": {**scores.provenance, "size_source": "model_name_estimate"},
                 "params": params_str,
                 "quant": quant,
                 "use_case": use_case_key,
@@ -360,13 +364,14 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
 
     def _handle_providers(self):
         """Return provider availability plus global and REST-surface metadata."""
-        availability = detect_available_providers()
+        snapshot = self.server.provider_discovery.snapshot()
         api_bases = get_provider_api_bases()
-        providers = build_provider_descriptors(availability, api_bases)
+        providers = build_provider_descriptors(snapshot["availability"], api_bases)
         self._json_response(
             {
                 "providers": providers,
                 "models_endpoint_providers": list(get_rest_model_provider_slugs()),
+                "discovery": {key: value for key, value in snapshot.items() if key != "availability"},
             }
         )
 
@@ -398,6 +403,7 @@ def create_server(
     """Create and configure the API server with an injectable hardware monitor."""
     ModelAPIHandler.monitor = monitor if monitor is not None else HardwareMonitor()
     server = _LocalThreadingHTTPServer((host, port), ModelAPIHandler)
+    server.provider_discovery = ProviderDiscovery(lambda: detect_available_providers())
     return server
 
 

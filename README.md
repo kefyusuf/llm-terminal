@@ -39,6 +39,14 @@ Structured diagnostics include stable metadata such as:
 
 The TUI/orchestrator preserves this metadata internally. REST exposes it directly, while CLI model-discovery commands surface human-readable warnings on stderr.
 
+Runtime TUI provider detection runs in a background worker, so optional provider probes do not delay search input. The selector starts with Ollama/Hugging Face and updates as detection completes, preserving the active selection.
+
+CPU/GPU discovery also runs in background workers. Cached hardware is displayed immediately; a cold start shows a detection placeholder while the input remains usable. Searches and model details reuse one lazily initialized monitor. Expected detection failures show a retry message instead of closing the application. See [hardware startup behavior](docs/hardware-startup.md).
+
+The opt-in [startup measurement harness](docs/startup-measurements.md) records fresh-process headless startup, input dispatch and first REST provider-list response latency with explicit local budgets and failure accounting.
+
+REST `/api/v1/providers` returns availability immediately with additive `discovery` metadata (`status`, `refreshing`, `stale`, `error`). Availability is provisional while `status` is `pending`, and last-known values are retained during stale/failed refreshes. Hugging Face's initial availability means its remote integration is configured, not that connectivity has been checked. Each API server runs at most one probe at a time and reuses results for 30 seconds. See [provider discovery behavior](docs/provider-discovery.md).
+
 ### 4-Dimension Scoring
 
 - **Quality** (0-100): parameter count and quantization quality.
@@ -94,6 +102,27 @@ Rich terminal commands for system information, search, fit analysis, recommendat
 
 CLI search/fit/recommend provider failures are printed to **stderr**. `recommend --json` keeps stdout as valid JSON for scripting.
 
+Run `ai-model-explorer-cli doctor --json` for shareable storage, runtime and TLS diagnostics, or add `--offline` to skip network probes. The default total network wait budget is three seconds. See [doctor diagnostics](docs/doctor.md) for exit codes, privacy and troubleshooting.
+
+Model quality, throughput, fit and context scores are heuristic estimates. CLI `scores`, TUI comparison and additive REST/recommendation JSON provenance explain their inputs and defaults. The context score is a model-size proxy, not supported token capacity. See [score estimates](docs/score-estimates.md).
+
+Search and hardware planning expose additive schema-1 JSON; saved-search
+comparison preserves recorded identity, scores and errors without another
+network search. See [model exports and exact artifact handoff](docs/model-exports.md).
+The existing `recommend --json` array remains compatible.
+
+Saved runtime declarations can drive explicit context/concurrency/placement
+scenarios through `plan --facts`; these retain unknowns and estimate assumptions.
+See [memory scenarios](docs/metadata-memory-scenarios.md). Developers can collect
+bounded repeated measurements from an already prepared dedicated local Ollama
+with the [calibration tool](docs/runtime-calibration.md); no runtime or model is
+downloaded by that tool, and no genuine calibration corpus is bundled.
+
+Hugging Face downloads preserve the selected file's resolved commit when available,
+use server-owned disk/path plans and validate declared byte/digest identity on
+completion. Legacy unknowns remain explicit. See
+[download identity and plans](docs/hf-download-identity.md) for the acquisition contract.
+
 ### Theming
 
 - default
@@ -136,6 +165,17 @@ Use a supported Python 3.10-3.14 interpreter for bootstrap. On Windows that can 
 `scripts/dev.py coverage` runs the deterministic pytest-cov lane and enforces the threshold configured in `pyproject.toml`. The canonical Ubuntu/Python 3.12 lane now measures **67.44% total coverage** (`5095` statements, `1659` missed) and enforces a **60%** merge floor. Focused deterministic tests raised `downloads/runner.py` from **24% to 90%**, `downloads/service_client.py` from **46% to 90%**, and `core/hardware.py` from **44% to 52%** while pinning concrete correctness contracts. The staged 50% → 55% → 60% coverage ratchet is complete; future increases should remain evidence-driven and must not rely on production-code exclusions.
 
 `scripts/dev.py smoke` runs bounded/offline-safe smoke checks for the CLI, REST API, TUI startup path and download service.
+
+Package CI verifies wheel installations on Linux/Windows/macOS with Python 3.10–3.14 and sdist installations on each OS with Python 3.12, using fresh environments outside the checkout. It checks installed module origins, console scripts, REST and download-service startup and records resolved dependencies. See [installed package validation](docs/installed-package-validation.md) for the checks, local evidence and limits.
+
+The [operation-specific support matrix](docs/support-matrix.md) separates tested
+installation/startup from live download recovery and unverified inference.
+[HF download plans](docs/hf-download-identity.md) preview exact identity,
+destination and known disk budget before queueing; [managed file removal](docs/managed-download-removal.md)
+preserves unrelated models and SDK caches. Current CI [builds one candidate](docs/build-once-candidates.md)
+for all installation consumers. [Release readiness](docs/release-readiness.md)
+records the remaining runtime, pilot, downgrade and publication gates; a green
+package build is not a stable-release or model-inference certification.
 
 The current verify baseline contains **600+ tests**.
 
@@ -275,10 +315,13 @@ The active post-hardening roadmap is in `.planning/roadmap.md`.
 
 Current priorities:
 
-1. Ollama registry parser resilience and structured-source research,
-2. safer incremental TUI DataTable updates,
-3. explicit WSL, real-provider and Apple Silicon/MLX acceptance beyond the basic hosted macOS lane,
-4. targeted tests for consequential weak modules as concrete changes require them.
+1. Transparent recommendation estimates, bounded startup/provider detection and clean package installation outside the checkout,
+2. exact model-artifact provenance and real download/cancellation/recovery acceptance,
+3. an evidence-based platform/provider support matrix,
+4. a tested package release, pilot and upgrade/recovery process,
+5. metadata-aware calibration, scriptable output and measured TUI performance improvements.
+
+The [industry comparison and release assessment](docs/industry-readiness.md) explains the rationale and proposed release gates. These are planned milestones, not claims that public-release readiness has already been achieved.
 
 Documentation maintenance rules are in `docs/maintenance.md`.
 

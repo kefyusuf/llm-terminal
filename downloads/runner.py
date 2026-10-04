@@ -26,6 +26,8 @@ from typing import Any
 from loguru import logger
 
 from core.utils import extract_download_progress
+from downloads.download_manager import prepare_hf_destination
+from downloads.preflight import plan_hf_download
 
 
 def _service_popen_kwargs() -> dict[str, Any]:
@@ -74,19 +76,43 @@ def _target_file_from_hf_command(command) -> str:
 def _hf_download_script() -> str:
     """Return the subprocess script used to download one exact HF file."""
     return (
+        "import sys; "
+        "from downloads.parent_lifetime import start_parent_watchdog; "
+        "start_parent_watchdog() if len(sys.argv) > 7 and sys.argv[7] == 'parent-stdin' else None; "
         "from huggingface_hub import hf_hub_download; "
         "import sys; "
         "hf_hub_download("
         "repo_id=sys.argv[1], "
         "filename=sys.argv[2], "
-        "local_dir=sys.argv[3]"
-        ")"
+        "local_dir=sys.argv[3], "
+        "revision=(sys.argv[4] or None) if len(sys.argv) > 4 else None"
+        "); "
+        "from downloads.preflight import verify_hf_artifact; "
+        "verify_hf_artifact(sys.argv[3], sys.argv[2], "
+        "int(sys.argv[5]) if sys.argv[5] else None, sys.argv[6] or None) "
+        "if len(sys.argv) > 6 else None"
     )
 
 
 def _cancel_requested(state, target_id: str) -> bool:
+    stop_event = getattr(state, "stop_event", None)
+    if stop_event is not None and stop_event.is_set():
+        return True
     latest = state.store.get_job_by_target(target_id)
-    return bool(latest and latest.get("cancel_requested"))
+    return latest is None or bool(latest.get("cancel_requested"))
+
+
+def _read_stderr_tail(process) -> str:
+    """Drain a child pipe while retaining at most 4096 characters."""
+    tail = ""
+    if process.stderr is None:
+        return tail
+    try:
+        while chunk := process.stderr.read(4096):
+            tail = (tail + chunk)[-4096:]
+    except (OSError, ValueError):
+        pass
+    return tail
 
 
 def _finalize_terminal(state, target_id: str, return_code, cancelled: bool, *, last_line: str = "") -> None:
@@ -148,8 +174,39 @@ def run_hf_download(state, target_id: str, command) -> None:
         )
         return
 
-    models_dir = config.settings.hf_models_dir
-    models_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        get_metadata = getattr(state.store, "get_execution_metadata", None)
+        execution = get_metadata(target_id) if callable(get_metadata) else {}
+        execution = execution if isinstance(execution, dict) else {}
+        if execution.get("download_plan_status") == "invalid":
+            raise ValueError("persisted download plan is invalid")
+        metadata = execution.get("artifact_metadata") or {}
+        persisted_plan = execution.get("download_plan")
+        directory = config.settings.hf_models_dir
+        if persisted_plan:
+            selected = {"source": "Hugging Face", "id": repo_id, "target_file": target_file,
+                        "resolved_revision": command[3] if len(command) > 3 else None,
+                        "artifact_metadata": metadata or None}
+            current = plan_hf_download(selected, directory,
+                reserved_bytes=state.store.reserved_download_bytes(target_id),
+                allow_unknown_size=persisted_plan.get("size_bytes") is None and persisted_plan.get("allowed") is True)
+            if not current["allowed"] or current["model_directory"] != persisted_plan.get("model_directory"):
+                raise ValueError("download plan changed or is blocked")
+            directory = current["model_directory"]
+        models_dir = prepare_hf_destination(directory, target_file)
+    except (OSError, RuntimeError, ValueError):
+        state.store.update_job(
+            target_id,
+            status="failed",
+            detail="Hugging Face target file or destination is unsafe or unavailable",
+            progress="",
+            return_code=1,
+        )
+        return
+
+    if _cancel_requested(state, target_id):
+        _finalize_terminal(state, target_id, None, cancelled=True)
+        return
 
     state.store.update_job(
         target_id,
@@ -158,7 +215,19 @@ def run_hf_download(state, target_id: str, command) -> None:
         progress="",
     )
     process = subprocess.Popen(
-        [sys.executable, "-c", _hf_download_script(), repo_id, target_file, str(models_dir)],
+        [
+            sys.executable,
+            "-c",
+            _hf_download_script(),
+            repo_id,
+            target_file,
+            str(models_dir),
+            command[3] if len(command) > 3 else "",
+            str(metadata["size_bytes"]) if metadata.get("size_bytes") is not None else "",
+            metadata.get("sha256") or "",
+            "parent-stdin",
+        ],
+        stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
@@ -168,6 +237,11 @@ def run_hf_download(state, target_id: str, command) -> None:
     )
     state.set_process(target_id, process)
     cancel_sent_at = None
+    stderr_tail: list[str] = []
+    stderr_reader = threading.Thread(
+        target=lambda: stderr_tail.append(_read_stderr_tail(process)), daemon=True
+    )
+    stderr_reader.start()
 
     try:
         while True:
@@ -190,14 +264,15 @@ def run_hf_download(state, target_id: str, command) -> None:
             time.sleep(0.25)
 
         cancelled = _cancel_requested(state, target_id)
+        stderr_reader.join(timeout=2)
         if cancelled:
             _finalize_terminal(state, target_id, return_code, cancelled=True)
         elif return_code == 0:
             _finalize_terminal(state, target_id, 0, cancelled=False)
         else:
             failure_detail = "hugging face download failed"
-            if process.stderr is not None:
-                err_text = process.stderr.read().strip()
+            if stderr_tail:
+                err_text = stderr_tail[0].strip()
                 if err_text:
                     failure_detail = err_text.splitlines()[-1][:180]
             state.store.update_job(
@@ -218,6 +293,15 @@ def run_hf_download(state, target_id: str, command) -> None:
             return_code=1,
         )
     finally:
+        parent_pipe = getattr(process, "stdin", None)
+        if parent_pipe is not None:
+            try:
+                parent_pipe.close()
+            except (OSError, ValueError):
+                pass
+        stderr_reader.join(timeout=0.5)
+        if not stderr_reader.is_alive() and process.stderr is not None:
+            process.stderr.close()
         state.clear_process(target_id)
 
 
@@ -285,6 +369,9 @@ def run_streamed_command(state, target_id: str, command) -> None:
     cancellation is monitored independently so a silent stdout pipe
     cannot prevent terminate/kill escalation.
     """
+    if _cancel_requested(state, target_id):
+        _finalize_terminal(state, target_id, None, cancelled=True)
+        return
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,

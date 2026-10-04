@@ -1,0 +1,77 @@
+# Bounded Hugging Face recovery acceptance
+
+This opt-in checkout tool acquires a public single file through the production
+HF runner. It never performs inference or removes files. Normal tests do not
+contact model services. Use a fresh empty work directory and a known small
+sample; verify its source/license separately before any use.
+
+```powershell
+.venv\Scripts\python.exe scripts/verify_hf_recovery.py ggml-org/models-moved tinyllamas/stories15M-q4_0.gguf --revision 499bc8821c6b12b4e53c5bffcb21ec206f212d81 --work-dir .venv/hf-trial-new --output .venv/hf-trial-new.json --max-bytes 67108864 --timeout 120
+```
+
+The chosen revision must be a full commit. Metadata must have a positive known
+size within the file limit and a SHA-256 digest. Existing nonempty directories
+are rejected. The tool isolates databases, destination and HF local auxiliary
+cache, disables implicit HF credentials and Xet, and retains files for inspection.
+TLS verification remains enabled; a prepared process-only trust bundle may be
+needed on a corporate Windows host. Do not disable certificate verification.
+
+The tool checks active duplicate retention, early process cancellation, durable
+plan reopening, cancellation after a nonempty SDK `.incomplete` file appears,
+then retry and exact size/digest completion. A fast transfer can finish before
+partial cancellation: this leaves that gate unproved and returns a failing result.
+The timeout applies to each owned download attempt, with bounded cleanup; SDK
+metadata uses a request timeout. The file-size limit is not an aggregate network
+traffic quota because retries can transfer bytes again.
+
+## Opt-in CI acquisition
+
+The existing CI workflow has a manual `live_hf_recovery` boolean input, disabled
+by default. Enabling it runs the fixed public 19 MB sample above in the Linux
+and Windows Python 3.12 verification lanes after ordinary tests pass. The sample
+identity is not caller-controlled. Each attempt has a 120-second deadline and
+64 MiB file limit; the step has a six-minute limit within the ten-minute job.
+No inference or model usage occurs. Network failure or a transfer too fast to
+observe partial cancellation fails acceptance rather than synthesizing proof.
+
+The JSON-only `hf-recovery-<os>-<source>` artifacts are retained for 30 days;
+downloaded model/SDK files are not uploaded. Reports include the CI source SHA
+when available. Run `gh workflow run ci.yml --ref EXACT_BRANCH -f live_hf_recovery=true`
+only for the source being qualified, and reconcile report identity with the
+actual run head. Normal push/PR/manual runs perform no model acquisition.
+
+The [Windows report](evidence/hf-recovery-windows-2026-10-04.json) observed a
+10 MiB incomplete file before cancellation and validated the complete 19,077,344
+byte artifact. This proves application cancellation/retry and persisted identity;
+the SDK owns HTTP resume/cache behavior. Network byte reuse was not measured.
+Forced download-service restart, TUI/service independence, other OS/runtime
+acceptance and Ollama remain separate evidence gates. The sample's model-card
+license declaration was unknown; the trial does not establish usage permission.
+
+The HF runner now consumes child stderr concurrently and retains at most 4096
+characters. A local child writing 256 KiB before a nonzero exit proves that pipe
+backpressure cannot indefinitely prevent normal terminal-state handling. This
+regression runs without network in ordinary tests.
+
+## Forced parent process stop
+
+The service-owned HF child receives a private stdin pipe whose writer stays open
+in its parent. A daemon watchdog reads the raw descriptor; EOF or a pipe error
+exits the child with status 75, including when SDK/native I/O is blocked. Raw
+descriptor reads avoid holding Python's buffered-stdin lock during normal
+interpreter shutdown. No PID scan, unrelated process termination or persistent
+machine configuration is needed. The parent closes its writer during cleanup.
+Legacy direct invocations without the internal guard argument retain their
+existing behavior; this boundary protects service-owned HF acquisitions.
+
+Two real local-process regressions cover normal completion and forced parent
+termination. A separate [Windows public-file trial](evidence/hf-service-crash-windows-2026-10-04.json)
+observed 10 MiB partial data, forcibly stopped the owned service, and observed
+the recorded child exit in about 15 ms. Restart marked the abandoned running job
+failed, preserved its plan, and an explicit retry completed with exact byte/hash
+verification. This was the worktree based on `cf0ca4d`; runtime fingerprints in
+the report identify the tested files. It is not released-source, inference,
+Ollama or host/power-loss durability proof, and HTTP byte reuse was not measured.
+The earlier buffered-stdin implementation failed normal shutdown and the first
+trial retry; it was fixed before this passing report. Partial/auxiliary SDK data
+remain retained under the existing selected-file deletion policy.

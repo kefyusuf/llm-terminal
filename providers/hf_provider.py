@@ -1,3 +1,4 @@
+import re
 import time
 
 from huggingface_hub import HfApi
@@ -5,6 +6,7 @@ from huggingface_hub.errors import HfHubHTTPError
 from requests.exceptions import RequestException
 
 from core import cache_db
+from core.artifacts import hf_artifact_metadata
 from core.errors import ProviderError
 from core.scoring import enrich_result_with_scores
 from core.utils import (
@@ -279,7 +281,7 @@ def search_hf_models(
             sort="downloads",
             limit=offset + window_size,
             filter="gguf",
-            expand=["likes", "siblings", "downloads"],
+            expand=["likes", "siblings", "downloads", "sha", "cardData"],
         )
         raw_window = raw_models[offset : offset + window_size]
     except HfHubHTTPError as exc:
@@ -366,6 +368,8 @@ def search_hf_models(
                 "gem_score": gem_score,
                 "quant": quant,
                 "target_file": target,
+                "artifact_metadata": hf_artifact_metadata(repo_id, target, model),
+                "resolved_revision": getattr(model, "sha", None),
                 "size_source": "estimated",
                 "mode": mode_str,
                 "fit": fit_str,
@@ -401,13 +405,26 @@ def enrich_hf_model_details(model, specs, model_info_cache):
         dict: The updated model result, or the original result when repository or file metadata is unavailable.
     """
     repo_id = model.get("id")
+    model.pop("metadata_fetch_error", None)
+    model["metadata_fetch_status"] = "unavailable"
     if not repo_id:
         return model
 
     target = model.get("target_file")
+    selected_revision = model.get("resolved_revision")
+    if selected_revision is not None and (
+        not isinstance(selected_revision, str)
+        or not re.fullmatch(r"[0-9a-fA-F]{40}", selected_revision)
+    ):
+        model["metadata_fetch_status"] = "failed"
+        model["metadata_fetch_error"] = "Invalid selected Hugging Face commit."
+        return model
 
     cached = cache_db.get_model_cache("huggingface", repo_id)
-    if cached is not None:
+    if (cached is not None and (not target or target == cached.get("target_file"))
+        and (not selected_revision or selected_revision == cached.get("resolved_revision"))):
+        model["resolved_revision"] = cached.get("resolved_revision")
+        model["artifact_metadata"] = cached.get("artifact_metadata")
         size = cached.get("size_gb")
         if size is not None:
             fit_str, mode_str, _ = calculate_fit(size, specs)
@@ -423,13 +440,18 @@ def enrich_hf_model_details(model, specs, model_info_cache):
                     quant = "GGUF"
                 model["quant"] = quant
                 model["target_file"] = target
+        model["metadata_fetch_status"] = "cached"
         return model
 
     try:
-        api = HfApi()
-        info = api.model_info(repo_id, files_metadata=True)
-        if model_info_cache is not None:
-            model_info_cache[repo_id] = info
+        import config
+
+        api = HfApi(token=config.settings.hf_token)
+        info = api.model_info(repo_id, files_metadata=True, timeout=10, revision=selected_revision)
+        if selected_revision and str(getattr(info, "sha", "")).lower() != selected_revision.lower():
+            model["metadata_fetch_status"] = "failed"
+            model["metadata_fetch_error"] = "Hugging Face metadata commit did not match the selection."
+            return model
 
         siblings = info.siblings or []
         target = target or _select_preferred_gguf(siblings)
@@ -437,6 +459,12 @@ def enrich_hf_model_details(model, specs, model_info_cache):
             return model
 
         metadata = next((item for item in siblings if item.rfilename == target), None)
+        if metadata is None:
+            return model
+        if model_info_cache is not None:
+            model_info_cache[repo_id] = info
+        model["artifact_metadata"] = hf_artifact_metadata(repo_id, target, info)
+        model["resolved_revision"] = model["artifact_metadata"]["resolved_revision"]
         size = None
         if metadata and metadata.size:
             size = metadata.size / (1024**3)
@@ -455,9 +483,17 @@ def enrich_hf_model_details(model, specs, model_info_cache):
         cache_db.set_model_cache(
             "huggingface",
             repo_id,
-            {"size_gb": size, "target_file": target},
+            {
+                "size_gb": size,
+                "target_file": target,
+                "resolved_revision": model.get("resolved_revision"),
+                "artifact_metadata": model.get("artifact_metadata"),
+            },
         )
+        model["metadata_fetch_status"] = "available"
     except (HfHubHTTPError, RequestException, OSError, ValueError, TypeError):
+        model["metadata_fetch_status"] = "failed"
+        model["metadata_fetch_error"] = "Hugging Face metadata request failed."
         return model
 
     return model

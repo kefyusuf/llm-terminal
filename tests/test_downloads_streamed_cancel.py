@@ -8,12 +8,13 @@ from downloads import runner
 class _Store:
     def __init__(self):
         self.updates = []
+        self.cancel_requested = False
 
     def update_job(self, target_id, **fields):
         self.updates.append((target_id, fields))
 
     def get_job_by_target(self, _target_id):
-        return {"cancel_requested": True}
+        return {"cancel_requested": self.cancel_requested}
 
 
 class _State:
@@ -24,6 +25,8 @@ class _State:
 
     def set_process(self, target_id, process):
         self.set_calls.append((target_id, process))
+        # Exercise cancellation of a started silent child, not prelaunch refusal.
+        self.store.cancel_requested = True
 
     def clear_process(self, target_id):
         self.clear_calls.append(target_id)

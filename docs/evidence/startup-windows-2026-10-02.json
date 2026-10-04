@@ -1,0 +1,343 @@
+{
+  "schema_version": 1,
+  "machine": "windows-native-ryzen7500f-rtx4060ti",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "python": "3.12.14",
+  "source_revision": "79d8920344b3ce3c87d2278ad6120473b57f01bd",
+  "scenario": "fresh-process-cold-cache",
+  "terminal_size": [
+    120,
+    40
+  ],
+  "samples": [
+    {
+      "status": "ok",
+      "input_ms": 4.633,
+      "providers_ms": 23.836,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1570.868
+    },
+    {
+      "status": "ok",
+      "input_ms": 2.515,
+      "providers_ms": 23.125,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1290.655
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.778,
+      "providers_ms": 24.13,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1240.472
+    },
+    {
+      "status": "ok",
+      "input_ms": 4.75,
+      "providers_ms": 23.751,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1333.051
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.808,
+      "providers_ms": 27.48,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1260.875
+    },
+    {
+      "status": "ok",
+      "input_ms": 2.498,
+      "providers_ms": 30.854,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1233.003
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.832,
+      "providers_ms": 25.393,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1245.849
+    },
+    {
+      "status": "ok",
+      "input_ms": 4.586,
+      "providers_ms": 25.726,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1336.997
+    },
+    {
+      "status": "ok",
+      "input_ms": 2.37,
+      "providers_ms": 22.019,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1334.476
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.805,
+      "providers_ms": 24.787,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1325.297
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.86,
+      "providers_ms": 21.088,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1232.583
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.695,
+      "providers_ms": 26.479,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1254.638
+    },
+    {
+      "status": "ok",
+      "input_ms": 2.01,
+      "providers_ms": 21.27,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1331.23
+    },
+    {
+      "status": "ok",
+      "input_ms": 2.414,
+      "providers_ms": 23.364,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1340.026
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.563,
+      "providers_ms": 29.26,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1243.113
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.961,
+      "providers_ms": 41.589,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 2953.136
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.452,
+      "providers_ms": 26.469,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1601.566
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.891,
+      "providers_ms": 26.204,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1340.009
+    },
+    {
+      "status": "ok",
+      "input_ms": 3.914,
+      "providers_ms": 27.854,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1316.966
+    },
+    {
+      "status": "ok",
+      "input_ms": 1.804,
+      "providers_ms": 25.111,
+      "input_during_provider_probe": true,
+      "rest_discovery": {
+        "status": "pending",
+        "refreshing": true,
+        "stale": true,
+        "error": null
+      },
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "startup_ms": 1368.653
+    }
+  ],
+  "summary": {
+    "successful_runs": 20,
+    "failed_runs": 0,
+    "metrics": {
+      "startup_ms": {
+        "p95": 1601.566,
+        "max": 2953.136,
+        "limit": 2000
+      },
+      "input_ms": {
+        "p95": 4.633,
+        "max": 4.75,
+        "limit": 100
+      },
+      "providers_ms": {
+        "p95": 30.854,
+        "max": 41.589,
+        "limit": 2000
+      }
+    },
+    "passed": true
+  },
+  "provider_availability_before_runs": {
+    "ollama": false,
+    "huggingface": true,
+    "lmstudio": true,
+    "docker": false,
+    "mlx": false
+  }
+}

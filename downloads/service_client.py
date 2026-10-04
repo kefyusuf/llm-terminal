@@ -13,8 +13,9 @@ try:
 except ImportError:  # pragma: no cover - exercised only in lightweight envs
     psutil = None
 
-MIN_SERVICE_VERSION = "1.8"
+MIN_SERVICE_VERSION = "2.1"
 _NO_PROXY_OPENER = build_opener(ProxyHandler({}))
+_owned_service_process = None
 
 
 def _is_loopback_host(host: str) -> bool:
@@ -112,15 +113,16 @@ def is_service_compatible(health):
 
 def _start_service_process():
     """Launch the download service module as a detached background process."""
+    global _owned_service_process
     if sys.platform.startswith("win"):
         pythonw = sys.executable.replace("python.exe", "pythonw.exe")
-        subprocess.Popen(
+        _owned_service_process = subprocess.Popen(
             [pythonw, "-m", "downloads.download_service"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
     else:
-        subprocess.Popen(
+        _owned_service_process = subprocess.Popen(
             [sys.executable, "-m", "downloads.download_service"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -148,11 +150,12 @@ def _wait_for_service(deadline_seconds=6.0):
 def stop_service():
     """Stop the running download service and wait for it to exit.
 
-    First tries a graceful ``/shutdown`` request, then falls back to
-    killing any process with the download service module in its command line.
+    First tries a graceful ``/shutdown`` request. Forced termination is limited
+    to the process handle launched by this client; other processes are never scanned.
 
     Returns ``True`` if the service stopped within 3 seconds.
     """
+    global _owned_service_process
     stopped_any = False
 
     try:
@@ -161,16 +164,13 @@ def stop_service():
     except (URLError, HTTPError, TimeoutError, ValueError, RuntimeError):
         pass
 
-    if psutil is not None:
-        for proc in psutil.process_iter(["pid", "cmdline"]):
-            try:
-                cmdline = proc.info.get("cmdline") or []
-                joined = " ".join(cmdline).lower()
-                if "downloads.download_service" in joined or "download_service.py" in joined:
-                    proc.kill()
-                    stopped_any = True
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                continue
+    if not stopped_any and _owned_service_process is not None:
+        try:
+            if _owned_service_process.poll() is None:
+                _owned_service_process.kill()
+                stopped_any = True
+        except OSError:
+            stopped_any = False
 
     if not stopped_any:
         return False
@@ -178,6 +178,7 @@ def stop_service():
     deadline = time.time() + 3.0
     while time.time() < deadline:
         if not is_service_running():
+            _owned_service_process = None
             return True
         time.sleep(0.1)
     return not is_service_running()
@@ -193,9 +194,13 @@ def ensure_service_running():
             health = get_service_health()
             if is_service_compatible(health):
                 return True
-            stop_service()
+            jobs = list_jobs(limit=1000, timeout=1.0)
+            if len(jobs) >= 1000 or any(job.get("status") in {"queued", "running"} for job in jobs):
+                return False
+            if not stop_service():
+                return False
         except (URLError, HTTPError, TimeoutError, ValueError, RuntimeError):
-            stop_service()
+            return False
 
     _start_service_process()
     return _wait_for_service(deadline_seconds=6.0)
@@ -217,20 +222,30 @@ def create_job(model):
     return _request("POST", "/jobs", payload={"model": model}, timeout=3.0)
 
 
+def preview_job(model):
+    """Read the server destination/disk plan without queueing."""
+    return _request("POST", "/jobs/plan", payload={"model": model}, timeout=3.0)["plan"]
+
+
 def cancel_job(target_id):
     """Request cancellation of the running or queued job identified by *target_id*."""
     return _request("POST", "/jobs/cancel", payload={"target_id": target_id}, timeout=2.0)
 
 
-def delete_job(target_id, _retry=True):
+def delete_job(target_id, _retry=True, *, delete_data=False):
     """Delete the job record for *target_id* from the service.
 
     Automatically restarts an incompatible service and retries once if the
     initial request returns 404.
     """
+    if delete_data and not ensure_service_running():
+        raise RuntimeError("managed data removal requires a compatible service")
     try:
-        return _request("POST", "/jobs/delete", payload={"target_id": target_id}, timeout=2.0)
+        payload = {"target_id": target_id}
+        if delete_data:
+            payload["delete_data"] = True
+        return _request("POST", "/jobs/delete", payload=payload, timeout=2.0)
     except HTTPError as exc:
         if exc.code == 404 and _retry and ensure_service_running():
-            return delete_job(target_id, _retry=False)
+            return delete_job(target_id, _retry=False, delete_data=delete_data)
         raise

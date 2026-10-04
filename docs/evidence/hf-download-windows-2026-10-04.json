@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "platform": "Windows",
+  "python_version": "3.12.14",
+  "huggingface_hub_version": "0.36.2",
+  "repository": "ggml-org/models-moved",
+  "filename": "tinyllamas/stories15M-q4_0.gguf",
+  "revision": "499bc8821c6b12b4e53c5bffcb21ec206f212d81",
+  "size_bytes": 19077344,
+  "sha256": "66967fbece6dbe97886593fdbb73589584927e29119ec31f08090732d1861739",
+  "duplicate_preserved": true,
+  "cancelled_status": "cancelled",
+  "reopened_plan_preserved": true,
+  "completion_status": "completed",
+  "elapsed_seconds": 4.312,
+  "license_status": "unknown",
+  "verified_bytes_and_sha256": true,
+  "limits": [
+    "Early process cancellation, not proven partial-file resumption",
+    "No inference, model quality or usage permission claim",
+    "Ollama CLI and loopback API unavailable on this host",
+    "Temporary process-only Windows trust bundle; TLS verification remained enabled",
+    "No shared model cache or existing service modified"
+  ]
+}

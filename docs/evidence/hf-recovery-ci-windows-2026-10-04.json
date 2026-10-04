@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "platform": "Windows",
+  "ci_source_sha": "6bab5a6488749e97ef6f7679fa280e5335c3ad84",
+  "python_version": "3.12.10",
+  "huggingface_hub_version": "0.36.2",
+  "repository": "ggml-org/models-moved",
+  "filename": "tinyllamas/stories15M-q4_0.gguf",
+  "revision": "499bc8821c6b12b4e53c5bffcb21ec206f212d81",
+  "size_bytes": 19077344,
+  "sha256": "66967fbece6dbe97886593fdbb73589584927e29119ec31f08090732d1861739",
+  "license_status": "unknown",
+  "duplicate_preserved": true,
+  "early_cancel_status": "cancelled",
+  "reopened_plan_preserved": true,
+  "partial_cancel_observed": true,
+  "partial_bytes_observed": 10485760,
+  "completion_status": "completed",
+  "elapsed_seconds": 2.344,
+  "verified_bytes_and_sha256": true,
+  "limits": [
+    "No inference or usage permission claim",
+    "No forced service restart",
+    "Partial resume belongs to the HF SDK; network byte reuse not measured",
+    "Byte limit caps selected file size, not retries or total wire bytes"
+  ]
+}

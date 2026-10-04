@@ -11,7 +11,7 @@ class SystemInfoWidget(Static):
     def update_info(self, specs, ollama_running):
         """Re-render the widget with fresh hardware *specs* and Ollama running state."""
         gpu_color = "#f0ef8a" if specs["has_gpu"] else "#ff7f8f"
-        ollama_status = (
+        ollama_status = "checking" if ollama_running is None else (
             "[bold #4fe08a]running[/bold #4fe08a]"
             if ollama_running
             else "[bold #ff7f8f]stopped[/bold #ff7f8f]"

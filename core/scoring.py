@@ -2,11 +2,12 @@
 
 Scores models on Quality, Speed, Fit, and Context dimensions (0-100 each),
 then computes a use-case-weighted composite score.
+These are unmeasured ranking heuristics; provenance records their inputs and defaults.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .model_intelligence import QUANT_MULTIPLIERS
 
@@ -143,6 +144,70 @@ class Scores:
     context: int
     composite: int
     estimated_tok_s: float
+    provenance: dict = field(default_factory=dict, compare=False, hash=False)
+
+
+def score_provenance(
+    size_gb: float, params: str, quant: str, use_case_key: str, specs: dict, mode: str
+) -> dict:
+    """Explain the actual heuristic inputs and defaults without claiming measurement."""
+    backend = specs.get("backend", "cuda")
+    bandwidth = find_gpu_bandwidth(specs.get("gpu_name", ""))
+    source = (
+        "gpu_lookup"
+        if bandwidth is not None
+        else "backend_default"
+        if backend in _BACKEND_DEFAULTS
+        else "cuda_default"
+    )
+    quant_match = next(
+        (item for item in QUANT_MULTIPLIERS if item.name in (quant or "").upper()), None
+    )
+    use_case = use_case_key if use_case_key in USE_CASE_WEIGHTS else "general"
+    return {
+        "schema_version": 1,
+        "kind": "heuristic",
+        "measured": False,
+        "size_gb": size_gb,
+        "size_source": "supplied_size_gb",
+        "quality": {
+            "basis": "parameters_and_quantization",
+            "params": params,
+            "quant": quant,
+            "quantization_default": quant_match is None,
+            "limitation": "Parameter count and quantization are proxies, not task benchmark results.",
+        },
+        "speed": {
+            "basis": "bandwidth_size_efficiency",
+            "bandwidth_source": source,
+            "bandwidth_gb_s": bandwidth
+            if bandwidth is not None
+            else _BACKEND_DEFAULTS.get(backend, _BACKEND_DEFAULTS["cuda"]),
+            "efficiency": _MODE_EFFICIENCY.get(mode, _MODE_EFFICIENCY["GPU"]),
+            "mode": mode,
+            "mode_default": mode not in _MODE_EFFICIENCY,
+            "computed": mode != "No Fit" and size_gb > 0,
+            "limitation": "Estimated throughput; runtime, context length, batching and offload are not measured. CPU mode retains the legacy GPU/backend bandwidth assumption.",
+        },
+        "fit": {
+            "basis": "size_memory_utilization",
+            "memory_basis": "total_capacity",
+            "vram_gb": specs.get("vram_total", 0),
+            "ram_gb": specs.get("ram_total", 0),
+            "mode": mode,
+            "limitation": "Uses total capacity, not current free memory; KV cache and runtime overhead are not included in this score.",
+        },
+        "context": {
+            "basis": "model_size_proxy",
+            "limitation": "Size-based ranking proxy, not a context-window measurement or supported token capacity.",
+        },
+        "composite": {
+            "basis": "weighted_heuristics",
+            "use_case": use_case,
+            "use_case_default": use_case_key not in USE_CASE_WEIGHTS,
+            "weights": dict(USE_CASE_WEIGHTS[use_case]),
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -301,15 +366,8 @@ def compute_fit_score(
 
 
 def compute_context_score(size_gb: float) -> int:
-    """Compute context score (0-100) based on model size.
-
-    Larger models typically support larger context windows. This is a
-    heuristic — ideally we'd use actual context window data.
-    """
-    # Models under 2B: limited context (score 20-40)
-    # Models 2B-13B: moderate context (score 40-60)
-    # Models 13B-70B: good context (score 60-80)
-    # Models 70B+: excellent context (score 80-100)
+    """Retain the legacy size-based ranking proxy, not supported token capacity."""
+    # Legacy size thresholds in GB do not establish a model's context window.
     if size_gb < 1.5:
         return 25
     elif size_gb < 5:
@@ -396,6 +454,7 @@ def score_model(
         context=context,
         composite=composite,
         estimated_tok_s=estimated_tok_s,
+        provenance=score_provenance(size_gb, params, quant, use_case_key, specs, mode),
     )
 
 
@@ -418,6 +477,10 @@ def enrich_result_with_scores(result: dict, specs: dict) -> dict:
     use_case_key = result.get("use_case_key", "general")
     mode_text = _strip_mode(result.get("mode", "-"))
     size_gb = result.get("_size_gb", 0.0)
+    size_source = "supplied_size_gb" if size_gb else "display_size_parse"
+    previous_provenance = result.get("score_provenance") or {}
+    if size_gb and previous_provenance.get("size_gb") == size_gb:
+        size_source = previous_provenance.get("size_source", size_source)
 
     # If we don't have a float size, try to parse from display string
     if not size_gb:
@@ -441,6 +504,7 @@ def enrich_result_with_scores(result: dict, specs: dict) -> dict:
     result["score_context"] = scores.context
     result["score_composite"] = scores.composite
     result["estimated_tok_s"] = scores.estimated_tok_s
+    result["score_provenance"] = {**scores.provenance, "size_source": size_source}
 
     # MoE metadata
     result["is_moe"] = detect_moe(name)

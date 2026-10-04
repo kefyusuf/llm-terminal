@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label
 
 from core.logging_ import get_logger
+from downloads.preflight import hf_download_command
 
 logger = get_logger(__name__)
 
@@ -24,6 +25,7 @@ class ModelDetailModal(ModalScreen):
     #modal-container {
         width: 60;
         height: auto;
+        max-height: 90%;
         background: #0f141f;
         border: round #4a5568;
         padding: 1 2;
@@ -78,8 +80,10 @@ class ModelDetailModal(ModalScreen):
         if self.data["source"] == "Ollama":
             cmd_text = f"ollama run {self.data['name']}"
         else:
-            repo_id = self.data.get("id", self.data["name"])
-            cmd_text = f"huggingface-cli download {repo_id} --include '*.gguf'"
+            try:
+                cmd_text = hf_download_command(self.data)
+            except ValueError:
+                cmd_text = "Select an exact file before downloading."
 
         size_source = self.data.get("size_source", "estimated")
         confidence_label = (
@@ -95,7 +99,7 @@ class ModelDetailModal(ModalScreen):
             else "fit-no-fit"
         )
 
-        with Vertical(id="modal-container"):
+        with VerticalScroll(id="modal-container"):
             yield Label(f"🤖 {self.data['name']}", id="modal-title")
 
             yield Label("")
@@ -133,12 +137,38 @@ class ModelDetailModal(ModalScreen):
             yield Label("[bold #63b3ed]🚀 Run Command[/bold #63b3ed]")
             yield Label(cmd_text, id="cmd-box")
 
+            if self.data.get("source") == "Hugging Face":
+                artifact = self.data.get("artifact_metadata") or {}
+                license_info = artifact.get("license") or {}
+                yield Label(
+                    f"File: {self.data.get('target_file') or 'Unknown'}\n"
+                    f"Revision: {artifact.get('resolved_revision') or 'Unknown'}\n"
+                    f"Required file bytes: {artifact.get('size_bytes') if artifact.get('size_bytes') is not None else 'Unknown'}\n"
+                    f"License declaration ({license_info.get('status', 'unknown')}): {license_info.get('name') or license_info.get('id') or 'Unknown'}\n"
+                    "A declaration is not permission to use the model. Review the source terms.\n"
+                    f"Source: {artifact.get('source_url') or 'Unknown'}\n"
+                    f"Model card: {artifact.get('model_card_url') or 'Unknown'}\n"
+                    f"License source: {license_info.get('url') or 'Unknown'}",
+                    id="artifact-info", markup=False,
+                )
+                plan = self.data.get("download_plan") or {}
+                yield Label(
+                    f"Destination: {plan.get('destination') or 'Unavailable'}\n"
+                    f"Disk free / required bytes: {plan.get('free_bytes')} / {plan.get('required_bytes')}\n"
+                    f"Plan: {plan.get('status', 'unavailable')}\n"
+                    "Unknown size requires clicking the Unknown size button to acknowledge an unknown disk requirement.",
+                    id="download-plan-info", markup=False,
+                )
+
             with Horizontal(id="button-row"):
                 current_download_state = self.data.get("download_state", "idle")
                 if current_download_state in {"queued", "downloading"}:
                     yield Button("⏸ Cancel", variant="warning", id="cancel-download-btn")
                 else:
-                    yield Button("⬇ Download", id="download-btn")
+                    plan = self.data.get("download_plan") or {}
+                    unknown = plan.get("status") == "unknown_size"
+                    blocked = self.data.get("source") == "Hugging Face" and not plan.get("allowed") and not unknown
+                    yield Button("⬇ Unknown size" if unknown else "⬇ Download", id="download-btn", disabled=blocked)
                 yield Button("📋 Copy", id="copy-btn")
                 yield Button("✕ Close", id="close-btn")
 
@@ -150,7 +180,10 @@ class ModelDetailModal(ModalScreen):
     def start_download(self):
         start_fn = getattr(self.app, "start_model_download", None)
         if callable(start_fn):
-            start_fn(self.data.copy())
+            model = self.data.copy()
+            if (model.get("download_plan") or {}).get("status") == "unknown_size":
+                model["allow_unknown_size"] = True
+            start_fn(model)
         self.dismiss()
 
     @on(Button.Pressed, "#cancel-download-btn")
@@ -165,8 +198,10 @@ class ModelDetailModal(ModalScreen):
         if self.data["source"] == "Ollama":
             cmd_text = f"ollama run {self.data['name']}"
         else:
-            repo_id = self.data.get("id", self.data["name"])
-            cmd_text = f"huggingface-cli download {repo_id} --include '*.gguf'"
+            try:
+                cmd_text = hf_download_command(self.data)
+            except ValueError:
+                return
 
         try:
             import pyperclip
@@ -293,10 +328,12 @@ class DownloadJobModal(ModalScreen):
             with Horizontal(id="job-button-row"):
                 if is_active:
                     yield Button("Cancel", id="job-cancel-btn")
-                    yield Button("Cancel & Delete", id="job-cancel-delete-btn")
+                    yield Button("Cancel & Delete File" if self.entry.get("source", "").lower() == "hugging face"
+                                 else "Cancel & Delete", id="job-cancel-delete-btn")
                 else:
                     yield Button("Delete", id="job-delete-btn")
-                    yield Button("Delete All", id="job-delete-all-btn")
+                    yield Button("Delete File" if self.entry.get("source", "").lower() == "hugging face"
+                                 else "Delete All", id="job-delete-all-btn")
                 yield Button("Close", id="job-close-btn")
 
     @on(Button.Pressed, "#job-cancel-btn")
@@ -507,6 +544,11 @@ class ComparisonModal(ModalScreen):
                 f"[bold #63b3ed]Model Comparison ({len(self.models)} models)[/bold #63b3ed]",
                 id="comparison-title",
             )
+            yield Label(
+                "Heuristic estimates: quality uses parameter/quantization proxies; speed is unmeasured. "
+                "Fit uses total memory without KV/runtime overhead. Context is a size proxy, not measured context capacity.",
+                id="comparison-estimates",
+            )
 
             with Vertical(id="comparison-scrollable"):
                 names = " | ".join(m.get("name", "-")[:18] for m in self.models)
@@ -526,6 +568,7 @@ class ComparisonModal(ModalScreen):
                     ("Fit Score", lambda m: str(m.get("score_fit", "-"))),
                     ("Context", lambda m: str(m.get("score_context", "-"))),
                     ("Composite", lambda m: str(m.get("score_composite", "-"))),
+                    ("Speed basis", lambda m: (m.get("score_provenance") or {}).get("speed", {}).get("bandwidth_source", "Unknown")),
                     (
                         "Est. tok/s",
                         lambda m: (

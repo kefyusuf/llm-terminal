@@ -1,0 +1,24 @@
+# SQLite candidate compatibility rehearsal
+
+`scripts/verify_sqlite_compatibility.py` uses SQLite's online backup API to create an immutable, integrity-checked terminal-job snapshot and tests separate copies with two installed candidate interpreters. It does not start workers, claim/requeue jobs, fetch files or touch model destinations. Quarantine stores must remain separate from live data.
+
+The source snapshot must have no queued/running/canceling jobs, at most 1000 records and at most 256 MiB of database plus observed WAL data. The backup operates inside a read transaction, includes committed WAL data, has a 30-second progress deadline and never overwrites its destination. The work directory must be fresh and contain no links. This is a bounded qualification tool, not a general backup scheduler. Preserve acquired model files separately; they are not contained in SQLite.
+
+Use actual wheel/sdist pairs and `candidate-manifest.json` from qualified CI runs. Supply both full source commits; byte/metadata verification runs before probing. Each interpreter must already have its candidate wheel installed from the file in a fresh environment with passing `pip check`. The probe requires the store module to belong to the installed distribution and checks its PEP 610 wheel hash, because equal package versions do not establish equal source. `-I`, a separate working directory and removed `PYTHONPATH` prevent source-tree imports. Manifests are unsigned records, not cryptographic attestations.
+
+```powershell
+.venv\Scripts\python.exe scripts/verify_sqlite_compatibility.py --database .venv/service-crash-trial2/jobs.db --work-dir .venv/sqlite-rehearsal-new --previous-dist .venv/sqlite-previous-dist --current-dist .venv/sqlite-current-dist --previous-python .venv/sqlite-previous-env/Scripts/python.exe --current-python .venv/sqlite-current-env/Scripts/python.exe --previous-source cf0ca4ddf046e16e1541b502e348927cc2e4da65 --current-source 5d65b5fcaf0997290e7df9fcdf4dd5df31ed334c
+```
+
+The report retains only aggregate counts, integrity results and hashes of canonical selected identity/status/command/artifact/plan records; it excludes model names, paths, command arguments and credentials. Candidates must return identical valid contracts and preserve the original backup hash. Expected cache/schema writes are confined to the separate copied stores.
+
+The [Windows trial](evidence/sqlite-candidate-compatibility-windows-2026-10-04.json) restored one real completed HF job from the forced-service-stop/retry trial. Exact build-once wheels for `cf0ca4d` and `5d65b5f` were downloaded from their green Package runs and installed into separate Python 3.12.14 environments; both passed dependency checks. Store integrity, record count and canonical contract matched, and the immutable backup was unchanged. Both distributions are development version 1.0.1; their wheel hashes differ and are individually checked. Ordinary tests additionally cover committed WAL content, active-job refusal, existing-destination preservation and malformed/mismatched receipts/contracts.
+
+This is previous-candidate data-read compatibility only. The older candidate lacks the new child-lifetime guard and must not resume active acquisitions in shared destinations. No production downgrade, file restore, old-worker execution, host/power-loss recovery, release withdrawal or publication was performed. Requalify every actual rollback target and its runtime behavior before enabling workers.
+
+Interpreter launch preserves the supplied absolute venv path without resolving
+its executable symlink. Resolving POSIX `venv/bin/python` would select the base
+interpreter under `-I`. A real POSIX venv identity regression covers this boundary;
+it substitutes only the contract probe and does not represent a Linux candidate
+data-restore trial. The separate [installed-worker/file rehearsal](qualified-candidate-restore.md)
+extends the actual Windows restore evidence with a qualified previous worker.

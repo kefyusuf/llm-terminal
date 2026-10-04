@@ -6,9 +6,13 @@ perform network requests, or write outside pytest temporary directories.
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from io import StringIO
 from types import SimpleNamespace
+
+import pytest
 
 from downloads import runner
 
@@ -180,6 +184,73 @@ def test_hf_download_success_sets_running_then_completed(tmp_path, monkeypatch):
     assert state.clear_calls == ["hf:success"]
 
 
+def test_hf_download_passes_persisted_revision_to_child(tmp_path, monkeypatch):
+    _install_fake_config(monkeypatch, tmp_path / "models")
+    process = _HFProcess([0])
+    captured = []
+    monkeypatch.setattr(
+        runner.subprocess, "Popen", lambda args, **kw: captured.append(args) or process
+    )
+    runner.run_hf_download(
+        _State(_Store()), "hf:pinned", ["hf_api_download", "owner/repo", "model.gguf", "a" * 40]
+    )
+    assert captured[0][6] == "a" * 40
+
+
+def test_hf_worker_rejects_unsafe_legacy_filename_before_mkdir(tmp_path, monkeypatch):
+    models_dir = tmp_path / "models"
+    _install_fake_config(monkeypatch, models_dir)
+    spawned = []
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **kw: spawned.append(a) or _HFProcess([0]))
+    store = _Store()
+    runner.run_hf_download(_State(store), "hf:unsafe", ["hf_api_download", "owner/repo", "../outside.gguf"])
+    assert _last_update(store)["status"] == "failed"
+    assert "target file" in _last_update(store)["detail"]
+    assert not spawned
+    assert not models_dir.exists()
+
+
+def _directory_link(link, target):
+    if os.name == "nt":
+        env = os.environ.copy()
+        env.update(AIMODEL_TEST_LINK=str(link), AIMODEL_TEST_TARGET=str(target))
+        subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path $env:AIMODEL_TEST_LINK -Target $env:AIMODEL_TEST_TARGET | Out-Null"],
+            env=env, check=True, capture_output=True, timeout=30,
+        )
+    else:
+        link.symlink_to(target, target_is_directory=True)
+
+
+@pytest.mark.parametrize("inside", [False, True])
+def test_hf_worker_checks_real_destination_through_directory_links(tmp_path, monkeypatch, inside):
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    target = models_dir / "contained" if inside else tmp_path / "outside"
+    target.mkdir()
+    _directory_link(models_dir / "nested", target)
+    _install_fake_config(monkeypatch, models_dir)
+    spawned = []
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **kw: spawned.append(a) or _HFProcess([0]))
+    store = _Store()
+    runner.run_hf_download(_State(store), "hf:linked", ["hf_api_download", "owner/repo", "nested/model.gguf"])
+    assert _last_update(store)["status"] == ("completed" if inside else "failed")
+    assert bool(spawned) is inside
+
+
+def test_hf_worker_reports_unusable_destination_without_spawning(tmp_path, monkeypatch):
+    models_dir = tmp_path / "models"
+    models_dir.write_text("not a directory", encoding="utf-8")
+    _install_fake_config(monkeypatch, models_dir)
+    spawned = []
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **kw: spawned.append(a) or _HFProcess([0]))
+    store = _Store()
+    runner.run_hf_download(_State(store), "hf:blocked", ["hf_api_download", "owner/repo", "model.gguf"])
+    assert _last_update(store)["status"] == "failed"
+    assert not spawned
+
+
 def test_hf_download_failure_uses_last_stderr_line(tmp_path, monkeypatch):
     _install_fake_config(monkeypatch, tmp_path / "models")
     process = _HFProcess([2], stderr="first line\nremote failed hard\n")
@@ -206,7 +277,7 @@ def test_hf_download_failure_uses_last_stderr_line(tmp_path, monkeypatch):
 def test_hf_download_cancel_escalates_from_terminate_to_kill(tmp_path, monkeypatch):
     _install_fake_config(monkeypatch, tmp_path / "models")
     process = _HFProcess([None, None, -9])
-    store = _Store(cancel_values=[True])
+    store = _Store(cancel_values=[False, True])
     state = _State(store)
     monotonic_values = iter([10.0, 12.0])
 
@@ -264,7 +335,7 @@ def test_streamed_command_reports_progress_heartbeat_and_completion(monkeypatch)
 
 def test_streamed_command_cancel_terminates_and_finalizes_cancelled(monkeypatch):
     process = _StreamProcess(["cancel requested\n"], return_code=-15)
-    store = _Store(cancel_values=[True])
+    store = _Store(cancel_values=[False, True])
     state = _State(store)
     monotonic_values = iter([0.0, 0.1])
 

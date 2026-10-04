@@ -125,11 +125,21 @@ def _make_handler(state, auth_token: str | None = None):
             if not self._require_auth():
                 return
 
-            if self.path == "/jobs":
+            if self.path in {"/jobs", "/jobs/plan"}:
                 try:
                     payload = self._read_json()
+                    if not isinstance(payload, dict):
+                        raise ValueError("expected a JSON object")
                     model = payload.get("model") or {}
-                    job, created_or_queued = state.store.upsert_job(model)
+                    if not isinstance(model, dict):
+                        raise ValueError("expected a model object")
+                    import config
+
+                    if self.path == "/jobs/plan":
+                        plan = state.store.plan_job(model, config.settings.hf_models_dir)
+                        self._json_response(200, {"plan": plan})
+                        return
+                    job, created_or_queued = state.store.upsert_job(model, models_dir=config.settings.hf_models_dir)
                     self._json_response(
                         200,
                         {
@@ -162,33 +172,34 @@ def _make_handler(state, auth_token: str | None = None):
                 elif process is not None:
                     process = None
 
-                if job.get("status") in {"queued", "running"} and process is None:
-                    job = state.store.update_job(
-                        target_id, status="cancelled", detail="Canceled", progress=""
-                    )
-                elif job.get("status") == "running":
-                    job = state.store.update_job(
-                        target_id,
-                        status="running",
-                        detail="Cancel requested",
-                    )
-
                 self._json_response(200, {"job": job})
                 return
 
             if self.path == "/jobs/delete":
                 payload = self._read_json()
+                if not isinstance(payload, dict) or type(payload.get("delete_data", False)) is not bool:
+                    self._json_response(400, {"error": "delete_data must be a boolean"})
+                    return
                 target_id = payload.get("target_id")
                 if not target_id:
                     self._json_response(400, {"error": "target_id is required"})
                     return
 
-                deleted, reason = state.store.delete_job(target_id)
+                if payload.get("delete_data"):
+                    import config
+                    deleted, reason = state.store.delete_job(
+                        target_id, delete_data=True, models_dir=config.settings.hf_models_dir
+                    )
+                else:
+                    deleted, reason = state.store.delete_job(target_id)
                 if not deleted and reason == "not_found":
                     self._json_response(404, {"error": "job not found"})
                     return
                 if not deleted and reason == "active":
                     self._json_response(409, {"error": "cannot delete active job"})
+                    return
+                if not deleted and reason == "unsafe_data":
+                    self._json_response(409, {"error": "managed artifact ownership is unsafe or unavailable"})
                     return
 
                 self._json_response(200, {"ok": True})

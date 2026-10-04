@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "python": "3.12.14",
+  "snapshot": {
+    "integrity": "ok",
+    "job_count": 1,
+    "backup_sha256": "70f9ecb474aac2d9d7c5322c88aade6510b11c790c3666d1aba37dcc179a098a"
+  },
+  "candidates": {
+    "previous": {
+      "source_sha": "cf0ca4ddf046e16e1541b502e348927cc2e4da65",
+      "version": "1.0.1",
+      "wheel_sha256": "f4f6f7d0924a1b0dd1b50c95c799ea150d49ff452f41825e45fe4a686cd67587",
+      "integrity": "ok",
+      "job_count": 1,
+      "record_sha256": "e7f18c1073a659ed8e3f8ac3529c4d5ff30eefa669d60b0ac5c620e057c45153"
+    },
+    "current": {
+      "source_sha": "5d65b5fcaf0997290e7df9fcdf4dd5df31ed334c",
+      "version": "1.0.1",
+      "wheel_sha256": "a5253c5b224b04ddc72cc92ba99ef53867291c7ec10d2597d8c73c3aacda89f9",
+      "integrity": "ok",
+      "job_count": 1,
+      "record_sha256": "e7f18c1073a659ed8e3f8ac3529c4d5ff30eefa669d60b0ac5c620e057c45153"
+    }
+  },
+  "workers_started": false,
+  "model_files_touched": false,
+  "scope": "terminal-job store contract compatibility only"
+}

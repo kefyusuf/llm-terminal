@@ -24,6 +24,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import sys
 import threading
 import time
 import urllib.request
@@ -37,7 +38,7 @@ from core.http_server import LocalThreadingHTTPServer
 from downloads.runner import process_job
 from downloads.store import DownloadStore
 
-SERVICE_VERSION = "1.8"
+SERVICE_VERSION = "2.1"
 
 
 def download_db_path():
@@ -126,6 +127,8 @@ class DownloadServiceState:
 
     def request_shutdown(self):
         self.stop_event.set()
+        for target_id in self.snapshot_active_targets():
+            self.store.mark_cancel_requested(target_id)
         server = self.server
         if server is not None:
             threading.Thread(target=server.shutdown, daemon=True).start()
@@ -205,7 +208,8 @@ def main():
     try:
         server.serve_forever(poll_interval=0.5)
     finally:
-        STATE.stop_event.set()
+        STATE.request_shutdown()
+        worker.join(timeout=5)
         server.server_close()
 
     return 0
@@ -254,4 +258,6 @@ def run_smoke_check() -> int:
 
 
 if __name__ == "__main__":
+    # Relative API imports must share this process's state when launched with -m.
+    sys.modules["downloads.download_service"] = sys.modules[__name__]
     raise SystemExit(main())

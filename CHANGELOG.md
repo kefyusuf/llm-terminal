@@ -4,6 +4,21 @@
 
 ### Reliability and provider correctness
 
+- Measured calibration HTTP elapsed time with a high-resolution counter so fast local responses do not fail on coarse Windows monotonic clock ticks; retained independent deadlines and token/identity validation.
+- Added a bounded, opt-in local Ollama calibration tool with exact installed identity, cloud-disabled checks, excluded warmup, separate timing metrics and prediction-error reports; genuine inference evidence remains pending and existing scoring is unchanged.
+- Added saved-runtime metadata memory scenarios with explicit context, concurrency, weight split, cache placement and provenance; retained existing scores and rejected unsupported cache layouts without fabricated estimates.
+- Bound service-owned HF children to the parent pipe lifetime, tested normal interpreter shutdown and forced parent death, and verified a Windows partial-download crash/restart/retry with exact byte/digest completion.
+- Bound HF detail requests to the selected commit and a 10-second request timeout, used configured credentials, rejected mismatched metadata and reported cached/unavailable detail state without exposing exception text.
+- Avoided unchanged download-cell writes; measured 100/1000-row headless table refresh costs and verified selection/scroll preservation in narrow and wide layouts.
+- Drained HF child stderr concurrently with a bounded tail to prevent pipe-buffer stalls; added an opt-in pinned-file recovery acceptance tool and Windows evidence for early/partial cancellation, reopen, retry and digest verification.
+- Added read-only HF download plans, transactionally reserved known disk bytes, repository/revision destinations, auxiliary-tree checks and completion byte/digest validation; preserved active jobs during service upgrades and limited fallback termination to client-owned processes.
+- Carried versioned upstream artifact/license/byte/digest metadata through HF search/detail cache, durable jobs and REST/CLI JSON; displayed declarations in the scrollable TUI detail screen without implying permission or parsing metadata markup.
+- Rejected unsafe Hugging Face filenames before queue writes and checked the resolved selected-file destination before spawning a download, including existing symlink/junction escapes and legacy commands.
+- Pinned Hugging Face single-file jobs to resolved commit metadata when available, preserved identity through cache/queue restart, and exposed explicit unknown revisions for legacy requests.
+- Added an opt-in fresh-process startup measurement harness with bounded collection, nearest-rank p95 budgets, explicit failure accounting and preserved Windows raw samples.
+- Deferred TUI CPU/GPU discovery to a shared worker initialization, kept cached/cold headers responsive, and handled expected hardware failures without terminating searches or model-detail interactions.
+- Moved runtime TUI optional-provider discovery off the UI thread and preserved active selection without triggering searches when selector options refresh.
+- Made REST provider listing return cached/pending availability immediately with additive discovery freshness/error metadata, single-flight refresh and retry after failed probes.
 - Added canonical provider capabilities for Ollama, Hugging Face, LM Studio, Docker Model Runner, and MLX and moved pagination/download/search decisions away from UI heuristics.
 - Added parallel multi-provider search orchestration with bounded workers, deterministic result grouping, cancellation polling, partial-result preservation, and provider-authoritative pagination.
 - Added structured provider diagnostics (`ProviderError`) alongside legacy human-readable errors and preserved them through search orchestration.
@@ -19,6 +34,9 @@
 
 ### REST and CLI contracts
 
+- Added schema-1 search/hardware-plan JSON and offline saved-search comparison while preserving recommendation JSON arrays, score values, artifact/provenance unknowns and stderr diagnostics; exercised the new offline commands in installed package consumers.
+- Exposed additive heuristic score provenance in REST/CLI JSON and estimate explanations in CLI scores and TUI comparison, preserving numeric scoring and legacy rows without metadata.
+- Added explicit `doctor` diagnostics with a shared network deadline, offline mode, shareable JSON, storage/CA checks and actionable runtime/TLS failures without exporting private configuration.
 - REST `/api/v1/models` now preserves provider `errors` and additive `structured_errors`, allowing partial models and diagnostics to coexist without changing the existing HTTP-200 partial-success contract.
 - REST model/provider/limit/context/sort validation now returns bounded 400 responses for invalid inputs rather than relying on generic 500 handling.
 - CLI `search`, `fit`, and `recommend` now surface provider failures on stderr instead of presenting them as ordinary zero-result success.
@@ -35,6 +53,8 @@
 
 ### Download service and local security boundary
 
+- Serialized queued cancellation against worker claim and kept claimed jobs active until worker acknowledgement, preventing cancellation/deletion from orphaning an unregistered download; both worker types check cancellation before launch.
+- Added service-owned terminal HF selected-file removal with shared/cache preservation, protocol 2.1 gating and confirmed cancellation; fixed module-launched API/worker state separation and propagated graceful shutdown to active children.
 - Refactored download service responsibilities across API, store, runner, service client, and lifecycle/state helpers.
 - Added bounded parallel download workers controlled by `AIMODEL_DOWNLOAD_MAX_WORKERS` (default `2`).
 - Moved runtime databases/model output toward OS-specific per-user application-data locations with configuration overrides.
@@ -44,6 +64,9 @@
 
 ### Packaging, CI, and verification
 
+- Added default-off pinned public HF recovery acceptance on Linux/Windows CI and archived real partial cancellation/retry/digest reports; rehearsed isolated terminal-job and selected-file restoration with two qualified installed candidate workers.
+- Built each CI package candidate once, recorded source/metadata/SHA-256 identity and verified the same wheel/sdist inputs across all 18 installation lanes; preserved the candidate for later authorized release qualification.
+- Strengthened Package CI with fresh wheel/sdist installations outside the checkout, installed-distribution origin checks, both console entry points, REST/download-service/client subprocess smoke and dependency-resolution evidence across the supported OS/Python matrix.
 - Standardized development workflow around `scripts/dev.py bootstrap`, `verify`, and `smoke` with committed platform-specific dependency locks.
 - Expanded supported runtime metadata to Python 3.10-3.14 and CI verification to Ubuntu/Windows on Python 3.12 and 3.14.
 - Added/expanded separate CI verify, smoke, and Package gates used as exact-head merge evidence.

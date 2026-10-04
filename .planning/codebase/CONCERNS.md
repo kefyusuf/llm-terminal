@@ -5,6 +5,36 @@
 
 This file lists **current, verified concerns**. Resolved mapper findings are retained only in the historical summary so completed work is not accidentally re-planned.
 
+## Historical Release Assessment — 2026-10-02
+
+The [industry/release assessment](../../docs/industry-readiness.md) established
+the release priorities. The findings below describe the pre-implementation
+baseline; their current disposition is recorded immediately afterward.
+
+- Recommendation evidence: `core/scoring.py` derives quality from heuristics and context score from size. These must be visibly distinguished from benchmark quality and actual context metadata before release.
+- Installed-package isolation: `.github/workflows/package.yml` installs a wheel but runs checks in the checkout, allowing source imports to mask missing installed contents. Test from an unrelated directory and fresh environment.
+- Artifact provenance: the runtime HF downloader selects an exact file but does not pass an immutable revision; the model/job presentation lacks a complete license/source/revision contract. Preserve SDK capabilities while adding application guarantees.
+- Provider detection latency: normal REST provider listing exceeded the initial 10-second client deadline in local validation, then completed with a longer deadline. This is local evidence requiring profiling, not proof of a universal response time.
+- Public-release operations: current workflows include deterministic, package and scheduled external checks; no registry-publishing workflow or documented pilot/withdrawal process was found. External PyPI/account and remote CI state were not verified.
+
+Historical coverage percentages below remain prior canonical CI evidence, not a new 2026-10-02 coverage measurement.
+
+### Integration disposition — 2026-10-05
+
+PR #143 incorporates the research roadmap and implementation stack #119–#142.
+Explicit estimate provenance, isolated installed-package qualification, pinned
+artifact metadata/plans and nonblocking detection are implemented and tested.
+They must not be re-planned as missing features from the historical bullets.
+Build-once candidate manifests, support/security/withdrawal guidance and isolated
+backup/previous-worker restore evidence also exist. See
+[release gates](../../docs/release-readiness.md) for their bounded operation scope.
+
+Genuine Ollama acquisition/inference/calibration, optional prepared-runtime UX,
+participant pilot and publisher/version/environment configuration remain
+unverified. Catalog HTML drift and filesystem-delete/SQLite-commit atomicity
+remain explicit limits. Integration review and current-source checks are gates
+before main delivery; publication is a separate authorization.
+
 ## Priority 1
 
 ### 1. Ollama remote registry depends on HTML structure
@@ -76,7 +106,7 @@ Remaining measured examples:
 
 **Area:** `tui_app.py`, `results/`
 
-Result refresh still uses `DataTable.clear()` in normal/structural refresh paths.
+The runtime viewer already uses a download-only incremental cell-update path guarded by ordered rendered-content and column-layout signatures. Structural/content/order changes still use `DataTable.clear()` and rebuild rows.
 
 **Risk:**
 
@@ -92,8 +122,8 @@ Result refresh still uses `DataTable.clear()` in normal/structural refresh paths
 
 **Next work:**
 
-- measure representative refresh cost,
-- use stable row keys and incremental cell/row updates where ordering/layout does not change,
+- measure representative refresh cost before expanding the existing incremental path,
+- preserve runtime content/order signature invalidation and cursor/selection contracts,
 - keep full rebuilds where they are simpler/correct for structural changes.
 
 ## Priority 2
