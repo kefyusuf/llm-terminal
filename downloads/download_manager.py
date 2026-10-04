@@ -59,6 +59,12 @@ def build_download_command(model):
         repo_id = model.get("id") or model.get("name")
         if not repo_id:
             raise ValueError("missing Hugging Face repository id")
+        from huggingface_hub.utils import validate_repo_id
+
+        try:
+            validate_repo_id(repo_id)
+        except ValueError as exc:
+            raise ValueError("invalid Hugging Face repository id") from exc
         target_file = model.get("target_file")
         if not target_file:
             raise ValueError("missing Hugging Face target file")

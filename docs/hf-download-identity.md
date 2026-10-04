@@ -55,25 +55,67 @@ not create the model directory. Filesystem errors or a directory where the file
 should be produce a terminal failed job without launching a download child.
 Error details use fixed text rather than exposing absolute local paths.
 
-This checks the selected artifact path at that moment. It is not an OS sandbox:
-concurrent filesystem changes after the check and SDK-managed auxiliary cache
-paths are outside this guard. The canonical configured root is passed to the
-child. Roots are not isolated by repository or revision yet.
+This selected-file check remains the compatibility path for legacy unplanned
+jobs. New service requests use the managed plan below.
+
+## Managed download plans
+
+Authenticated `POST /jobs/plan` previews an HF selection without queue writes or
+model-directory creation. `POST /jobs` recalculates the authoritative plan inside
+a SQLite write transaction. Each job stores its bound plan through restart.
+Destinations are `<model-root>/huggingface/<sha256(repository)>/<commit-or-unresolved>/<file>`;
+the full repository hash separates repository namespaces. Active duplicate
+requests preserve their original metadata and destination.
+
+Known queued/running byte counts reserve their full size, even after partial
+transfer. A plan requires artifact bytes plus other known reservations and a
+64 MiB safety margin. Unknown-sized jobs cannot reserve an unknown byte count;
+they require explicit `allow_unknown_size: true`. The TUI labels this exception
+before its download action. Disk snapshots can change and the margin is not a
+guarantee against disk exhaustion.
+
+Existing managed trees are bounded to 4096 entries and checked for symlinks,
+junctions and hardlinked files, including SDK auxiliary directories. The worker
+rechecks the plan, current disk budget and configured root before launch. A
+changed root, corrupt persisted plan or unsafe tree fails without a child.
+Concurrent filesystem changes after a check remain outside this guard: this is
+not an OS sandbox. Legacy unplanned jobs retain their selected-file guard.
+
+The SDK child requires a contained regular selected file after download and
+matches known byte count and upstream SHA-256 before reporting completion.
+This validates transfer identity, not model format or inference compatibility.
+
+`ai-model-explorer-cli download-plan REPOSITORY FILENAME --json` obtains current upstream
+metadata and emits schema version 1 with `allowed`, `status`, warnings, declared
+metadata and local paths. It does not enqueue or download. A successful JSON
+command can contain a blocked plan; automation must inspect `allowed`. Offline
+mode leaves unknown facts explicit; a requested full commit records requested
+identity rather than claiming remote verification. Paths in this private plan
+are not the redacted output of `doctor`.
+
+The copied command selects one exact file and commit using the current Python
+environment's HF CLI module. Shell quoting supports PowerShell and POSIX shells.
+Manual execution bypasses the application's queue reservations and completion
+guard; inspect the plan and license before using it.
+
+Service protocol 2.0 is required for plan-aware clients. Automatic upgrade does
+not stop an incompatible service with active jobs or uncertain job history.
+Graceful shutdown addresses only the configured service; fallback force-stop
+is limited to the process launched by this client, never a system-wide scan.
 
 ## Limits and remaining release gates
 
 - Legacy requests remain supported and download the SDK's default revision.
   Unknown metadata is not an immutable identity guarantee.
 - Cached identity describes the previously observed commit, not necessarily the
-  latest repository head. This does not independently verify a file digest.
+  latest repository head. Unknown digests cannot be verified independently.
 - Queue deduplication remains repository-based. Different files or revisions of
   one repository cannot run as separate active jobs yet.
-- Repository/revision destination isolation, auxiliary-cache containment,
-  byte/disk preflight, license/model-card metadata and user-facing confirmation
-  remain pending in roadmap M1-D1.
 - Tests exercise enrichment, cached metadata, SQLite restart/duplicate/requeue,
   the worker's child arguments and the generated SDK call without downloading
-  model weights. A real bounded download/cancel/recovery trial remains M1-D2.
+  model weights. The separate [Windows real SDK trial](evidence/hf-download-windows-2026-10-04.json)
+  verified early cancellation, reopen, retry and exact bytes/SHA-256. Partial-file
+  resumption, forced service restart and Ollama trials remain M1-D2 gates.
 
-This is the revision-pinning slice of the proposed roadmap in PR #118, not
-completion of all artifact preflight or evidence of production readiness.
+These are artifact identity and preflight slices of the proposed roadmap in
+PR #118. They are not evidence of production readiness or real recovery trials.

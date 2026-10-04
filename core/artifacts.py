@@ -100,6 +100,11 @@ def bound_artifact_metadata(model):
     size = metadata.get("size_bytes")
     if size is not None and (type(size) is not int or size < 0):
         raise ValueError("artifact metadata size must be a non-negative byte count")
+    digest = metadata.get("sha256")
+    if digest is not None and (not isinstance(digest, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", digest)):
+        raise ValueError("artifact metadata SHA-256 must be a full digest")
+    if metadata.get("license") is not None and not isinstance(metadata["license"], dict):
+        raise ValueError("artifact metadata license must be an object")
     try:
         return json.loads(json.dumps(metadata, allow_nan=False))
     except (ValueError, TypeError) as exc:

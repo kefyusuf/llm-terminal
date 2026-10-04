@@ -37,7 +37,7 @@ from core.http_server import LocalThreadingHTTPServer
 from downloads.runner import process_job
 from downloads.store import DownloadStore
 
-SERVICE_VERSION = "1.8"
+SERVICE_VERSION = "2.0"
 
 
 def download_db_path():

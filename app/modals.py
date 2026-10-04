@@ -9,6 +9,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Label
 
 from core.logging_ import get_logger
+from downloads.preflight import hf_download_command
 
 logger = get_logger(__name__)
 
@@ -79,8 +80,10 @@ class ModelDetailModal(ModalScreen):
         if self.data["source"] == "Ollama":
             cmd_text = f"ollama run {self.data['name']}"
         else:
-            repo_id = self.data.get("id", self.data["name"])
-            cmd_text = f"huggingface-cli download {repo_id} --include '*.gguf'"
+            try:
+                cmd_text = hf_download_command(self.data)
+            except ValueError:
+                cmd_text = "Select an exact file before downloading."
 
         size_source = self.data.get("size_source", "estimated")
         confidence_label = (
@@ -148,13 +151,24 @@ class ModelDetailModal(ModalScreen):
                     f"License source: {license_info.get('url') or 'Unknown'}",
                     id="artifact-info", markup=False,
                 )
+                plan = self.data.get("download_plan") or {}
+                yield Label(
+                    f"Destination: {plan.get('destination') or 'Unavailable'}\n"
+                    f"Disk free / required bytes: {plan.get('free_bytes')} / {plan.get('required_bytes')}\n"
+                    f"Plan: {plan.get('status', 'unavailable')}\n"
+                    "Unknown size requires clicking the Unknown size button to acknowledge an unknown disk requirement.",
+                    id="download-plan-info", markup=False,
+                )
 
             with Horizontal(id="button-row"):
                 current_download_state = self.data.get("download_state", "idle")
                 if current_download_state in {"queued", "downloading"}:
                     yield Button("⏸ Cancel", variant="warning", id="cancel-download-btn")
                 else:
-                    yield Button("⬇ Download", id="download-btn")
+                    plan = self.data.get("download_plan") or {}
+                    unknown = plan.get("status") == "unknown_size"
+                    blocked = self.data.get("source") == "Hugging Face" and not plan.get("allowed") and not unknown
+                    yield Button("⬇ Unknown size" if unknown else "⬇ Download", id="download-btn", disabled=blocked)
                 yield Button("📋 Copy", id="copy-btn")
                 yield Button("✕ Close", id="close-btn")
 
@@ -166,7 +180,10 @@ class ModelDetailModal(ModalScreen):
     def start_download(self):
         start_fn = getattr(self.app, "start_model_download", None)
         if callable(start_fn):
-            start_fn(self.data.copy())
+            model = self.data.copy()
+            if (model.get("download_plan") or {}).get("status") == "unknown_size":
+                model["allow_unknown_size"] = True
+            start_fn(model)
         self.dismiss()
 
     @on(Button.Pressed, "#cancel-download-btn")
@@ -181,8 +198,10 @@ class ModelDetailModal(ModalScreen):
         if self.data["source"] == "Ollama":
             cmd_text = f"ollama run {self.data['name']}"
         else:
-            repo_id = self.data.get("id", self.data["name"])
-            cmd_text = f"huggingface-cli download {repo_id} --include '*.gguf'"
+            try:
+                cmd_text = hf_download_command(self.data)
+            except ValueError:
+                return
 
         try:
             import pyperclip

@@ -421,6 +421,56 @@ def cache_clear():
     console.print("[green]Cache cleared successfully[/green]")
 
 
+@cli.command("download-plan")
+@click.argument("repository")
+@click.argument("filename")
+@click.option("--revision", default=None, help="Resolve a specified upstream revision.")
+@click.option("--offline", is_flag=True, help="Plan unknown metadata without network requests.")
+@click.option("--allow-unknown-size", is_flag=True, help="Acknowledge an unknown disk requirement.")
+@click.option("--json", "json_output", is_flag=True, help="Emit the versioned plan JSON.")
+def download_plan(repository, filename, revision, offline, allow_unknown_size, json_output):
+    """Inspect one exact HF file's destination and disk budget; never queue it."""
+    import json
+    import re
+
+    from core.artifacts import hf_artifact_metadata
+    from downloads.download_manager import validate_hf_target_file
+    from downloads.preflight import plan_hf_download
+
+    try:
+        validate_hf_target_file(filename)
+        info = None
+        if not offline:
+            from huggingface_hub import HfApi
+            from huggingface_hub.errors import HfHubHTTPError
+            from requests.exceptions import RequestException
+
+            try:
+                info = HfApi(token=config.settings.hf_token).model_info(repository, revision=revision, files_metadata=True, timeout=10)
+            except (HfHubHTTPError, RequestException, OSError, ValueError) as exc:
+                raise click.ClickException("Repository metadata is unavailable. Use doctor for diagnostics or --offline for an explicit unknown plan.") from exc
+            if not any(getattr(item, "rfilename", None) == filename for item in info.siblings or []):
+                raise click.ClickException("Selected file is absent from repository metadata.")
+        artifact = hf_artifact_metadata(repository, filename, info)
+        if offline and revision:
+            if not re.fullmatch(r"[0-9a-fA-F]{40}", revision):
+                raise ValueError("Offline revision must be a full immutable commit SHA.")
+            artifact["resolved_revision"] = revision
+            artifact["revision_status"] = "pinned"
+            artifact["revision_origin"] = "requested"
+        model = {"source": "Hugging Face", "id": repository, "target_file": filename,
+                 "resolved_revision": artifact["resolved_revision"], "artifact_metadata": artifact}
+        plan = plan_hf_download(model, config.settings.hf_models_dir, allow_unknown_size=allow_unknown_size)
+        plan["artifact_metadata"] = artifact
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(plan, indent=2))
+    else:
+        click.echo(f"Destination: {plan['destination']}\nFile bytes: {plan['size_bytes']}\nFree bytes: {plan['free_bytes']}\nRequired bytes (with safety margin): {plan['required_bytes']}\nStatus: {plan['status']}\nWarnings: {', '.join(plan['warnings']) or 'none'}")
+        click.echo("Read the source/model license terms. This command never queues a download.")
+
+
 @cli.command()
 def cache_stats():
     """Show cache statistics."""

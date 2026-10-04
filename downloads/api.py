@@ -125,11 +125,21 @@ def _make_handler(state, auth_token: str | None = None):
             if not self._require_auth():
                 return
 
-            if self.path == "/jobs":
+            if self.path in {"/jobs", "/jobs/plan"}:
                 try:
                     payload = self._read_json()
+                    if not isinstance(payload, dict):
+                        raise ValueError("expected a JSON object")
                     model = payload.get("model") or {}
-                    job, created_or_queued = state.store.upsert_job(model)
+                    if not isinstance(model, dict):
+                        raise ValueError("expected a model object")
+                    import config
+
+                    if self.path == "/jobs/plan":
+                        plan = state.store.plan_job(model, config.settings.hf_models_dir)
+                        self._json_response(200, {"plan": plan})
+                        return
+                    job, created_or_queued = state.store.upsert_job(model, models_dir=config.settings.hf_models_dir)
                     self._json_response(
                         200,
                         {

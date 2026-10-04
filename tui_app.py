@@ -1346,6 +1346,12 @@ class AIModelViewer(App):
             specs,
             self.hf_model_info_cache,
         )
+        from downloads.service_client import preview_job
+
+        try:
+            enriched["download_plan"] = preview_job(enriched)
+        except (OSError, ValueError, RuntimeError):
+            enriched["download_plan"] = {"status": "service_unavailable", "allowed": False}
         self.call_from_thread(self.on_hf_detail_ready, enriched)
 
     def on_hf_detail_ready(self, enriched_model):

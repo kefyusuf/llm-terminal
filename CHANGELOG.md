@@ -4,6 +4,7 @@
 
 ### Reliability and provider correctness
 
+- Added read-only HF download plans, transactionally reserved known disk bytes, repository/revision destinations, auxiliary-tree checks and completion byte/digest validation; preserved active jobs during service upgrades and limited fallback termination to client-owned processes.
 - Carried versioned upstream artifact/license/byte/digest metadata through HF search/detail cache, durable jobs and REST/CLI JSON; displayed declarations in the scrollable TUI detail screen without implying permission or parsing metadata markup.
 - Rejected unsafe Hugging Face filenames before queue writes and checked the resolved selected-file destination before spawning a download, including existing symlink/junction escapes and legacy commands.
 - Pinned Hugging Face single-file jobs to resolved commit metadata when available, preserved identity through cache/queue restart, and exposed explicit unknown revisions for legacy requests.

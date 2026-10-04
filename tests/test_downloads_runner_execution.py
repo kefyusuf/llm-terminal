@@ -194,7 +194,7 @@ def test_hf_download_passes_persisted_revision_to_child(tmp_path, monkeypatch):
     runner.run_hf_download(
         _State(_Store()), "hf:pinned", ["hf_api_download", "owner/repo", "model.gguf", "a" * 40]
     )
-    assert captured[0][-1] == "a" * 40
+    assert captured[0][6] == "a" * 40
 
 
 def test_hf_worker_rejects_unsafe_legacy_filename_before_mkdir(tmp_path, monkeypatch):

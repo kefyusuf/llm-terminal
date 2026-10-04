@@ -30,6 +30,7 @@ from pathlib import Path
 from core.artifacts import bound_artifact_metadata
 
 from .download_manager import build_download_command, download_target_id
+from .preflight import plan_hf_download
 
 
 class DownloadStore:
@@ -55,6 +56,7 @@ class DownloadStore:
     def _init_db(self):
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS jobs (
@@ -78,6 +80,8 @@ class DownloadStore:
             columns = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)")}
             if "artifact_metadata_json" not in columns:
                 conn.execute("ALTER TABLE jobs ADD COLUMN artifact_metadata_json TEXT")
+            if "download_plan_json" not in columns:
+                conn.execute("ALTER TABLE jobs ADD COLUMN download_plan_json TEXT")
 
     def normalize_target_ids(self):
         with self.lock, self._connect() as conn:
@@ -175,6 +179,22 @@ class DownloadStore:
                 })
             except (TypeError, ValueError):
                 metadata = None
+        plan = None
+        plan_status = "unplanned"
+        if row["download_plan_json"]:
+            plan_status = "invalid"
+            try:
+                candidate = json.loads(row["download_plan_json"])
+                if (isinstance(candidate, dict) and candidate.get("schema_version") == 1 and artifact
+                    and candidate.get("repository") == artifact["repository"]
+                    and candidate.get("filename") == artifact["filename"]
+                    and candidate.get("resolved_revision") == artifact["revision"]
+                    and candidate.get("size_bytes") == (metadata or {}).get("size_bytes")
+                    and candidate.get("sha256") == (metadata or {}).get("sha256")):
+                    plan = candidate
+                    plan_status = "available"
+            except (ValueError, TypeError):
+                plan = None
         return {
             "id": row["id"],
             "target_id": row["target_id"],
@@ -190,6 +210,8 @@ class DownloadStore:
             "return_code": row["return_code"],
             "artifact": artifact,
             "artifact_metadata": metadata,
+            "download_plan": plan,
+            "download_plan_status": plan_status,
         }
 
     def list_jobs(self, limit=50):
@@ -205,13 +227,31 @@ class DownloadStore:
             row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()
         return self._row_to_dict(row)
 
-    def upsert_job(self, model):
+    def _reserved_bytes(self, conn, exclude_target=None):
+        rows = conn.execute("SELECT * FROM jobs WHERE status IN ('queued', 'running') AND target_id != ?", (exclude_target or "",)).fetchall()
+        return sum((self._row_to_dict(row).get("artifact_metadata") or {}).get("size_bytes") or 0 for row in rows)
+
+    def plan_job(self, model, models_dir):
+        with self.lock, self._connect() as conn:
+            reserved = self._reserved_bytes(conn, download_target_id(model))
+            return plan_hf_download(model, models_dir, reserved_bytes=reserved,
+                                    allow_unknown_size=model.get("allow_unknown_size") is True)
+
+    def reserved_download_bytes(self, exclude_target=None):
+        with self.lock, self._connect() as conn:
+            return self._reserved_bytes(conn, exclude_target)
+
+    def get_execution_metadata(self, target_id):
+        return self.get_job_by_target(target_id)
+
+    def upsert_job(self, model, *, models_dir=None):
         target_id = download_target_id(model)
         command = build_download_command(model)
         metadata = bound_artifact_metadata(model) if model.get("source") == "Hugging Face" else None
         now = time.time()
 
         with self.lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             existing = conn.execute(
                 "SELECT * FROM jobs WHERE target_id = ?", (target_id,)
             ).fetchone()
@@ -219,13 +259,20 @@ class DownloadStore:
             if existing is not None and existing["status"] in {"queued", "running"}:
                 return self._row_to_dict(existing), False
 
+            plan = None
+            if models_dir is not None and model.get("source") == "Hugging Face":
+                plan = plan_hf_download(model, models_dir, reserved_bytes=self._reserved_bytes(conn, target_id),
+                                        allow_unknown_size=model.get("allow_unknown_size") is True)
+                if not plan["allowed"]:
+                    raise ValueError("download preflight blocked: " + plan["status"])
+
             if existing is None:
                 conn.execute(
                     """
                     INSERT INTO jobs (
                         target_id, source, publisher, name, command_json, status,
-                        detail, progress, created_at, updated_at, cancel_requested, return_code, artifact_metadata_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)
+                        detail, progress, created_at, updated_at, cancel_requested, return_code, artifact_metadata_json, download_plan_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
                     """,
                     (
                         target_id,
@@ -239,6 +286,7 @@ class DownloadStore:
                         now,
                         now,
                         json.dumps(metadata) if metadata is not None else None,
+                        json.dumps(plan) if plan is not None else None,
                     ),
                 )
             else:
@@ -247,7 +295,7 @@ class DownloadStore:
                     UPDATE jobs
                     SET source = ?, publisher = ?, name = ?, command_json = ?,
                         status = 'queued', detail = 'Queued', progress = '',
-                        updated_at = ?, cancel_requested = 0, return_code = NULL, artifact_metadata_json = ?
+                        updated_at = ?, cancel_requested = 0, return_code = NULL, artifact_metadata_json = ?, download_plan_json = ?
                     WHERE target_id = ?
                     """,
                     (
@@ -257,6 +305,7 @@ class DownloadStore:
                         json.dumps(command),
                         now,
                         json.dumps(metadata) if metadata is not None else None,
+                        json.dumps(plan) if plan is not None else None,
                         target_id,
                     ),
                 )

@@ -68,7 +68,7 @@ def test_start_service_process_uses_platform_specific_detached_launch(monkeypatc
 def test_wait_for_service_retries_until_healthy_compatible_response(monkeypatch):
     """Transient health failures and incompatible versions should be retried within the deadline."""
     health_calls = []
-    responses = [URLError("booting"), {"ok": True, "version": "1.7"}, {"ok": True, "version": "1.8"}]
+    responses = [URLError("booting"), {"ok": True, "version": "1.7"}, {"ok": True, "version": "2.0"}]
 
     def _health():
         health_calls.append(True)
@@ -109,11 +109,13 @@ def test_stop_service_returns_true_after_graceful_shutdown(monkeypatch):
     assert requests == [("POST", "/shutdown", {}, 1.0)]
 
 
-def test_stop_service_falls_back_to_matching_process_kill(monkeypatch):
+def test_stop_service_falls_back_to_owned_process_kill(monkeypatch):
     """If graceful shutdown fails, the known service process should be killed as fallback."""
     process = SimpleNamespace(info={"cmdline": ["python", "-m", "downloads.download_service"]})
     killed = []
     process.kill = lambda: killed.append(True)
+    process.poll = lambda: None
+    monkeypatch.setattr(service_client, "_owned_service_process", process)
 
     fake_psutil = SimpleNamespace(
         process_iter=lambda _attrs: [process],
@@ -140,6 +142,7 @@ def test_stop_service_returns_false_when_nothing_was_stopped(monkeypatch):
 
     monkeypatch.setattr(service_client, "_request", _shutdown_failure)
     monkeypatch.setattr(service_client, "psutil", None)
+    monkeypatch.setattr(service_client, "_owned_service_process", None)
 
     assert service_client.stop_service() is False
 
@@ -148,7 +151,7 @@ def test_ensure_service_running_reuses_compatible_service(monkeypatch):
     """A healthy compatible service should be reused without restart."""
     actions = []
     monkeypatch.setattr(service_client, "is_service_running", lambda: True)
-    monkeypatch.setattr(service_client, "get_service_health", lambda: {"ok": True, "version": "1.8"})
+    monkeypatch.setattr(service_client, "get_service_health", lambda: {"ok": True, "version": "2.0"})
     monkeypatch.setattr(service_client, "stop_service", lambda: actions.append("stop"))
     monkeypatch.setattr(service_client, "_start_service_process", lambda: actions.append("start"))
     monkeypatch.setattr(service_client, "_wait_for_service", lambda **_kwargs: actions.append("wait"))
@@ -162,6 +165,7 @@ def test_ensure_service_running_restarts_incompatible_service(monkeypatch):
     actions = []
     monkeypatch.setattr(service_client, "is_service_running", lambda: True)
     monkeypatch.setattr(service_client, "get_service_health", lambda: {"ok": True, "version": "1.7"})
+    monkeypatch.setattr(service_client, "list_jobs", lambda **kwargs: [])
     monkeypatch.setattr(service_client, "stop_service", lambda: actions.append("stop") or True)
     monkeypatch.setattr(service_client, "_start_service_process", lambda: actions.append("start"))
     monkeypatch.setattr(
@@ -174,8 +178,8 @@ def test_ensure_service_running_restarts_incompatible_service(monkeypatch):
     assert actions == ["stop", "start", ("wait", 6.0)]
 
 
-def test_ensure_service_running_recovers_from_health_error(monkeypatch):
-    """A reachable probe followed by a failed detailed health read should still restart safely."""
+def test_ensure_service_running_preserves_service_on_health_error(monkeypatch):
+    """Unknown live service state must not trigger automatic termination."""
     actions = []
 
     def _health_error():
@@ -192,7 +196,7 @@ def test_ensure_service_running_recovers_from_health_error(monkeypatch):
     )
 
     assert service_client.ensure_service_running() is False
-    assert actions == ["stop", "start", ("wait", 6.0)]
+    assert actions == []
 
 
 def test_request_wrappers_preserve_methods_paths_payloads_and_timeouts(monkeypatch):

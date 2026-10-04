@@ -27,6 +27,7 @@ from loguru import logger
 
 from core.utils import extract_download_progress
 from downloads.download_manager import prepare_hf_destination
+from downloads.preflight import plan_hf_download
 
 
 def _service_popen_kwargs() -> dict[str, Any]:
@@ -82,7 +83,11 @@ def _hf_download_script() -> str:
         "filename=sys.argv[2], "
         "local_dir=sys.argv[3], "
         "revision=(sys.argv[4] or None) if len(sys.argv) > 4 else None"
-        ")"
+        "); "
+        "from downloads.preflight import verify_hf_artifact; "
+        "verify_hf_artifact(sys.argv[3], sys.argv[2], "
+        "int(sys.argv[5]) if sys.argv[5] else None, sys.argv[6] or None) "
+        "if len(sys.argv) > 6 else None"
     )
 
 
@@ -151,7 +156,25 @@ def run_hf_download(state, target_id: str, command) -> None:
         return
 
     try:
-        models_dir = prepare_hf_destination(config.settings.hf_models_dir, target_file)
+        get_metadata = getattr(state.store, "get_execution_metadata", None)
+        execution = get_metadata(target_id) if callable(get_metadata) else {}
+        execution = execution if isinstance(execution, dict) else {}
+        if execution.get("download_plan_status") == "invalid":
+            raise ValueError("persisted download plan is invalid")
+        metadata = execution.get("artifact_metadata") or {}
+        persisted_plan = execution.get("download_plan")
+        directory = config.settings.hf_models_dir
+        if persisted_plan:
+            selected = {"source": "Hugging Face", "id": repo_id, "target_file": target_file,
+                        "resolved_revision": command[3] if len(command) > 3 else None,
+                        "artifact_metadata": metadata or None}
+            current = plan_hf_download(selected, directory,
+                reserved_bytes=state.store.reserved_download_bytes(target_id),
+                allow_unknown_size=persisted_plan.get("size_bytes") is None and persisted_plan.get("allowed") is True)
+            if not current["allowed"] or current["model_directory"] != persisted_plan.get("model_directory"):
+                raise ValueError("download plan changed or is blocked")
+            directory = current["model_directory"]
+        models_dir = prepare_hf_destination(directory, target_file)
     except (OSError, RuntimeError, ValueError):
         state.store.update_job(
             target_id,
@@ -177,6 +200,8 @@ def run_hf_download(state, target_id: str, command) -> None:
             target_file,
             str(models_dir),
             command[3] if len(command) > 3 else "",
+            str(metadata["size_bytes"]) if metadata.get("size_bytes") is not None else "",
+            metadata.get("sha256") or "",
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
