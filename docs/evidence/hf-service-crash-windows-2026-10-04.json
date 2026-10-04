@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "platform": "Windows",
+  "service_version": "2.1",
+  "source_base_sha": "cf0ca4ddf046e16e1541b502e348927cc2e4da65",
+  "worktree_runtime_sha256": {
+    "downloads/runner.py": "ba704f47ce6b0144f828adfdecffb0f19f7a18aac5ffbb831d5784481e5aac44",
+    "downloads/parent_lifetime.py": "3989b2982d0b06a04cac82c918b4e0359100616cf5a6e7894c40ca63ada32756"
+  },
+  "repository": "ggml-org/models-moved",
+  "filename": "tinyllamas/stories15M-q4_0.gguf",
+  "revision": "499bc8821c6b12b4e53c5bffcb21ec206f212d81",
+  "size_bytes": 19077344,
+  "sha256": "66967fbece6dbe97886593fdbb73589584927e29119ec31f08090732d1861739",
+  "partial_bytes_before_parent_kill": 10485760,
+  "child_exit_seconds": 0.015000000013969839,
+  "forced_parent_stop": true,
+  "owned_child_exited": true,
+  "reopened_status": "failed",
+  "reopened_plan_preserved": true,
+  "restart_retry_completed": true,
+  "verified_bytes_and_sha256": true,
+  "limits": [
+    "Worktree trial, not released source",
+    "Public HF sample only; no inference or Ollama proof",
+    "Forced service process stop, not host/power-loss durability proof",
+    "SDK reuse and aggregate transfer bytes were not measured"
+  ]
+}

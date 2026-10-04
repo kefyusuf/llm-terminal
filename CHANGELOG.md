@@ -4,6 +4,7 @@
 
 ### Reliability and provider correctness
 
+- Bound service-owned HF children to the parent pipe lifetime, tested normal interpreter shutdown and forced parent death, and verified a Windows partial-download crash/restart/retry with exact byte/digest completion.
 - Bound HF detail requests to the selected commit and a 10-second request timeout, used configured credentials, rejected mismatched metadata and reported cached/unavailable detail state without exposing exception text.
 - Avoided unchanged download-cell writes; measured 100/1000-row headless table refresh costs and verified selection/scroll preservation in narrow and wide layouts.
 - Drained HF child stderr concurrently with a bounded tail to prevent pipe-buffer stalls; added an opt-in pinned-file recovery acceptance tool and Windows evidence for early/partial cancellation, reopen, retry and digest verification.

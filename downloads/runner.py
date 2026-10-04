@@ -76,6 +76,9 @@ def _target_file_from_hf_command(command) -> str:
 def _hf_download_script() -> str:
     """Return the subprocess script used to download one exact HF file."""
     return (
+        "import sys; "
+        "from downloads.parent_lifetime import start_parent_watchdog; "
+        "start_parent_watchdog() if len(sys.argv) > 7 and sys.argv[7] == 'parent-stdin' else None; "
         "from huggingface_hub import hf_hub_download; "
         "import sys; "
         "hf_hub_download("
@@ -223,7 +226,9 @@ def run_hf_download(state, target_id: str, command) -> None:
             command[3] if len(command) > 3 else "",
             str(metadata["size_bytes"]) if metadata.get("size_bytes") is not None else "",
             metadata.get("sha256") or "",
+            "parent-stdin",
         ],
+        stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
@@ -289,6 +294,12 @@ def run_hf_download(state, target_id: str, command) -> None:
             return_code=1,
         )
     finally:
+        parent_pipe = getattr(process, "stdin", None)
+        if parent_pipe is not None:
+            try:
+                parent_pipe.close()
+            except (OSError, ValueError):
+                pass
         stderr_reader.join(timeout=0.5)
         if not stderr_reader.is_alive() and process.stderr is not None:
             process.stderr.close()

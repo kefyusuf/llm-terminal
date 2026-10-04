@@ -36,3 +36,26 @@ The HF runner now consumes child stderr concurrently and retains at most 4096
 characters. A local child writing 256 KiB before a nonzero exit proves that pipe
 backpressure cannot indefinitely prevent normal terminal-state handling. This
 regression runs without network in ordinary tests.
+
+## Forced parent process stop
+
+The service-owned HF child receives a private stdin pipe whose writer stays open
+in its parent. A daemon watchdog reads the raw descriptor; EOF or a pipe error
+exits the child with status 75, including when SDK/native I/O is blocked. Raw
+descriptor reads avoid holding Python's buffered-stdin lock during normal
+interpreter shutdown. No PID scan, unrelated process termination or persistent
+machine configuration is needed. The parent closes its writer during cleanup.
+Legacy direct invocations without the internal guard argument retain their
+existing behavior; this boundary protects service-owned HF acquisitions.
+
+Two real local-process regressions cover normal completion and forced parent
+termination. A separate [Windows public-file trial](evidence/hf-service-crash-windows-2026-10-04.json)
+observed 10 MiB partial data, forcibly stopped the owned service, and observed
+the recorded child exit in about 15 ms. Restart marked the abandoned running job
+failed, preserved its plan, and an explicit retry completed with exact byte/hash
+verification. This was the worktree based on `cf0ca4d`; runtime fingerprints in
+the report identify the tested files. It is not released-source, inference,
+Ollama or host/power-loss durability proof, and HTTP byte reuse was not measured.
+The earlier buffered-stdin implementation failed normal shutdown and the first
+trial retry; it was fixed before this passing report. Partial/auxiliary SDK data
+remain retained under the existing selected-file deletion policy.

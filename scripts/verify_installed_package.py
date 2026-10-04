@@ -48,7 +48,7 @@ recorded = {Path(distribution.locate_file(item)).resolve() for item in distribut
 modules = (
     "main", "cli", "api_server", "config", "tui_app", "app.viewer", "app.startup_viewer",
     "app.modals", "core.scoring", "core.diagnostics", "core.hardware", "core.exports",
-    "downloads.service_client", "downloads.download_service", "providers.hf_provider",
+    "downloads.service_client", "downloads.download_service", "downloads.parent_lifetime", "providers.hf_provider",
     "providers.ollama_provider", "providers.lmstudio_provider", "providers.docker_provider",
     "providers.mlx_provider", "results.results_presenter", "search.search_orchestration", "terminal_ui",
 )

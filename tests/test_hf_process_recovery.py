@@ -25,6 +25,14 @@ def test_hf_child_stderr_cannot_block_completion(tmp_path, monkeypatch):
 
     monkeypatch.setattr(config.settings, "hf_models_dir", tmp_path / "models")
     monkeypatch.setattr(config.settings, "hf_token", None)
+    launches = []
+    actual_popen = subprocess.Popen
+
+    def capture(command, **kwargs):
+        launches.append((command, kwargs))
+        return actual_popen(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "Popen", capture)
     # Exceeds the pipe buffer before exit; no SDK or model weights involved.
     monkeypatch.setattr(runner, "_hf_download_script", lambda: (
         "import sys; sys.stderr.write('x' * 262144 + '\\nlast diagnostic\\n'); "
@@ -49,6 +57,8 @@ def test_hf_child_stderr_cannot_block_completion(tmp_path, monkeypatch):
     assert final["status"] == "failed"
     assert final["detail"] == "last diagnostic"
     assert final["return_code"] == 2
+    assert launches[0][0][-1] == "parent-stdin"
+    assert launches[0][1]["stdin"] == subprocess.PIPE
 
 
 def test_hf_stderr_tail_is_bounded():
