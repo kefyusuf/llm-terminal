@@ -27,6 +27,8 @@ import threading
 import time
 from pathlib import Path
 
+from core.artifacts import bound_artifact_metadata
+
 from .download_manager import build_download_command, download_target_id
 
 
@@ -72,6 +74,10 @@ class DownloadStore:
                 )
                 """
             )
+
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)")}
+            if "artifact_metadata_json" not in columns:
+                conn.execute("ALTER TABLE jobs ADD COLUMN artifact_metadata_json TEXT")
 
     def normalize_target_ids(self):
         with self.lock, self._connect() as conn:
@@ -159,6 +165,16 @@ class DownloadStore:
                 }
         except (TypeError, ValueError):
             pass
+        metadata = None
+        if artifact and row["artifact_metadata_json"]:
+            try:
+                metadata = bound_artifact_metadata({
+                    "id": artifact["repository"], "target_file": artifact["filename"],
+                    "resolved_revision": artifact["revision"],
+                    "artifact_metadata": json.loads(row["artifact_metadata_json"]),
+                })
+            except (TypeError, ValueError):
+                metadata = None
         return {
             "id": row["id"],
             "target_id": row["target_id"],
@@ -173,6 +189,7 @@ class DownloadStore:
             "cancel_requested": bool(row["cancel_requested"]),
             "return_code": row["return_code"],
             "artifact": artifact,
+            "artifact_metadata": metadata,
         }
 
     def list_jobs(self, limit=50):
@@ -191,6 +208,7 @@ class DownloadStore:
     def upsert_job(self, model):
         target_id = download_target_id(model)
         command = build_download_command(model)
+        metadata = bound_artifact_metadata(model) if model.get("source") == "Hugging Face" else None
         now = time.time()
 
         with self.lock, self._connect() as conn:
@@ -206,8 +224,8 @@ class DownloadStore:
                     """
                     INSERT INTO jobs (
                         target_id, source, publisher, name, command_json, status,
-                        detail, progress, created_at, updated_at, cancel_requested, return_code
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
+                        detail, progress, created_at, updated_at, cancel_requested, return_code, artifact_metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)
                     """,
                     (
                         target_id,
@@ -220,6 +238,7 @@ class DownloadStore:
                         "",
                         now,
                         now,
+                        json.dumps(metadata) if metadata is not None else None,
                     ),
                 )
             else:
@@ -228,7 +247,7 @@ class DownloadStore:
                     UPDATE jobs
                     SET source = ?, publisher = ?, name = ?, command_json = ?,
                         status = 'queued', detail = 'Queued', progress = '',
-                        updated_at = ?, cancel_requested = 0, return_code = NULL
+                        updated_at = ?, cancel_requested = 0, return_code = NULL, artifact_metadata_json = ?
                     WHERE target_id = ?
                     """,
                     (
@@ -237,6 +256,7 @@ class DownloadStore:
                         model.get("name", existing["name"]),
                         json.dumps(command),
                         now,
+                        json.dumps(metadata) if metadata is not None else None,
                         target_id,
                     ),
                 )

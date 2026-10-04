@@ -5,6 +5,7 @@ from huggingface_hub.errors import HfHubHTTPError
 from requests.exceptions import RequestException
 
 from core import cache_db
+from core.artifacts import hf_artifact_metadata
 from core.errors import ProviderError
 from core.scoring import enrich_result_with_scores
 from core.utils import (
@@ -279,7 +280,7 @@ def search_hf_models(
             sort="downloads",
             limit=offset + window_size,
             filter="gguf",
-            expand=["likes", "siblings", "downloads"],
+            expand=["likes", "siblings", "downloads", "sha", "cardData"],
         )
         raw_window = raw_models[offset : offset + window_size]
     except HfHubHTTPError as exc:
@@ -366,6 +367,8 @@ def search_hf_models(
                 "gem_score": gem_score,
                 "quant": quant,
                 "target_file": target,
+                "artifact_metadata": hf_artifact_metadata(repo_id, target, model),
+                "resolved_revision": getattr(model, "sha", None),
                 "size_source": "estimated",
                 "mode": mode_str,
                 "fit": fit_str,
@@ -409,6 +412,7 @@ def enrich_hf_model_details(model, specs, model_info_cache):
     cached = cache_db.get_model_cache("huggingface", repo_id)
     if cached is not None and (not target or target == cached.get("target_file")):
         model["resolved_revision"] = cached.get("resolved_revision")
+        model["artifact_metadata"] = cached.get("artifact_metadata")
         size = cached.get("size_gb")
         if size is not None:
             fit_str, mode_str, _ = calculate_fit(size, specs)
@@ -439,6 +443,7 @@ def enrich_hf_model_details(model, specs, model_info_cache):
 
         metadata = next((item for item in siblings if item.rfilename == target), None)
         model["resolved_revision"] = getattr(info, "sha", None) if metadata else None
+        model["artifact_metadata"] = hf_artifact_metadata(repo_id, target, info)
         size = None
         if metadata and metadata.size:
             size = metadata.size / (1024**3)
@@ -461,6 +466,7 @@ def enrich_hf_model_details(model, specs, model_info_cache):
                 "size_gb": size,
                 "target_file": target,
                 "resolved_revision": model.get("resolved_revision"),
+                "artifact_metadata": model.get("artifact_metadata"),
             },
         )
     except (HfHubHTTPError, RequestException, OSError, ValueError, TypeError):

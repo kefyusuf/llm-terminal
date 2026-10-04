@@ -277,6 +277,7 @@ class ModelAPIHandler(BaseHTTPRequestHandler):
                         "estimated_tok_s": r.get("estimated_tok_s", 0),
                     },
                     "score_provenance": r.get("score_provenance"),
+                    "artifact_metadata": r.get("artifact_metadata"),
                     "moe": {
                         "is_moe": r.get("is_moe", False),
                         "total_experts": r.get("total_experts", 0),

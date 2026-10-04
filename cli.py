@@ -297,6 +297,7 @@ def recommend(limit, use_case, output_json):
                         "composite": r.get("score_composite", 0),
                     },
                     "score_provenance": r.get("score_provenance"),
+                    "artifact_metadata": r.get("artifact_metadata"),
                 }
             )
         click.echo(json_mod.dumps(data, indent=2))

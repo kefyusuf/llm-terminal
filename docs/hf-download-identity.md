@@ -1,5 +1,28 @@
 # Hugging Face download identity
 
+## Artifact metadata contract
+
+`artifact_metadata` schema version 1 carries provider, repository, selected file,
+resolved commit, upstream LFS SHA-256 when supplied, exact `size_bytes`, source
+and model-card links, license declaration and `metadata_observed_at` (Unix UTC
+seconds). Missing values are null. `metadata_status` distinguishes available,
+partial and unavailable metadata; none of these values is a benchmark or usage
+permission. Search metadata may not include exact file size.
+
+Repository model-card data declares `license`, `license_name` and `license_link`,
+as described in the [Hub model-card specification](https://huggingface.co/docs/hub/model-cards).
+Only HTTPS custom license URLs or files actually present in repository metadata
+are linked. The application's MIT license is never substituted for a model's
+missing license. Read the linked model terms before use.
+
+Metadata survives detail caching, queue restart and active duplicate requests.
+The SQLite migration only adds a nullable JSON column; legacy jobs remain valid
+with null metadata. A mismatched declaration is rejected before queue writes;
+corrupt/stale persisted declarations are omitted while the job remains visible.
+REST model responses and CLI recommendation JSON include the additive field;
+the TUI detail screen shows literal metadata with scrolling rather than parsing
+upstream license text as Rich markup.
+
 When repository file metadata includes a commit SHA, detail enrichment records
 `resolved_revision` alongside the selected `target_file` and caches both values.
 A cache entry for another file does not replace an explicit file selection.

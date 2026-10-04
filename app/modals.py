@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label
 
@@ -24,6 +24,7 @@ class ModelDetailModal(ModalScreen):
     #modal-container {
         width: 60;
         height: auto;
+        max-height: 90%;
         background: #0f141f;
         border: round #4a5568;
         padding: 1 2;
@@ -95,7 +96,7 @@ class ModelDetailModal(ModalScreen):
             else "fit-no-fit"
         )
 
-        with Vertical(id="modal-container"):
+        with VerticalScroll(id="modal-container"):
             yield Label(f"🤖 {self.data['name']}", id="modal-title")
 
             yield Label("")
@@ -132,6 +133,21 @@ class ModelDetailModal(ModalScreen):
             yield Label("")
             yield Label("[bold #63b3ed]🚀 Run Command[/bold #63b3ed]")
             yield Label(cmd_text, id="cmd-box")
+
+            if self.data.get("source") == "Hugging Face":
+                artifact = self.data.get("artifact_metadata") or {}
+                license_info = artifact.get("license") or {}
+                yield Label(
+                    f"File: {self.data.get('target_file') or 'Unknown'}\n"
+                    f"Revision: {artifact.get('resolved_revision') or 'Unknown'}\n"
+                    f"Required file bytes: {artifact.get('size_bytes') if artifact.get('size_bytes') is not None else 'Unknown'}\n"
+                    f"License declaration ({license_info.get('status', 'unknown')}): {license_info.get('name') or license_info.get('id') or 'Unknown'}\n"
+                    "A declaration is not permission to use the model. Review the source terms.\n"
+                    f"Source: {artifact.get('source_url') or 'Unknown'}\n"
+                    f"Model card: {artifact.get('model_card_url') or 'Unknown'}\n"
+                    f"License source: {license_info.get('url') or 'Unknown'}",
+                    id="artifact-info", markup=False,
+                )
 
             with Horizontal(id="button-row"):
                 current_download_state = self.data.get("download_state", "idle")
