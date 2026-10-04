@@ -74,3 +74,32 @@ matches actual squash-merged main source `93395de`, which independently passed
 and [main Package, 19 jobs](https://github.com/kefyusuf/llm-terminal/actions/runs/37236975704).
 The earlier previous-worker restore report retains its original named candidates;
 the new integration qualification is not a new production rollback rehearsal.
+
+## Actual main candidate requalification
+
+The [2026-10-05 Windows report](evidence/qualified-main-restore-windows-2026-10-05.json)
+repeats the installed-worker procedure with current main source
+`eabf63e5651bc9bd2e07fd9ad0fbaee80f16179c` and previous qualified source
+`6bab5a6488749e97ef6f7679fa280e5335c3ad84`. Current main passed
+[CI 11/11](https://github.com/kefyusuf/llm-terminal/actions/runs/37240529606)
+and [Package 19/19](https://github.com/kefyusuf/llm-terminal/actions/runs/37242705905).
+The rehearsal consumed the preserved CI wheel/sdist pair and manifest without
+rebuilding. Its wheel SHA-256 is
+`b17695bde1b8a76e7220ade88271af4faa5fe7f094e34a2646ce9e4ad84890ab`;
+the previous wheel remains identified by its original manifest and report.
+
+Both candidate environments passed `pip check`. The current wheel was installed
+in a new isolated Python 3.12.14 environment. Installed origins and PEP 610 wheel
+receipts matched their manifests. Both actual workers completed with verified
+19,077,344-byte pinned output and exited zero after controlled shutdown. The
+previous worker read the one terminal record from the current candidate's SQLite
+backup, then recomputed its plan for a separate quarantine root before requeue.
+The database backup passed integrity checking; immutable backups and original
+selected files retained their hashes. No original database was used by the
+previous worker.
+
+This closes the named-main candidate's bounded terminal-job/file restore check.
+The package version is still 1.0.1; an authorized new release version must be
+qualified separately. Active-job migration, arbitrary downgrade safety, shared
+destinations, auxiliary caches, power loss, inference, transfer reuse and
+production rollback remain outside this evidence.

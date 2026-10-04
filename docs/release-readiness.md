@@ -19,7 +19,7 @@ as superseded, with history retained. The current
 | M3-L1 single release input | PR #131 exact source passed 11 CI jobs and 19 Package jobs; manifest and one preserved wheel/sdist pair | Candidate qualification implemented; no TestPyPI/PyPI publication |
 | M3-L2 security/support | [Private report route](../SECURITY.md) enabled; issue tracker for non-sensitive defects | Route verified; no support SLA or completed pilot claimed |
 | M2 selection/calibration/export/table cost | PRs #133–#139; versioned exports, saved comparisons, declared full-attention memory scenarios, measured table update costs and bounded local calibration tool | Implemented and tested; genuine inference/calibration corpus pending; numerical scoring unchanged |
-| Previous-candidate restore | [Installed worker/file rehearsal](qualified-candidate-restore.md) with exact CI candidates `6bab5a6` and `5d65b5f` | Isolated terminal-job/file restore verified; no production rollback claim |
+| Previous-candidate restore | [Installed worker/file rehearsal](qualified-candidate-restore.md) with historical CI candidates `6bab5a6` and `5d65b5f`, then actual main `eabf63e5` against previous `6bab5a6` | Named-main isolated terminal-job/file restore verified; a future release version and production rollback remain unqualified |
 
 ## Candidate review and publication
 

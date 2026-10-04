@@ -102,8 +102,14 @@ previous-worker execution after server-side plan rebinding. See
    Real acquisition/recovery and inference still require an explicitly budgeted
    model; this empty-server readiness probe does not satisfy those gates.
 3. SQLite data compatibility and isolated previous-worker/file restore passed
-   for the named candidates. Requalify the actual release/rollback target after
-   integration or version changes; additive migrations alone are not downgrade proof.
+   for the named candidates. Actual main `eabf63e5` subsequently passed Package
+   19/19 and the installed-worker restore rehearsal against previous `6bab5a6`:
+   one terminal job, isolated roots, rebound plan, pinned file size/digest,
+   immutable backup preservation and controlled shutdown. See
+   `docs/evidence/qualified-main-restore-windows-2026-10-05.json` and
+   `docs/qualified-candidate-restore.md`. This does not qualify a future changed
+   release version or production rollback; additive migrations alone are not
+   downgrade proof.
 4. Keep TestPyPI/PyPI account/name, publisher/protected environment, chosen new
    version, attestations, genuine participant pilot and actual promotion as
    explicit gates. Do not fabricate human outcomes, send unapproved messages or
