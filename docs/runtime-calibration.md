@@ -1,5 +1,14 @@
 # Bounded local runtime calibration
 
+The tool now issues a promptless model preload before the excluded generation
+warmup. Loading and generation each use the configured request timeout and share
+the original whole-worker deadline; neither budget is increased. The additive
+schema-1 `preload.wall_seconds` field excludes loading from sample statistics.
+Failures identify the fixed stage (`model_preload`, `warmup`, `sample_N`, or a
+metadata/revalidation stage), distinguish HTTP status/request timeout/overall
+deadline, and omit server bodies. The supervisor accepts only known stage markers;
+an unknown marker becomes `worker`. Failed runs save no report.
+
 Run `scripts/calibrate_ollama.py` only against a prepared dedicated local Ollama with an already installed exact model name. The tool never pulls, imports, deletes or publishes models. It accepts credential-free loopback HTTP, disables proxies/redirects, and requires `/api/status` to explicitly report cloud disabled. Runtime versions without that experimental status contract remain unsupported for this tool. Remote model declarations/cloud tags are rejected before generation. See the official [cloud guidance](https://docs.ollama.com/cloud), [API client status implementation](https://github.com/ollama/ollama/blob/main/api/client.go) and [remote-model fields](https://github.com/ollama/ollama/blob/main/api/types.go). No API key is sent.
 
 ```powershell
@@ -23,4 +32,4 @@ around a fast local response; its `QueryPerformanceCounter` resolution was
 100 ns. A deterministic coarse-clock regression verifies that this does not
 invalidate a successful sample or bypass the subsequent identity check.
 
-The schema-1 report's `model_facts` can feed [saved-facts memory scenarios](metadata-memory-scenarios.md). Archive actual reports by hardware/runtime/model digest and workload before evaluating prediction errors across a real corpus. CI tests use simulated metrics and a real local HTTP fixture to verify request/JSON/deadline boundaries; they are not inference measurements. The [2026-10-05 dedicated-server preflight](evidence/ollama-runtime-preflight-windows-2026-10-05.json) verified the cloud-disabled runtime contract with an empty store. The [2026-10-07 live trial](ollama-live-acceptance.md) subsequently acquired and hash-verified `tinyllama:1.1b`, but this tool's CUDA generation request failed at its 30-second deadline and saved no calibration result. A separate forced-CPU probe measured one warmup and three genuine 32-token samples, with runtime-reported zero VRAM usage. Those CPU measurements do not validate GPU predictions or turn the CUDA calibration failure into a pass; a broader comparable calibration corpus remains unavailable.
+The schema-1 report's `model_facts` can feed [saved-facts memory scenarios](metadata-memory-scenarios.md). Archive actual reports by hardware/runtime/model digest and workload before evaluating prediction errors across a real corpus. CI tests use simulated metrics and real local HTTP fixtures, including a cold-load request that fails before separation and succeeds afterward. They are not inference measurements. The [live acceptance record](ollama-live-acceptance.md) preserves the 2026-10-07 CUDA failure and CPU fallback separately from the successful 2026-10-08 repeated GPU calibration. The original transient timeout cause remains unresolved; a broader comparable corpus remains unavailable.

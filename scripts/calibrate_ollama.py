@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
@@ -143,15 +144,27 @@ def run_trial(args):
     base = validate_endpoint(args.url)
     deadline = time.monotonic() + args.max_seconds
 
-    def request(path, body=None):
-        return request_json(base, path, body, deadline=deadline, request_timeout=args.request_timeout)
+    def request(path, body=None, *, stage):
+        if getattr(args, "worker", False):
+            print(f"calibration-stage:{stage}", file=sys.stderr, flush=True)
+        try:
+            return request_json(base, path, body, deadline=deadline, request_timeout=args.request_timeout)
+        except HTTPError as exc:
+            status = f"HTTP {exc.code}" if 400 <= exc.code <= 599 else "unsupported HTTP status"
+            raise CalibrationError(f"Calibration stage {stage}: runtime returned {status}.") from exc
+        except TimeoutError as exc:
+            reason = "overall deadline exceeded" if time.monotonic() >= deadline else "request timed out"
+            raise CalibrationError(f"Calibration stage {stage}: {reason}.") from exc
+        except (OSError, ValueError, TypeError) as exc:
+            reason = str(exc) if isinstance(exc, CalibrationError) else "runtime unavailable or invalid response"
+            raise CalibrationError(f"Calibration stage {stage}: {reason}.") from exc
 
-    version = request("/api/version").get("version")
+    version = request("/api/version", stage="runtime_version").get("version")
     if not isinstance(version, str) or not 0 < len(version) <= 128:
         raise CalibrationError("runtime version is unavailable")
-    require_local_runtime(request("/api/status"))
-    entry = model_entry(request("/api/tags"), args.model)
-    show = request("/api/show", {"model": args.model})
+    require_local_runtime(request("/api/status", stage="cloud_status"))
+    entry = model_entry(request("/api/tags", stage="model_identity"), args.model)
+    show = request("/api/show", {"model": args.model}, stage="model_metadata")
     reject_remote(show)
     capabilities = show.get("capabilities") or []
     if not isinstance(capabilities, list) or "completion" not in capabilities:
@@ -176,11 +189,21 @@ def run_trial(args):
     _fit, markup_mode, _resource = calculate_fit(size_gib, specs)
     mode = re.sub(r"\[[^]]*\]", "", markup_mode)
     prediction = scoring.estimate_tok_per_s(size_gib, specs["gpu_name"], mode, specs["backend"])
+    preload_start = time.perf_counter()
+    loaded = request("/api/generate", {"model": args.model, "stream": False,
+                     "keep_alive": "30s", "options": {"num_ctx": args.context}}, stage="model_preload")
+    preload_seconds = time.perf_counter() - preload_start
+    reject_remote(loaded)
+    if loaded.get("done") is not True or loaded.get("model") != args.model:
+        raise CalibrationError("model preload did not complete with the selected identity")
+    if not math.isfinite(preload_seconds) or preload_seconds <= 0:
+        raise CalibrationError("model preload elapsed time is unavailable")
     samples = []
     warmup = None
     for index in range(args.repetitions + 1):
         start = time.perf_counter()
-        response = request("/api/generate", payload)
+        stage = "warmup" if index == 0 else f"sample_{index}"
+        response = request("/api/generate", payload, stage=stage)
         if response.get("model") != args.model:
             raise CalibrationError("runtime generation model identity changed")
         sample = sample_metrics(response, wall_seconds=time.perf_counter() - start, max_tokens=args.tokens)
@@ -188,9 +211,9 @@ def run_trial(args):
             warmup = sample
         else:
             samples.append(sample)
-    require_local_runtime(request("/api/status"))
-    after = model_entry(request("/api/tags"), args.model)
-    if after["digest"] != entry["digest"] or request("/api/version").get("version") != version:
+    require_local_runtime(request("/api/status", stage="cloud_revalidation"))
+    after = model_entry(request("/api/tags", stage="identity_revalidation"), args.model)
+    if after["digest"] != entry["digest"] or request("/api/version", stage="version_revalidation").get("version") != version:
         raise CalibrationError("runtime/model identity changed during calibration")
     hardware_keys = ("cpu_name", "cpu_cores", "ram_total", "ram_free", "gpu_name", "gpu_vendor",
                      "backend", "has_gpu", "vram_total", "vram_free", "gpu_count")
@@ -204,6 +227,7 @@ def run_trial(args):
             "prediction": {"generation_tok_s": prediction, "mode": mode, "mode_is_estimated": True,
                            "size_input": "runtime disk-size proxy", "formula": "existing bandwidth heuristic",
                            "scoring_source_sha256": hashlib.sha256(Path(scoring.__file__).read_bytes()).hexdigest()},
+            "preload": {"wall_seconds": preload_seconds},
             "warmup": warmup, "samples": samples, "summary": summarize_samples(samples, prediction=prediction),
             "limits": ["Requested context/offload is not measured allocation", "Single sequential workload, not universal accuracy",
                        "Prompt rate uses reported uncached counts when available", "No quality benchmark or model download"]}
@@ -243,6 +267,17 @@ def main():
         with args.output.open("x", encoding="utf-8") as handle:
             handle.write(json.dumps(report, indent=2, allow_nan=False) + "\n")
         print("[calibration] completed; report saved")
+    except subprocess.TimeoutExpired as exc:
+        trace = exc.stderr or b""
+        if isinstance(trace, bytes):
+            trace = trace.decode("utf-8", errors="replace")
+        allowed = {"runtime_version", "cloud_status", "model_identity", "model_metadata",
+                   "model_preload", "warmup", "cloud_revalidation", "identity_revalidation",
+                   "version_revalidation", *(f"sample_{index}" for index in range(1, 11))}
+        stages = [line.removeprefix("calibration-stage:") for line in trace.splitlines()
+                  if line.startswith("calibration-stage:")]
+        stage = stages[-1] if stages and stages[-1] in allowed else "worker"
+        raise SystemExit(f"Calibration failed: Calibration stage {stage}: overall deadline exceeded; no result was saved.") from exc
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as exc:
         reason = str(exc) if isinstance(exc, CalibrationError) else "Local calibration failed or exceeded its deadline; no result was saved."
         raise SystemExit("Calibration failed: " + reason) from exc

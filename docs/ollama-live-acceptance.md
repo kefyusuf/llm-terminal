@@ -48,6 +48,25 @@ tool, a GPU prediction validation or a quality benchmark. See official
 
 ## Cleanup and remaining gates
 
+### 2026-10-08 bounded CUDA follow-up
+
+The unchanged tool passed twice before implementation, so the original transient
+30-second failure does not establish a driver, CUDA graphs or cold-start cause.
+A real local HTTP regression independently reproduced combined cold loading plus
+generation exceeding the request timeout. The correction separates promptless
+preload from generation while preserving the 30-second request and 120-second
+worker budgets used here, token limits, identity checks and numerical scoring.
+
+The [GPU report](evidence/ollama-cuda-calibration-windows-2026-10-08.json) binds
+the tested tool and scoring hashes. Two fresh owned Ollama 0.35.0 servers reused
+the verified model above, with cloud disabled and default GPU selection. Each run
+completed a separate preload, one excluded warmup and three 64-token samples at
+context 512. Median generation rates were 337.86 and 334.51 tokens/s; the runtime
+reported 658,379,898 VRAM bytes. Both owned servers stopped with zero remaining
+captured descendants. No model was downloaded, driver changed or timeout raised.
+This is bounded native Windows GPU evidence for this model and workload, not a
+general CUDA reliability guarantee or proof of the original failure's cause.
+
 The acquisition/CUDA phase lasted 125.062 seconds; the CPU probe lasted 4.312
 seconds. Preparation and diagnosis also fit the authorized total 15-minute
 window. The first preparation attempt lacked the required model name, was
@@ -60,8 +79,8 @@ its owned server and descendants. Downloaded files and bounded reports remain
 under ignored `.venv/` for review; no model deletion was requested. No Docker
 resources or worktrees were created.
 
-Native Windows Ollama acquisition/recovery now has named-model evidence. CUDA
-inference and genuine GPU calibration remain failed/unqualified. Other platforms,
+Native Windows Ollama acquisition/recovery and repeated CUDA calibration now have
+named-model evidence. The historical failed trial remains failed. Other platforms,
 a broader calibration corpus, participant outcomes and authorized release
 version/publisher/environment/publication remain open. Keep numerical scoring
 unchanged until comparable measured evidence supports a change.
