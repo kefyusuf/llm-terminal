@@ -13,12 +13,12 @@ as superseded, with history retained. The current
 |---|---|---|
 | M0 startup, diagnosis, estimate explanations, isolated installs | PRs #119–#124; startup reports and installed smoke; heuristic provenance remains explicit | Implemented; historical startup timing is not a new candidate timing sample |
 | M1-D1 HF identity/license/path/disk plan | PRs #125–#128; durable pinned identity, metadata, known-byte reservation and explicit unknowns | Implemented and tested; no license permission inferred |
-| M1-D2 HF acceptance | PRs #129–#130/#136/#140; Windows controlled/forced service stop, child exit, selected-file removal; Linux/Windows CI partial cancellation/retry and bytes/digest | Bounded HF operations verified; Ollama acquisition and host/power-loss proof pending |
+| M1-D2 acquisition acceptance | PRs #129–#130/#136/#140; Windows HF service stop/removal; hosted HF cancel/retry; [Ollama named-model trial](ollama-live-acceptance.md) with controlled reopen/retry and manifest/blob hashes | Bounded named-artifact operations verified; host/power-loss proof pending |
 | M1-P1 declared operation support | [Support matrix](support-matrix.md); hosted package reports and native Windows trials | Packaging verified; optional inference/backend combinations experimental |
 | M1-O1 catalog source decision | [ADR 0001](adr/0001-ollama-catalog-source.md), parser fixtures and observable shape errors | Decision recorded; no undocumented global API migration |
 | M3-L1 single release input | PR #131 exact source passed 11 CI jobs and 19 Package jobs; manifest and one preserved wheel/sdist pair | Candidate qualification implemented; no TestPyPI/PyPI publication |
 | M3-L2 security/support | [Private report route](../SECURITY.md) enabled; issue tracker for non-sensitive defects | Route verified; no support SLA or completed pilot claimed |
-| M2 selection/calibration/export/table cost | PRs #133–#139; versioned exports, saved comparisons, declared full-attention memory scenarios, measured table update costs and bounded local calibration tool | Implemented and tested; genuine inference/calibration corpus pending; numerical scoring unchanged |
+| M2 selection/calibration/export/table cost | PRs #133–#139; exports/comparisons, memory scenarios, table costs, bounded calibration tool; named-model forced-CPU inference samples | CUDA calibration failed at 30 seconds; broad comparable corpus pending; numerical scoring unchanged |
 | Previous-candidate restore | [Installed worker/file rehearsal](qualified-candidate-restore.md) with historical CI candidates `6bab5a6` and `5d65b5f`, then actual main `eabf63e5` against previous `6bab5a6` | Named-main isolated terminal-job/file restore verified; a future release version and production rollback remain unqualified |
 
 ## Candidate review and publication

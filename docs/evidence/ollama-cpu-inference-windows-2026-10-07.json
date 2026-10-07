@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "scope": "forced CPU local inference fallback, not CUDA calibration",
+  "model": "tinyllama:1.1b",
+  "status": "measured",
+  "runtime_cloud_disabled": true,
+  "prompt_sha256": "989c8d4ab92af0d42026c61a626094aca41fe528f2cb759b153275fecedbde7d",
+  "context": 512,
+  "max_tokens": 32,
+  "warmup_repetitions": 1,
+  "repetitions": 3,
+  "limits": [
+    "No additional download or model-store copy.",
+    "CPU samples cannot qualify GPU predictions or the failed CUDA path.",
+    "No response text archived; no model quality claim."
+  ],
+  "runtime_version": "0.35.0",
+  "model_digest": "2644915ede352ea7bdfaff0bfac0be74c719d5d5202acb63a6fb095b52f394a4",
+  "warmup": {
+    "generation_tok_s": 80.47581324581589,
+    "prompt_tok_s": 315.71147836732064,
+    "prompt_cache_count_reported": true,
+    "prompt_eval_count": 49,
+    "prompt_cached_count": 0,
+    "generation_count": 32,
+    "wall_seconds": 1.1088206999993417,
+    "runtime_total_seconds": 1.0985242,
+    "load_seconds": 0.5414823
+  },
+  "samples": [
+    {
+      "generation_tok_s": 81.6259897151253,
+      "prompt_tok_s": 71.58196134574088,
+      "prompt_cache_count_reported": true,
+      "prompt_eval_count": 49,
+      "prompt_cached_count": 48,
+      "generation_count": 32,
+      "wall_seconds": 0.423934399997961,
+      "runtime_total_seconds": 0.4099714,
+      "load_seconds": 0.0015858
+    },
+    {
+      "generation_tok_s": 81.04589730471737,
+      "prompt_tok_s": 77.67593599502874,
+      "prompt_cache_count_reported": true,
+      "prompt_eval_count": 49,
+      "prompt_cached_count": 48,
+      "generation_count": 32,
+      "wall_seconds": 0.4346609999993234,
+      "runtime_total_seconds": 0.4114949,
+      "load_seconds": 0.0015442
+    },
+    {
+      "generation_tok_s": 77.31167962039966,
+      "prompt_tok_s": 80.52826542116283,
+      "prompt_cache_count_reported": true,
+      "prompt_eval_count": 49,
+      "prompt_cached_count": 48,
+      "generation_count": 32,
+      "wall_seconds": 0.46647979999761446,
+      "runtime_total_seconds": 0.4302648,
+      "load_seconds": 0.0017834
+    }
+  ],
+  "runtime_reported_size_vram": 0,
+  "owned_descendants_remaining": 0,
+  "owned_server_stopped": true,
+  "elapsed_seconds": 4.312
+}

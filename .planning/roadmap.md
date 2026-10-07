@@ -17,7 +17,7 @@ and evidence. This is not a publication or inference-readiness claim.
 |---|---|---|
 | M0 R1/R2/R3 | Nonblocking discovery/hardware startup, measured startup, doctor, transparent estimates and installed wheel/sdist entrypoints | Requalify the integrated release/version; prepared optional-runtime UX evidence |
 | M1 D1 | Pinned selected artifact, public metadata, server-owned destination/disk plans and final byte/digest checks | Unknown upstream facts and license permission remain explicit |
-| M1 D2/P1 | Windows/Linux HF cancellation/retry, Windows service stop/child exit, managed removal and operation-specific support matrix | Prepared Ollama acquisition/recovery; optional native inference/backend evidence |
+| M1 D2/P1 | Windows/Linux HF cancellation/retry, Windows service stop/child exit, managed removal; native Windows tinyllama Ollama cancel/reopen/retry and blob hashes; forced-CPU inference samples | CUDA generation failed at 30 seconds; other native inference/backend/model evidence remains open |
 | M1 O1 | Recorded catalog-source ADR, fixture-backed parsing and actionable drift diagnostics | No catalog migration without a verified supported replacement |
 | M2 S1/A1/U1 | Saved runtime memory scenarios, bounded calibration tool, versioned exports/offline comparison and measured incremental table refresh | Genuine repeated local inference corpus before accuracy claims or scoring changes |
 | M3 L1 | Build-once candidate pair, source/byte manifest and 18 isolated consumers | Authorized new version, publisher/account/name, protected environment, TestPyPI/attestation and promotion |
