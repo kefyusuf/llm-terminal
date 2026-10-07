@@ -99,8 +99,14 @@ previous-worker execution after server-side plan rebinding. See
    zero installed models, and owned-process cleanup. The server created only
    empty `blobs`/`manifests` directories. See the archived
    `docs/evidence/ollama-runtime-preflight-windows-2026-10-05.json`.
-   Real acquisition/recovery and inference still require an explicitly budgeted
-   model; this empty-server readiness probe does not satisfy those gates.
+   On 2026-10-07, the user authorized `tinyllama:1.1b` with at most 1 GB model
+   files and 15 minutes. Main `bc50cf1e` passed CI 11/11; its managed
+   acquisition/cancel/reopen/retry passed with exact manifest/blob verification.
+   Default CUDA calibration failed at the 30-second generation deadline.
+   Forced-CPU fallback measured three post-warmup samples at median 81.05 tok/s,
+   using the same files. See `docs/ollama-live-acceptance.md`; this named Windows
+   path does not qualify CUDA, other platforms or a broad calibration corpus.
+   Owned processes/descendants were cleaned up; model files remain for review.
 3. SQLite data compatibility and isolated previous-worker/file restore passed
    for the named candidates. Actual main `eabf63e5` subsequently passed Package
    19/19 and the installed-worker restore rehearsal against previous `6bab5a6`:

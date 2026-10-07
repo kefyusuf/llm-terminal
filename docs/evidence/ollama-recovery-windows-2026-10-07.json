@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "source_sha": "bc50cf1e6bbf2cf19b40833cbe0edae1b910d9ce",
+  "model": "tinyllama:1.1b",
+  "budget": {
+    "model_file_bytes": 1000000000,
+    "wall_seconds": 900
+  },
+  "declared_artifact_bytes": 637700138,
+  "registry_manifest_sha256": "2644915ede352ea7bdfaff0bfac0be74c719d5d5202acb63a6fb095b52f394a4",
+  "cloud_disabled": true,
+  "status": "failed",
+  "limits": [
+    "Model-store byte limit is not a wire-transfer byte measurement.",
+    "One local model and sequential workload; no universal speed or quality claim.",
+    "Controlled server/service reopen; no host/power-loss proof.",
+    "No model deletion, publisher change or package publication requested."
+  ],
+  "runtime_version": "0.35.0",
+  "active_duplicate_preserved": true,
+  "partial_progress_percent": 1,
+  "managed_cancel_acknowledged": true,
+  "partial_store_bytes_after_stop": 637699889,
+  "cancelled_job_preserved_on_reopen": true,
+  "managed_retry_completed": true,
+  "installed_manifest_digest": "2644915ede352ea7bdfaff0bfac0be74c719d5d5202acb63a6fb095b52f394a4",
+  "verified_blobs": [
+    {
+      "digest": "sha256:6331358be52a6ebc2fd0755a51ad1175734fd17a628ab5ea6897109396245362",
+      "size_bytes": 483
+    },
+    {
+      "digest": "sha256:2af3b81862c6be03c769683af18efdadb2c33f60ff32ab6f83e42c043d6c7816",
+      "size_bytes": 637699456
+    },
+    {
+      "digest": "sha256:af0ddbdaaa26f30d54d727f9dd944b76bdb926fdaf9a58f63f78c532f57c191f",
+      "size_bytes": 70
+    },
+    {
+      "digest": "sha256:c8472cd9daed5e7c20aa53689e441e10620a002aacd58686aeac2cb188addb5c",
+      "size_bytes": 31
+    },
+    {
+      "digest": "sha256:fa956ab37b8c21152f975a7fcdd095c4fee8754674b21d9b44d710435697a00d",
+      "size_bytes": 98
+    }
+  ],
+  "manifest_and_all_blob_hashes_verified": true,
+  "calibration_exit_code": 1,
+  "calibration_failure": "Calibration failed: Local runtime is unavailable or returned an unsupported response.",
+  "error_type": "RuntimeError",
+  "failure": "calibration failed",
+  "all_owned_processes_stopped": true,
+  "peak_model_store_bytes": 637702198,
+  "elapsed_seconds": 125.062,
+  "supplementary_cleanup": {
+    "owned_descendants_remaining": 0,
+    "additional_cleanup_count": 2,
+    "identity_fencing": "Captured descendants of the owned trial process, matched PID and creation time.",
+    "explanation": "Original all_owned_processes_stopped covers direct handles; two residual descendants were separately stopped."
+  }
+}
