@@ -18,7 +18,7 @@ as superseded, with history retained. The current
 | M1-O1 catalog source decision | [ADR 0001](adr/0001-ollama-catalog-source.md), parser fixtures and observable shape errors | Decision recorded; no undocumented global API migration |
 | M3-L1 single release input | PR #131 exact source passed 11 CI jobs and 19 Package jobs; manifest and one preserved wheel/sdist pair | Candidate qualification implemented; no TestPyPI/PyPI publication |
 | M3-L2 security/support | [Private report route](../SECURITY.md) enabled; issue tracker for non-sensitive defects | Route verified; no support SLA or completed pilot claimed |
-| M2 selection/calibration/export/table cost | PRs #133–#139; exports/comparisons, memory scenarios, table costs, bounded calibration tool; named-model forced-CPU inference samples | CUDA calibration failed at 30 seconds; broad comparable corpus pending; numerical scoring unchanged |
+| M2 selection/calibration/export/table cost | PRs #133–#139; exports/comparisons, memory scenarios, table costs, bounded calibration tool; named-model CPU and repeated CUDA samples in [live record](ollama-live-acceptance.md) | Original transient CUDA timeout cause unresolved; broad comparable corpus pending; numerical scoring unchanged |
 | Previous-candidate restore | [Installed worker/file rehearsal](qualified-candidate-restore.md) with historical CI candidates `6bab5a6` and `5d65b5f`, then actual main `eabf63e5` against previous `6bab5a6` | Named-main isolated terminal-job/file restore verified; a future release version and production rollback remain unqualified |
 
 ## Candidate review and publication

@@ -5,6 +5,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import suppress
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
@@ -109,9 +110,9 @@ def test_protocol_uses_exact_installed_model_and_preserves_identity(monkeypatch,
     assert report["model_facts"]["model_digest"] == "a" * 64
     assert len(report["samples"]) == 2
     assert all(sample["wall_seconds"] == pytest.approx(.005) for sample in report["samples"])
-    assert len([path for path, _ in calls if path == "/api/generate"]) == 3  # warmup + samples
+    assert len([path for path, body in calls if path == "/api/generate" and "prompt" in body]) == 3
     assert all(body["stream"] is False and body["options"]["num_predict"] == 8
-               for path, body in calls if path == "/api/generate")
+               for path, body in calls if path == "/api/generate" and "prompt" in body)
     assert not any(path in {"/api/pull", "/api/create", "/api/delete"} for path, _ in calls)
 
 
@@ -161,8 +162,11 @@ def test_cli_protocol_with_real_local_http_fixture(tmp_path):
                 self.reply({"capabilities": ["completion"], "model_info": {}})
             elif self.path == "/api/generate":
                 assert body["stream"] is False
-                assert body["options"]["num_predict"] == 8
-                self.reply(response())
+                if "prompt" in body:
+                    assert body["options"]["num_predict"] == 8
+                    self.reply(response())
+                else:
+                    self.reply({"model": "fixture:latest", "done": True})
             else:
                 raise AssertionError("unexpected calibration operation")
 
@@ -183,7 +187,7 @@ def test_cli_protocol_with_real_local_http_fixture(tmp_path):
         report = json.loads(report_path.read_text())
         assert report["runtime"]["version"] == "simulated-fixture"
         assert len(report["samples"]) == 2
-        assert operations.count("/api/generate") == 3
+        assert operations.count("/api/generate") == 4  # preload, warmup and two samples
         assert "response" not in report
     finally:
         server.shutdown()
@@ -202,7 +206,8 @@ def test_cli_failure_explains_boundary_without_writing_result(tmp_path):
     assert not output.exists()
 
 
-def test_supervisor_enforces_wall_budget_against_a_slow_http_body(tmp_path):
+@pytest.mark.parametrize("slow_path", ["/api/version", "/api/generate"])
+def test_supervisor_enforces_wall_budget_against_a_slow_http_body(tmp_path, slow_path):
     stop = threading.Event()
 
     class Handler(BaseHTTPRequestHandler):
@@ -210,7 +215,32 @@ def test_supervisor_enforces_wall_budget_against_a_slow_http_body(tmp_path):
             pass
 
         def do_GET(self):
-            data = json.dumps({"version": "slow-fixture-version"}).encode()
+            if self.path != slow_path:
+                data = {"/api/version": {"version": "slow-fixture-version"},
+                        "/api/status": {"cloud": {"disabled": True}},
+                        "/api/tags": {"models": [{"name": "fixture:latest", "digest": "a" * 64,
+                                                   "size": 1024**3}]}}[self.path]
+                self.reply(data)
+                return
+            self.drip({"version": "slow-fixture-version"})
+
+        def reply(self, data):
+            encoded = json.dumps(data).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            if self.path == "/api/show":
+                self.reply({"capabilities": ["completion"], "model_info": {}})
+                return
+            assert self.path == slow_path == "/api/generate"
+            self.drip({"model": "fixture:latest", "done": True})
+
+        def drip(self, response):
+            data = json.dumps(response).encode()
             self.send_response(200)
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
@@ -236,10 +266,149 @@ def test_supervisor_enforces_wall_budget_against_a_slow_http_body(tmp_path):
                   capture_output=True, text=True, timeout=15)
         assert result.returncode != 0
         assert "deadline" in result.stderr
+        expected_stage = "model_preload" if slow_path == "/api/generate" else "runtime_version"
+        assert f"stage {expected_stage}:" in result.stderr
         assert time.monotonic() - started < 12
         assert not output.exists()
     finally:
         stop.set()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_cli_separates_cold_model_loading_from_bounded_generation(tmp_path):
+    """Each stage fits one second, but combined cold load/generation does not."""
+    operations = []
+    loaded = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+
+        def reply(self, data):
+            encoded = json.dumps(data).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            with suppress(OSError):
+                self.wfile.write(encoded)
+
+        def do_GET(self):
+            self.reply({"/api/version": {"version": "cold-start-fixture"},
+                        "/api/status": {"cloud": {"disabled": True}},
+                        "/api/tags": {"models": [{"name": "fixture:latest", "digest": "a" * 64,
+                                                   "size": 1024**3}]}}[self.path])
+
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if self.path == "/api/show":
+                self.reply({"capabilities": ["completion"], "model_info": {}})
+                return
+            assert self.path == "/api/generate" and body["model"] == "fixture:latest"
+            kind = "generation" if "prompt" in body else "preload"
+            operations.append(kind)
+            if not loaded.is_set():
+                time.sleep(.65)
+                loaded.set()
+            if kind == "preload":
+                self.reply({"model": "fixture:latest", "done": True, "done_reason": "load"})
+            else:
+                time.sleep(.65)
+                self.reply({**response(), "load_duration": 0})
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "cold-start.json"
+    env = os.environ.copy()
+    env.update(AIMODEL_CACHE_DB_PATH=str(tmp_path / "cache.db"),
+               AIMODEL_DOWNLOAD_DB_PATH=str(tmp_path / "jobs.db"),
+               AIMODEL_HF_MODELS_DIR=str(tmp_path / "models"))
+    try:
+        run = subprocess.run([sys.executable, str(root / "scripts/calibrate_ollama.py"),
+            "fixture:latest", "--url", f"http://127.0.0.1:{server.server_port}",
+            "--request-timeout", "1", "--max-seconds", "15", "--repetitions", "2",
+            "--tokens", "8", "--output", str(output)],
+            cwd=root, env=env, capture_output=True, text=True, timeout=20)
+        assert run.returncode == 0, run.stderr
+        report = json.loads(output.read_text())
+        assert operations == ["preload", "generation", "generation", "generation"]
+        assert report["preload"]["wall_seconds"] >= .6
+        assert report["warmup"]["load_seconds"] == 0
+        assert len(report["samples"]) == 2
+        assert all(sample["generation_tok_s"] == 2 for sample in report["samples"])
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.parametrize("stage", ["model_preload", "warmup", "sample_2"])
+@pytest.mark.parametrize("failure", ["timeout", "http500"])
+def test_cli_failure_identifies_stage_without_leaking_runtime_body(tmp_path, stage, failure):
+    generations = 0
+    secret_body = "private-token-and-model-path"
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+
+        def reply(self, data, status=200):
+            encoded = json.dumps(data).encode()
+            self.send_response(status)
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            with suppress(OSError):
+                self.wfile.write(encoded)
+
+        def do_GET(self):
+            self.reply({"/api/version": {"version": "failure-fixture"},
+                        "/api/status": {"cloud": {"disabled": True}},
+                        "/api/tags": {"models": [{"name": "fixture:latest", "digest": "a" * 64,
+                                                   "size": 1024**3}]}}[self.path])
+
+        def do_POST(self):
+            nonlocal generations
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if self.path == "/api/show":
+                self.reply({"capabilities": ["completion"], "model_info": {}})
+                return
+            assert self.path == "/api/generate"
+            current = "model_preload"
+            if "prompt" in body:
+                generations += 1
+                current = "warmup" if generations == 1 else f"sample_{generations - 1}"
+            if current == stage:
+                if failure == "timeout":
+                    time.sleep(1.2)
+                else:
+                    self.reply({"error": secret_body}, 500)
+                    return
+            self.reply(response() if "prompt" in body else {"model": "fixture:latest", "done": True})
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "failed-report.json"
+    env = os.environ.copy()
+    env.update(AIMODEL_CACHE_DB_PATH=str(tmp_path / "cache.db"),
+               AIMODEL_DOWNLOAD_DB_PATH=str(tmp_path / "jobs.db"),
+               AIMODEL_HF_MODELS_DIR=str(tmp_path / "models"))
+    try:
+        run = subprocess.run([sys.executable, str(root / "scripts/calibrate_ollama.py"),
+            "fixture:latest", "--url", f"http://127.0.0.1:{server.server_port}",
+            "--request-timeout", "1", "--max-seconds", "15", "--repetitions", "2",
+            "--tokens", "8", "--output", str(output)],
+            cwd=root, env=env, capture_output=True, text=True, timeout=20)
+        assert run.returncode != 0
+        assert f"stage {stage}:" in run.stderr
+        assert ("timed out" if failure == "timeout" else "HTTP 500") in run.stderr
+        assert secret_body not in run.stderr + run.stdout
+        assert not output.exists()
+    finally:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)

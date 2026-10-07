@@ -1,11 +1,11 @@
 # Operation-specific support evidence
 
-Evidence reviewed on 2026-10-07. Installation, startup, acquisition and inference
+Evidence reviewed on 2026-10-08. Installation, startup, acquisition and inference
 are different operations; success in one does not establish the others.
 
 | Environment | Verified operation | Evidence | Unverified operation |
 |---|---|---|---|
-| Native Windows, Ollama 0.35.0, tinyllama:1.1b | Isolated managed acquisition, partial cancel, server/service reopen, retry, manifest/blob hashes; forced-CPU repeated inference | [Named-model trial](ollama-live-acceptance.md) | CUDA generation failed at 30 seconds; GPU calibration, other models/platforms and power loss remain unqualified |
+| Native Windows, Ollama 0.35.0, tinyllama:1.1b | Isolated managed acquisition, partial cancel, server/service reopen, retry, manifest/blob hashes; repeated CPU and CUDA inference | [Named-model trials](ollama-live-acceptance.md) | Original transient CUDA timeout cause unresolved; other models/platforms, broad corpus and power loss remain unqualified |
 | Native Windows, Python 3.12.14, HF SDK 0.36.2 | CLI/TUI/API/service smoke, pinned 19 MB HF acquisition, cancellation/retry, controlled and forced service stop with child exit, selected-file removal, isolated previous-candidate worker/file restore | [HF trial](hf-recovery-acceptance.md), [service trial](managed-download-removal.md), [forced-stop trial](evidence/hf-service-crash-windows-2026-10-04.json), [candidate restore](qualified-candidate-restore.md) | Host/power-loss recovery, other inference/backend combinations and broad calibration |
 | Hosted Linux x86_64, Python 3.10–3.14 | Isolated wheel installation and entrypoint/service startup | Package CI reports; Python 3.12 report observed Linux 6.17.0/glibc 2.39 | Native GPU/backend and acquisition/recovery on Python versions other than the separately tested 3.12 lane |
 | Hosted Linux/Windows, Python 3.12, HF SDK 0.36.2 | Pinned 19 MB HF acquisition, early/partial cancellation, reopen/retry and final size/digest | [Exact-source CI reports](qualified-candidate-restore.md#hosted-acquisition-evidence) | Hosted forced-service crash, Ollama acquisition and GPU inference |
@@ -38,12 +38,13 @@ was stopped. Only empty `blobs`/`manifests` directories were created. Default
 server unavailability is distinct from this successful dedicated-server startup.
 That preflight did not download or execute a model. The later
 [2026-10-07 named-model trial](ollama-live-acceptance.md) verified acquisition and
-CPU inference; its CUDA calibration failed and remains unqualified. See the
+CPU inference; its initial CUDA calibration failed. Two subsequent fresh-server
+GPU runs passed with separately bounded preload and generation. See the
 official [local-only configuration](https://docs.ollama.com/faq#how-do-i-disable-ollama-cloud-features).
 
 Stable promotion must not advertise untested inference/backend combinations.
 A restricted prerelease can label optional runtimes/platform operations
 experimental. The mandatory HF/Ollama acquisition/recovery gate has bounded
 named-artifact native Windows evidence and separately recorded hosted HF evidence;
-this does not certify all runtime/backend/model combinations. Failed CUDA
-generation and the remaining release/pilot gates must stay explicit.
+this does not certify all runtime/backend/model combinations. The historical CUDA
+failure, its unresolved cause and remaining release/pilot gates stay explicit.

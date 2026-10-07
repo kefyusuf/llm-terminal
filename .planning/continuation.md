@@ -105,7 +105,12 @@ previous-worker execution after server-side plan rebinding. See
    Default CUDA calibration failed at the 30-second generation deadline.
    Forced-CPU fallback measured three post-warmup samples at median 81.05 tok/s,
    using the same files. See `docs/ollama-live-acceptance.md`; this named Windows
-   path does not qualify CUDA, other platforms or a broad calibration corpus.
+   path alone does not qualify CUDA, other platforms or a broad calibration corpus.
+   On 2026-10-08, unchanged CUDA calibration passed twice. A subsequent bounded
+   preload separation passed two fresh-server GPU runs at median 337.86/334.51
+   tok/s, with three 64-token samples each and unchanged 30/120-second budgets.
+   See the script-hash-bound GPU report in the acceptance record. The original
+   transient timeout cause remains unresolved; broader qualification remains open.
    Owned processes/descendants were cleaned up; model files remain for review.
 3. SQLite data compatibility and isolated previous-worker/file restore passed
    for the named candidates. Actual main `eabf63e5` subsequently passed Package

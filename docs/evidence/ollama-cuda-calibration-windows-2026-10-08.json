@@ -1,0 +1,364 @@
+{
+  "schema_version": 1,
+  "kind": "bounded_cuda_calibration_validation",
+  "date": "2026-10-08",
+  "source_base": "ba3b0927b4c81fabaeeb14c9ea4a4de2423070b0",
+  "source_binding": "calibration_script_sha256 in each run binds the changed tool; scoring_source_sha256 binds unchanged scoring",
+  "request_timeout_seconds": 30,
+  "worker_budget_seconds": 120,
+  "original_timeout_cause": "unresolved; unchanged baseline also passed twice before this fix",
+  "runs": [
+    {
+      "calibration_script_sha256": "08efdffc4e55d2d453c9eab3562e766e9e1246bafdd073da912525aada54ecf7",
+      "phase": "cold_run_1",
+      "request_timeout_seconds": 30,
+      "model": "tinyllama:1.1b",
+      "runtime_version": "0.35.0",
+      "calibration_exit_code": 0,
+      "calibration_report_saved": true,
+      "status": "passed",
+      "runtime_reported_size_vram": 658379898,
+      "owned_descendants_remaining": 0,
+      "owned_server_stopped": true,
+      "elapsed_seconds": 7.906,
+      "calibration": {
+        "schema_version": 1,
+        "kind": "runtime_calibration",
+        "status": "measured",
+        "runtime": {
+          "name": "ollama",
+          "version": "0.35.0",
+          "cloud_disabled": true
+        },
+        "python": "3.12.14",
+        "hardware": {
+          "cpu_name": "AMD Ryzen 5 7500F 6-Core Processor",
+          "cpu_cores": 12,
+          "ram_total": 31.38082504272461,
+          "ram_free": 5.422145843505859,
+          "gpu_name": "NVIDIA GeForce RTX 4060 Ti",
+          "gpu_vendor": "nvidia",
+          "backend": "cuda",
+          "has_gpu": true,
+          "vram_total": 15.99609375,
+          "vram_free": 14.40792465209961,
+          "gpu_count": 1
+        },
+        "model_facts": {
+          "schema_version": 1,
+          "kind": "model_facts",
+          "model": "tinyllama:1.1b",
+          "model_digest": "2644915ede352ea7bdfaff0bfac0be74c719d5d5202acb63a6fb095b52f394a4",
+          "architecture": "llama",
+          "declared_supported_context": 2048,
+          "layers": 22,
+          "kv_heads": 4,
+          "key_head_dim": 64,
+          "value_head_dim": 64,
+          "head_dimension_provenance": {
+            "key": "embedding_divided_by_attention_heads",
+            "value": "embedding_divided_by_attention_heads"
+          },
+          "disk_size_bytes": 637700138,
+          "quantization": "Q4_0",
+          "capabilities": [
+            "completion"
+          ],
+          "special_cache_layout": false,
+          "provenance": {
+            "kind": "runtime_declaration",
+            "provider": "ollama",
+            "runtime_version": "0.35.0",
+            "observed_at": 1791410223.0631046
+          }
+        },
+        "workload": {
+          "name": "hash-explanation-v1",
+          "prompt_sha256": "989c8d4ab92af0d42026c61a626094aca41fe528f2cb759b153275fecedbde7d",
+          "requested_context": 512,
+          "max_generated_tokens": 64,
+          "repetitions": 3,
+          "warmup_repetitions": 1,
+          "keep_alive_seconds": 30
+        },
+        "prediction": {
+          "generation_tok_s": 266.7,
+          "mode": "GPU",
+          "mode_is_estimated": true,
+          "size_input": "runtime disk-size proxy",
+          "formula": "existing bandwidth heuristic",
+          "scoring_source_sha256": "944603ff87c66c44ae0b31e3930139b718d2a232ac470bd0c9fe5f7ff634700b"
+        },
+        "preload": {
+          "wall_seconds": 1.514030600003025
+        },
+        "warmup": {
+          "generation_tok_s": 322.5692641892675,
+          "prompt_tok_s": 1659.9478302110506,
+          "prompt_cache_count_reported": true,
+          "prompt_eval_count": 49,
+          "prompt_cached_count": 0,
+          "generation_count": 64,
+          "wall_seconds": 0.24412119999760762,
+          "runtime_total_seconds": 0.2318885,
+          "load_seconds": 0.0015507
+        },
+        "samples": [
+          {
+            "generation_tok_s": 339.00280207003584,
+            "prompt_tok_s": 333.889816360601,
+            "prompt_cache_count_reported": true,
+            "prompt_eval_count": 49,
+            "prompt_cached_count": 48,
+            "generation_count": 64,
+            "wall_seconds": 0.20610339999984717,
+            "runtime_total_seconds": 0.1964335,
+            "load_seconds": 0.0005047
+          },
+          {
+            "generation_tok_s": 337.86280658410146,
+            "prompt_tok_s": 319.79533098816756,
+            "prompt_cache_count_reported": true,
+            "prompt_eval_count": 49,
+            "prompt_cached_count": 48,
+            "generation_count": 64,
+            "wall_seconds": 0.21861860000353772,
+            "runtime_total_seconds": 0.1958244,
+            "load_seconds": 0.0020206
+          },
+          {
+            "generation_tok_s": 336.1927224781606,
+            "prompt_tok_s": 316.85678073510775,
+            "prompt_cache_count_reported": true,
+            "prompt_eval_count": 49,
+            "prompt_cached_count": 48,
+            "generation_count": 64,
+            "wall_seconds": 0.23207340000226395,
+            "runtime_total_seconds": 0.1973751,
+            "load_seconds": 0.0017004
+          }
+        ],
+        "summary": {
+          "generation_tok_s": {
+            "count": 3,
+            "median": 337.86280658410146,
+            "min": 336.1927224781606,
+            "max": 339.00280207003584,
+            "population_stddev": 1.1539939313118333
+          },
+          "prompt_tok_s": {
+            "count": 3,
+            "median": 319.79533098816756,
+            "min": 316.85678073510775,
+            "max": 333.889816360601,
+            "population_stddev": 7.434259270602258
+          },
+          "wall_seconds": {
+            "count": 3,
+            "median": 0.21861860000353772,
+            "min": 0.20610339999984717,
+            "max": 0.23207340000226395,
+            "population_stddev": 0.010604520913604238
+          },
+          "runtime_total_seconds": {
+            "count": 3,
+            "median": 0.1964335,
+            "min": 0.1958244,
+            "max": 0.1973751,
+            "population_stddev": 0.0006379031500854046
+          },
+          "load_seconds": {
+            "count": 3,
+            "median": 0.0017004,
+            "min": 0.0005047,
+            "max": 0.0020206,
+            "population_stddev": 0.0006523614659237792
+          },
+          "prediction_error_on_median_percent": -21.062634062500006
+        },
+        "limits": [
+          "Requested context/offload is not measured allocation",
+          "Single sequential workload, not universal accuracy",
+          "Prompt rate uses reported uncached counts when available",
+          "No quality benchmark or model download"
+        ]
+      }
+    },
+    {
+      "calibration_script_sha256": "08efdffc4e55d2d453c9eab3562e766e9e1246bafdd073da912525aada54ecf7",
+      "phase": "cold_run_2",
+      "request_timeout_seconds": 30,
+      "model": "tinyllama:1.1b",
+      "runtime_version": "0.35.0",
+      "calibration_exit_code": 0,
+      "calibration_report_saved": true,
+      "status": "passed",
+      "runtime_reported_size_vram": 658379898,
+      "owned_descendants_remaining": 0,
+      "owned_server_stopped": true,
+      "elapsed_seconds": 6.328,
+      "calibration": {
+        "schema_version": 1,
+        "kind": "runtime_calibration",
+        "status": "measured",
+        "runtime": {
+          "name": "ollama",
+          "version": "0.35.0",
+          "cloud_disabled": true
+        },
+        "python": "3.12.14",
+        "hardware": {
+          "cpu_name": "AMD Ryzen 5 7500F 6-Core Processor",
+          "cpu_cores": 12,
+          "ram_total": 31.38082504272461,
+          "ram_free": 5.394073486328125,
+          "gpu_name": "NVIDIA GeForce RTX 4060 Ti",
+          "gpu_vendor": "nvidia",
+          "backend": "cuda",
+          "has_gpu": true,
+          "vram_total": 15.99609375,
+          "vram_free": 14.40792465209961,
+          "gpu_count": 1
+        },
+        "model_facts": {
+          "schema_version": 1,
+          "kind": "model_facts",
+          "model": "tinyllama:1.1b",
+          "model_digest": "2644915ede352ea7bdfaff0bfac0be74c719d5d5202acb63a6fb095b52f394a4",
+          "architecture": "llama",
+          "declared_supported_context": 2048,
+          "layers": 22,
+          "kv_heads": 4,
+          "key_head_dim": 64,
+          "value_head_dim": 64,
+          "head_dimension_provenance": {
+            "key": "embedding_divided_by_attention_heads",
+            "value": "embedding_divided_by_attention_heads"
+          },
+          "disk_size_bytes": 637700138,
+          "quantization": "Q4_0",
+          "capabilities": [
+            "completion"
+          ],
+          "special_cache_layout": false,
+          "provenance": {
+            "kind": "runtime_declaration",
+            "provider": "ollama",
+            "runtime_version": "0.35.0",
+            "observed_at": 1791410229.7131352
+          }
+        },
+        "workload": {
+          "name": "hash-explanation-v1",
+          "prompt_sha256": "989c8d4ab92af0d42026c61a626094aca41fe528f2cb759b153275fecedbde7d",
+          "requested_context": 512,
+          "max_generated_tokens": 64,
+          "repetitions": 3,
+          "warmup_repetitions": 1,
+          "keep_alive_seconds": 30
+        },
+        "prediction": {
+          "generation_tok_s": 266.7,
+          "mode": "GPU",
+          "mode_is_estimated": true,
+          "size_input": "runtime disk-size proxy",
+          "formula": "existing bandwidth heuristic",
+          "scoring_source_sha256": "944603ff87c66c44ae0b31e3930139b718d2a232ac470bd0c9fe5f7ff634700b"
+        },
+        "preload": {
+          "wall_seconds": 1.2439911999972537
+        },
+        "warmup": {
+          "generation_tok_s": 324.3035075451238,
+          "prompt_tok_s": 1974.6917062948335,
+          "prompt_cache_count_reported": true,
+          "prompt_eval_count": 49,
+          "prompt_cached_count": 0,
+          "generation_count": 64,
+          "wall_seconds": 0.236570600005507,
+          "runtime_total_seconds": 0.2246857,
+          "load_seconds": 0.0015316
+        },
+        "samples": [
+          {
+            "generation_tok_s": 336.9467360917337,
+            "prompt_tok_s": 325.8390355164549,
+            "prompt_cache_count_reported": true,
+            "prompt_eval_count": 49,
+            "prompt_cached_count": 48,
+            "generation_count": 64,
+            "wall_seconds": 0.20780109999759588,
+            "runtime_total_seconds": 0.1967729,
+            "load_seconds": 0.0015595
+          },
+          {
+            "generation_tok_s": 334.51458797210984,
+            "prompt_tok_s": 314.16902293433867,
+            "prompt_cache_count_reported": true,
+            "prompt_eval_count": 49,
+            "prompt_cached_count": 48,
+            "generation_count": 64,
+            "wall_seconds": 0.20808259999466827,
+            "runtime_total_seconds": 0.1985931,
+            "load_seconds": 0.0015274
+          },
+          {
+            "generation_tok_s": 334.4097146022092,
+            "prompt_tok_s": 329.5978905735003,
+            "prompt_cache_count_reported": true,
+            "prompt_eval_count": 49,
+            "prompt_cached_count": 48,
+            "generation_count": 64,
+            "wall_seconds": 0.20720820000133244,
+            "runtime_total_seconds": 0.1968265,
+            "load_seconds": 0.0015572
+          }
+        ],
+        "summary": {
+          "generation_tok_s": {
+            "count": 3,
+            "median": 334.51458797210984,
+            "min": 334.4097146022092,
+            "max": 336.9467360917337,
+            "population_stddev": 1.172026779074685
+          },
+          "prompt_tok_s": {
+            "count": 3,
+            "median": 325.8390355164549,
+            "min": 314.16902293433867,
+            "max": 329.5978905735003,
+            "population_stddev": 6.569019389303398
+          },
+          "wall_seconds": {
+            "count": 3,
+            "median": 0.20780109999759588,
+            "min": 0.20720820000133244,
+            "max": 0.20808259999466827,
+            "population_stddev": 0.00036443990546631026
+          },
+          "runtime_total_seconds": {
+            "count": 3,
+            "median": 0.1968265,
+            "min": 0.1967729,
+            "max": 0.1985931,
+            "population_stddev": 0.0008457000098537702
+          },
+          "load_seconds": {
+            "count": 3,
+            "median": 0.0015572,
+            "min": 0.0015274,
+            "max": 0.0015595,
+            "population_stddev": 1.4620153517965823e-05
+          },
+          "prediction_error_on_median_percent": -20.2725353125
+        },
+        "limits": [
+          "Requested context/offload is not measured allocation",
+          "Single sequential workload, not universal accuracy",
+          "Prompt rate uses reported uncached counts when available",
+          "No quality benchmark or model download"
+        ]
+      }
+    }
+  ]
+}
