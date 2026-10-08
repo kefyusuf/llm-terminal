@@ -62,7 +62,9 @@ retains each raw report's SHA-256, not its temporary runtime paths. Retention is
 not permanent archival. Use these exact bytes for any subsequently authorized
 development pilot; changing source/version requires requalification. Version
 1.0.1 remains a development candidate, not a published release or a completed
-participant pilot. Existing rollback trials do not qualify this new byte pair.
+participant pilot. A subsequent [isolated terminal-job/file restore](qualified-candidate-restore.md#2026-10-08-development-pilot-input-pair)
+qualified these exact wheel bytes against previous `eabf63e5`; it does not qualify
+active-job migration or a new release version's production rollback.
 
 ## Publication gates
 

@@ -1,5 +1,47 @@
 # Qualified candidate restore rehearsal
 
+## 2026-10-08 development pilot input pair
+
+The [new Windows report](evidence/qualified-pilot-candidate-restore-windows-2026-10-08.json)
+qualifies the exact [development pilot input](build-once-candidates.md#2026-10-08-exact-main-candidate-checkpoint)
+`88fed3f02bf8607407fbbe4250106c52971147cb` against previous verified source
+`eabf63e5651bc9bd2e07fd9ad0fbaee80f16179c`. Both are version 1.0.1; this is a
+named byte-pair rehearsal, not a version downgrade or production rollback.
+Current and previous wheel hashes are respectively
+`ec49018eb98c52bd4cccdd108671b89f39c7ce286aa12eec685c31516fe3496d` and
+`b17695bde1b8a76e7220ade88271af4faa5fe7f094e34a2646ce9e4ad84890ab`.
+They came from preserved Package runs 37736783425 and 37242705905, both 19/19.
+
+The current wheel was installed in a fresh project-owned Python 3.12.14
+environment; the previous independently qualified installation was reused.
+Both environments passed `pip check`. Complete manifests/distribution bytes,
+installed module ownership and PEP 610 receipts matched the expected sources
+and hashes before either installed worker ran.
+
+The bounded procedure below was repeated with separate owned database/cache/model
+roots and a private process-only service token. Both installed workers completed
+the same previously verified 19,077,344-byte pinned public file and then exited
+zero after controlled shutdown. SQLite's backup API copied one terminal job and
+passed integrity checking. The previous service read that completed job from a
+copy, recomputed its plan for the quarantine root before requeue and verified
+the selected file again. Immutable database/file backups, original selected file
+and current trial output kept their hashes. TLS verification remained enabled;
+the restored selected file does not imply zero network transfer.
+
+The first driver invocation failed before trial creation because its import path
+did not include developer scripts. The corrected driver affected only the local
+probe; installed worker subprocesses still used isolated mode and removed
+`PYTHONPATH`. No application source or dependency contract changed.
+
+Owned services stopped. Trial data and reports remain under ignored
+`.venv/candidate-restore-88fed-2026-10-08/`; the fresh candidate environment is
+retained for review. No Docker resources or worktrees were created. Actual
+participant tasks, active-job migration, shared destinations, auxiliary-cache
+restore, host/power loss, inference and arbitrary release rollback remain
+unverified. A new release version or changed bytes require their own qualification.
+
+## Historical candidate pair
+
 The [Windows report](evidence/qualified-candidate-restore-windows-2026-10-04.json)
 extends the earlier [read-only SQLite qualification](sqlite-compatibility-rehearsal.md)
 with actual installed worker execution and selected-file restoration. This is an

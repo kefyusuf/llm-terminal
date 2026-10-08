@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "platform": "Windows",
+  "python_version": "3.12.14",
+  "current": {
+    "source_sha": "88fed3f02bf8607407fbbe4250106c52971147cb",
+    "version": "1.0.1",
+    "wheel_sha256": "ec49018eb98c52bd4cccdd108671b89f39c7ce286aa12eec685c31516fe3496d",
+    "installed_origin_verified": true,
+    "completed": true,
+    "restored_terminal_records": 0,
+    "server_plan_rebound_to_isolated_root": true,
+    "verified_bytes_and_sha256": true,
+    "controlled_shutdown_exit_zero": true
+  },
+  "previous": {
+    "source_sha": "eabf63e5651bc9bd2e07fd9ad0fbaee80f16179c",
+    "version": "1.0.1",
+    "wheel_sha256": "b17695bde1b8a76e7220ade88271af4faa5fe7f094e34a2646ce9e4ad84890ab",
+    "installed_origin_verified": true,
+    "completed": true,
+    "restored_terminal_records": 1,
+    "server_plan_rebound_to_isolated_root": true,
+    "verified_bytes_and_sha256": true,
+    "controlled_shutdown_exit_zero": true
+  },
+  "backup": {
+    "integrity": "ok",
+    "job_count": 1,
+    "backup_sha256": "fa60f2396764028b0998034a0f0995e015ae481b33107024d93575f552d779df"
+  },
+  "repository": "ggml-org/models-moved",
+  "filename": "tinyllamas/stories15M-q4_0.gguf",
+  "revision": "499bc8821c6b12b4e53c5bffcb21ec206f212d81",
+  "size_bytes": 19077344,
+  "sha256": "66967fbece6dbe97886593fdbb73589584927e29119ec31f08090732d1861739",
+  "immutable_backups_and_original_files_unchanged": true,
+  "limits": [
+    "Isolated candidate rehearsal, not a production downgrade or published release",
+    "One terminal HF job and one selected file; no active-job or auxiliary-cache restore",
+    "No inference, usage permission, host/power-loss or transfer-reuse proof"
+  ],
+  "date": "2026-10-08",
+  "current_package_run": "https://github.com/kefyusuf/llm-terminal/actions/runs/37736783425",
+  "previous_package_run": "https://github.com/kefyusuf/llm-terminal/actions/runs/37242705905",
+  "dependency_checks": {
+    "current_pip_check": "passed",
+    "previous_pip_check": "passed"
+  }
+}
