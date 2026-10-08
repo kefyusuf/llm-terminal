@@ -1,8 +1,39 @@
 # Verified continuation record
 
-Date: 2026-10-05. Repository: `kefyusuf/llm-terminal`.
+Date: 2026-10-08. Repository: `kefyusuf/llm-terminal`.
 
-## Source and delivery state
+## Current verified main checkpoint
+
+[PR #148](https://github.com/kefyusuf/llm-terminal/pull/148) merged the bounded
+calibration preload/failure-stage correction as
+`0afc411bbd6258195a0248b86f33995e42bbe891`. Its tracked tree matches independently
+reviewed head `d19ed3e7e6d7b54ad78da098cb3a214756ef7518`. Both
+[PR CI](https://github.com/kefyusuf/llm-terminal/actions/runs/37693435961) and
+[actual-main CI](https://github.com/kefyusuf/llm-terminal/actions/runs/37694030839)
+passed all 11 jobs. The full local collection had 911 tests: 910 passed and one
+POSIX-only test was skipped on Windows. Imports/Ruff, staged 39-file mypy and
+CLI/TUI/API/service smoke passed. The first full-test attempt could not remove
+an existing temporary root; the successful repeat used a fresh project-owned
+root without changing ACLs.
+
+Two fresh owned Ollama 0.35.0 servers completed CUDA calibration with the already
+verified `tinyllama:1.1b` files and unchanged 30-second request/120-second worker
+limits. The [archived report](../docs/evidence/ollama-cuda-calibration-windows-2026-10-08.json)
+binds the tested calibration and scoring hashes; the historical timeout cause
+remains unresolved. Owned servers/descendants stopped; model files remain under
+ignored `.venv/`. No Docker resources or worktrees were created.
+
+Package CI was not triggered by these calibration-tool/test/document paths.
+Historical Package qualification below does not qualify new release bytes.
+Version remains 1.0.1; no publication or participant outcome is claimed.
+
+Next, use the [pilot acceptance form](../docs/pilot-acceptance.md) after selecting
+an authorized immutable candidate and its installation reports. Collect actual
+participant outcomes; do not replace them with maintainer tests. New release
+version, publisher/protected environment and promotion remain explicit decisions.
+Keep broader calibration separate and preserve current scoring.
+
+## Historical source and delivery state
 
 Main delivery: [integration PR #143](https://github.com/kefyusuf/llm-terminal/pull/143)
 squash-merged the researched roadmap and implementation stack on 2026-10-05
