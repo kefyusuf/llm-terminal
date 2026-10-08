@@ -1,5 +1,14 @@
 # Release evidence and promotion gates
 
+Current checkpoint (2026-10-08): main
+`0afc411bbd6258195a0248b86f33995e42bbe891` passed
+[CI, 11/11](https://github.com/kefyusuf/llm-terminal/actions/runs/37694030839)
+after [PR #148](https://github.com/kefyusuf/llm-terminal/pull/148) merged.
+Calibration changes preserved request/worker limits and scoring; two bounded
+native Windows GPU runs are recorded separately from the historical failed trial.
+No new Package candidate was scheduled for these paths. The qualification below
+is historical artifact evidence, not a newly versioned release.
+
 Reviewed on 2026-10-05. Integration PR #143 incorporates the research roadmap
 #118 and implementation stack #119–#142, including the Windows calibration
 elapsed-clock correction. It squash-merged as
@@ -47,6 +56,10 @@ doctor JSON. Exclude credentials, private model identities and unrelated files.
 Do not invent feedback or automatically message participants. Resolve blocking
 defects before stable promotion and publish the tested/experimental support
 matrix with known limits. No participant outcomes have been collected here.
+
+Use the [pilot acceptance form](pilot-acceptance.md) to bind submitted outcomes
+to candidate bytes and to keep failed, blocked and unverified tasks explicit.
+Preparing the form does not complete the pilot or authorize invitations.
 
 ## Upgrade, backup and withdrawal
 
