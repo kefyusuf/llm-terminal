@@ -11,7 +11,9 @@ The candidate-manifest SHA-256 is
 `b75d54ecd58bf761a310718f22432bf13af2fb9ae7ccd01369090b00f5ead47f`.
 Its available bytes can populate the identity fields after a pilot is authorized;
 the task outcomes remain unverified. This does not choose a public release version
-or supply an independently qualified upgrade/rollback pair for these artifacts.
+or establish production rollback. A subsequently [qualified isolated byte pair](qualified-candidate-restore.md#2026-10-08-development-pilot-input-pair)
+uses this candidate and previous `eabf63e5` for one terminal-job/file restore;
+the actual participant upgrade/recovery task remains unverified.
 
 ## Prepare one immutable input
 

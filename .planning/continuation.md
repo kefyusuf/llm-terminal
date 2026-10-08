@@ -44,6 +44,15 @@ This supplies immutable development pilot inputs without selecting a new release
 version, publishing, messaging participants or claiming real pilot/rollback
 outcomes. Those gates remain open.
 
+The 2026-10-08 [installed-worker restore report](../docs/evidence/qualified-pilot-candidate-restore-windows-2026-10-08.json)
+then qualified the exact `88fed3f` development wheel against previous `eabf63e5`:
+both installed origins/receipts and dependency checks passed; both workers
+completed the same pinned 19 MB selected file and shut down cleanly. The previous
+worker used a copy of the one-terminal-job backup, rebound its plan to a separate
+root, and preserved immutable backups and original files. This closes only that
+byte pair's isolated terminal-job/file restore; actual participant tasks and a
+new release version's rollback remain open. See [procedure and limits](../docs/qualified-candidate-restore.md#2026-10-08-development-pilot-input-pair).
+
 ## Historical source and delivery state
 
 Main delivery: [integration PR #143](https://github.com/kefyusuf/llm-terminal/pull/143)
