@@ -33,6 +33,17 @@ participant outcomes; do not replace them with maintainer tests. New release
 version, publisher/protected environment and promotion remain explicit decisions.
 Keep broader calibration separate and preserve current scoring.
 
+The next checkpoint completed on actual main
+`88fed3f02bf8607407fbbe4250106c52971147cb`: its
+[CI passed 11/11](https://github.com/kefyusuf/llm-terminal/actions/runs/37722565654)
+and manually dispatched [Package passed 19/19](https://github.com/kefyusuf/llm-terminal/actions/runs/37736783425).
+The downloaded manifest/distribution bytes and all 18 consumer reports were
+cross-checked; see [exact-main package inputs](../docs/build-once-candidates.md#2026-10-08-exact-main-candidate-checkpoint)
+and [archived summary](../docs/evidence/qualified-main-package-2026-10-08.json).
+This supplies immutable development pilot inputs without selecting a new release
+version, publishing, messaging participants or claiming real pilot/rollback
+outcomes. Those gates remain open.
+
 ## Historical source and delivery state
 
 Main delivery: [integration PR #143](https://github.com/kefyusuf/llm-terminal/pull/143)
