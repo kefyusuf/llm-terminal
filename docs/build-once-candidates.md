@@ -37,6 +37,33 @@ The manifest helper requires `packaging`, supplied by the build tooling. A local
 report must identify its actual source separately; passing a SHA argument alone
 does not establish clean-source provenance.
 
+## 2026-10-08 exact-main candidate checkpoint
+
+Actual main `88fed3f02bf8607407fbbe4250106c52971147cb` passed
+[CI, 11/11](https://github.com/kefyusuf/llm-terminal/actions/runs/37722565654)
+and a manually dispatched [Package run, 19/19](https://github.com/kefyusuf/llm-terminal/actions/runs/37736783425).
+The [archived qualification summary](evidence/qualified-main-package-2026-10-08.json)
+records the manifest and all 18 report identities. Downloaded distribution bytes
+were independently checked against the manifest; all consumer reports matched
+the expected OS/Python/kind lanes, version and input artifact hashes and reported
+fresh environments, checkout exclusion, removed Python path overrides, 24 module
+origins and all 11 installation/startup checks.
+
+| Input | Bytes | SHA-256 |
+|---|---|---|
+| `ai_model_explorer-1.0.1-py3-none-any.whl` | 145574 | `ec49018eb98c52bd4cccdd108671b89f39c7ce286aa12eec685c31516fe3496d` |
+| `ai_model_explorer-1.0.1.tar.gz` | 231759 | `76ed67855a31c61443a0a561b21106a14a54d9540c9f292750e50cfd6e487ed8` |
+
+The original candidate artifact is
+`package-candidate-88fed3f02bf8607407fbbe4250106c52971147cb` in that Package run;
+its configured retention is 30 days. Downloaded bytes and raw consumer reports
+are retained under ignored `.venv/package-main-88fed3f-37736783425/`. The summary
+retains each raw report's SHA-256, not its temporary runtime paths. Retention is
+not permanent archival. Use these exact bytes for any subsequently authorized
+development pilot; changing source/version requires requalification. Version
+1.0.1 remains a development candidate, not a published release or a completed
+participant pilot. Existing rollback trials do not qualify this new byte pair.
+
 ## Publication gates
 
 This workflow does not publish, grant OIDC write permission or create releases.

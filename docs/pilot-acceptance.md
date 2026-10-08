@@ -4,6 +4,15 @@ Status: prepared on 2026-10-08; no participant outcomes collected. This form
 implements the evidence contract in [release readiness](release-readiness.md).
 It is not an invitation, publication authorization or completed pilot report.
 
+A qualified development input is now available: source
+`88fed3f02bf8607407fbbe4250106c52971147cb`, version 1.0.1, with
+[exact distribution hashes and 18 installation reports](build-once-candidates.md#2026-10-08-exact-main-candidate-checkpoint).
+The candidate-manifest SHA-256 is
+`b75d54ecd58bf761a310718f22432bf13af2fb9ae7ccd01369090b00f5ead47f`.
+Its available bytes can populate the identity fields after a pilot is authorized;
+the task outcomes remain unverified. This does not choose a public release version
+or supply an independently qualified upgrade/rollback pair for these artifacts.
+
 ## Prepare one immutable input
 
 Before a participant starts, the maintainer selects an authorized candidate and
