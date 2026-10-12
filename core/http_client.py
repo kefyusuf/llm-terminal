@@ -23,13 +23,19 @@ def _build_adapter() -> requests.adapters.HTTPAdapter:
     return adapter
 
 
+def create_session() -> requests.Session:
+    """Create an independently owned client with the standard retry policy."""
+    session = requests.Session()
+    adapter = _build_adapter()
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
 def get_session() -> requests.Session:
     global _session
     if _session is None:
-        _session = requests.Session()
-        adapter = _build_adapter()
-        _session.mount("http://", adapter)
-        _session.mount("https://", adapter)
+        _session = create_session()
     return _session
 
 
