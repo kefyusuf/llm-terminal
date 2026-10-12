@@ -1,5 +1,7 @@
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 
 from bs4 import BeautifulSoup
 from requests.exceptions import ConnectionError, RequestException, Timeout
@@ -7,7 +9,7 @@ from requests.exceptions import ConnectionError, RequestException, Timeout
 import config
 from core import cache_db
 from core.errors import ProviderError
-from core.http_client import get_session
+from core.http_client import create_session, get_session
 from core.scoring import enrich_result_with_scores
 from core.utils import (
     calculate_fit,
@@ -94,6 +96,27 @@ class OllamaProvider:
 
 
 _ollama_meta_cache_lock = threading.Lock()
+_metadata_http = threading.local()
+
+
+@contextmanager
+def _metadata_batch(model_names):
+    """Overlap at most four detail requests using search-owned worker clients."""
+    sessions = []
+    lock = threading.Lock()
+
+    def initialize_worker():
+        session = create_session()
+        _metadata_http.session = session
+        with lock:
+            sessions.append(session)
+
+    try:
+        with ThreadPoolExecutor(max_workers=4, initializer=initialize_worker) as executor:
+            yield executor.map(get_ollama_model_metadata, model_names)
+    finally:
+        for session in sessions:
+            session.close()
 
 
 def _init_ollama_cache():
@@ -241,7 +264,8 @@ def get_ollama_model_metadata(model_name):
     metadata = None
     try:
         detail_url = f"https://ollama.com/library/{model_name}"
-        detail_response = get_session().get(
+        session = getattr(_metadata_http, "session", None) or get_session()
+        detail_response = session.get(
             detail_url,
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=config.settings.ollama_timeout,
@@ -361,6 +385,7 @@ def search_ollama_models(
 
         html_text = response.text
         soup = BeautifulSoup(html_text, "html.parser")
+        candidates = []
         for anchor in soup.find_all("a", href=True):
             href = anchor.get("href")
             if not isinstance(href, str):
@@ -374,63 +399,66 @@ def search_ollama_models(
                 continue
             found_keys.add(unique_key)
 
-            full_text = anchor.get_text(" ", strip=True)
-            pulls = re.search(r"(\d+(?:\.\d+)?[KM]?)\s*Pulls", full_text, re.IGNORECASE)
-            if not pulls:
-                parent = anchor.find_parent("li")
-                if parent:
-                    pulls = re.search(
-                        r"(\d+(?:\.\d+)?[KM]?)\s*Pulls",
-                        parent.get_text(" ", strip=True),
-                        re.IGNORECASE,
-                    )
+            candidates.append((anchor, model_name))
 
-            score_str = f"[cyan]📥 {pulls.group(1)}[/cyan]" if pulls else "[grey50]-[/grey50]"
-            params = extract_params(model_name)
-            inst = (
-                "[green]✔[/green]" if model_name.lower() in local_models else "[grey37]-[/grey37]"
-            )
-            use_case = determine_use_case(model_name)
-            use_case_key = determine_use_case_key(model_name)
-            size_gb = estimate_model_size_gb(model_name)
-            quant = infer_quant_from_name(model_name, default="GGUF")
-            size_source = "estimated"
+        with _metadata_batch([name for _, name in candidates]) as metadata_results:
+            for (anchor, model_name), metadata in zip(candidates, metadata_results, strict=True):
+                full_text = anchor.get_text(" ", strip=True)
+                pulls = re.search(r"(\d+(?:\.\d+)?[KM]?)\s*Pulls", full_text, re.IGNORECASE)
+                if not pulls:
+                    parent = anchor.find_parent("li")
+                    if parent:
+                        pulls = re.search(
+                            r"(\d+(?:\.\d+)?[KM]?)\s*Pulls",
+                            parent.get_text(" ", strip=True),
+                            re.IGNORECASE,
+                        )
 
-            metadata = get_ollama_model_metadata(model_name)
-            if metadata and metadata.get("size_gb"):
-                size_gb = metadata["size_gb"]
-                size_source = "exact"
-                quant = metadata.get("quant", quant)
-                meta_params = metadata.get("params", "-")
-                if params == "-" and meta_params != "-":
-                    params = meta_params
+                score_str = f"[cyan]📥 {pulls.group(1)}[/cyan]" if pulls else "[grey50]-[/grey50]"
+                params = extract_params(model_name)
+                inst = (
+                    "[green]✔[/green]" if model_name.lower() in local_models else "[grey37]-[/grey37]"
+                )
+                use_case = determine_use_case(model_name)
+                use_case_key = determine_use_case_key(model_name)
+                size_gb = estimate_model_size_gb(model_name)
+                quant = infer_quant_from_name(model_name, default="GGUF")
+                size_source = "estimated"
 
-            fit_str, mode_str, _ = calculate_fit(size_gb, specs)
+                if metadata and metadata.get("size_gb"):
+                    size_gb = metadata["size_gb"]
+                    size_source = "exact"
+                    quant = metadata.get("quant", quant)
+                    meta_params = metadata.get("params", "-")
+                    if params == "-" and meta_params != "-":
+                        params = meta_params
 
-            result_dict = {
-                "inst": inst,
-                "source": "Ollama",
-                "provider": "Ollama Registry",
-                "publisher": "ollama",
-                "id": model_name,
-                "name": model_name,
-                "params": params,
-                "use_case": use_case,
-                "use_case_key": use_case_key,
-                "score": score_str,
-                "likes": 0,
-                "downloads": 0,
-                "is_hidden_gem": False,
-                "gem_score": 0.0,
-                "quant": quant,
-                "size_source": size_source,
-                "mode": mode_str,
-                "fit": fit_str,
-                "size": (f"{size_gb:.1f} GB" if size_source == "exact" else f"~{size_gb:.1f} GB"),
-                "_size_gb": size_gb,
-            }
-            enrich_result_with_scores(result_dict, specs)
-            results.append(result_dict)
+                fit_str, mode_str, _ = calculate_fit(size_gb, specs)
+
+                result_dict = {
+                    "inst": inst,
+                    "source": "Ollama",
+                    "provider": "Ollama Registry",
+                    "publisher": "ollama",
+                    "id": model_name,
+                    "name": model_name,
+                    "params": params,
+                    "use_case": use_case,
+                    "use_case_key": use_case_key,
+                    "score": score_str,
+                    "likes": 0,
+                    "downloads": 0,
+                    "is_hidden_gem": False,
+                    "gem_score": 0.0,
+                    "quant": quant,
+                    "size_source": size_source,
+                    "mode": mode_str,
+                    "fit": fit_str,
+                    "size": (f"{size_gb:.1f} GB" if size_source == "exact" else f"~{size_gb:.1f} GB"),
+                    "_size_gb": size_gb,
+                }
+                enrich_result_with_scores(result_dict, specs)
+                results.append(result_dict)
 
         if not results and "No models found." not in soup.get_text(" ", strip=True):
             _record_error(

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "kind": "bounded_ollama_search_comparison",
+  "date": "2026-10-12",
+  "query": "deepsek",
+  "requested_results": 5,
+  "returned_results": 5,
+  "baseline_source_sha": "88fed3f02bf8607407fbbe4250106c52971147cb",
+  "baseline_wheel_sha256": "ec49018eb98c52bd4cccdd108671b89f39c7ce286aa12eec685c31516fe3496d",
+  "comparison_environment": {
+    "python": "3.12.14",
+    "requests": "2.34.2",
+    "same_interpreter_and_dependencies": true,
+    "tls_verification": true,
+    "separate_empty_metadata_caches": true
+  },
+  "baseline": {
+    "elapsed_seconds": 4.61985449999338,
+    "detail_requests": 14,
+    "error_count": 0
+  },
+  "fixed_source": {
+    "elapsed_seconds": 1.9155080000055023,
+    "detail_requests": 14,
+    "error_count": 0,
+    "max_workers": 4
+  },
+  "returned_result_dictionaries_equal": true,
+  "result_contract_sha256": "26535430c340e47beb97acb0c8d5c0a96af7e8327df6d92189e1974abd383dab",
+  "tested_source_sha256_normalized_lf": {
+    "core\\http_client.py": "2fc7557f5b9931c639de2ba43d2774255e37a078770632f317ad4529a09ab006",
+    "providers\\ollama_provider.py": "834ca119b8cd58baa9255300646ae656a753000254cfe4bcc721f00084ffd651"
+  },
+  "limits": [
+    "One same-day live sample per implementation; not a p95 or universal latency guarantee.",
+    "Old installed wheel compared to fixed checkout source in the same interpreter; new installed package qualification is separate.",
+    "Existing retry and per-request timeout policy retained; no whole-search deadline promised.",
+    "Public catalog requests only; no model acquisition, inference or competitor comparison."
+  ]
+}

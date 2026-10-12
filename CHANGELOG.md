@@ -4,6 +4,8 @@
 
 ### Reliability and provider correctness
 
+- Overlapped Ollama catalog metadata requests with at most four search-owned HTTP clients; preserved catalog ordering, retry/timeouts, cached facts, estimated-size fallback and scoring while reducing sequential detail-request latency.
+
 - Separated bounded Ollama calibration model preload from generation, recorded preload timing separately, and identified safe failure stages for request and whole-worker timeouts without increasing budgets or changing scoring.
 
 - Measured calibration HTTP elapsed time with a high-resolution counter so fast local responses do not fail on coarse Windows monotonic clock ticks; retained independent deadlines and token/identity validation.

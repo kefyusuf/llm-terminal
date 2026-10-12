@@ -1,6 +1,11 @@
 # Candidate-bound pilot acceptance
 
-Status: prepared on 2026-10-08; no participant outcomes collected. This form
+Status: partial pilot. The Windows participant reported successful application
+startup and search, plus slow Ollama results for `deepsek`. No participant latency
+value or competitor repository was supplied. The [maintainer investigation](ollama-search-performance.md)
+is separate from this qualitative feedback. Acquisition/recovery, upgrade and
+uninstall outcomes remain unverified; installation was prepared by the maintainer.
+The participant's input remains the original `88fed3f` wheel below. This form
 implements the evidence contract in [release readiness](release-readiness.md).
 It is not an invitation, publication authorization or completed pilot report.
 
