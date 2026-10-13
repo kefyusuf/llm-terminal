@@ -85,6 +85,7 @@ class DownloadStore:
 
     def normalize_target_ids(self):
         with self.lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             rows = conn.execute(
                 "SELECT id, target_id, updated_at FROM jobs ORDER BY updated_at DESC, id DESC"
             ).fetchall()
@@ -103,11 +104,11 @@ class DownloadStore:
                 if normalized != row["target_id"]:
                     update_rows.append((normalized, row_id))
 
-            for normalized, row_id in update_rows:
-                conn.execute("UPDATE jobs SET target_id = ? WHERE id = ?", (normalized, row_id))
-
             for row_id in delete_ids:
                 conn.execute("DELETE FROM jobs WHERE id = ?", (row_id,))
+
+            for normalized, row_id in update_rows:
+                conn.execute("UPDATE jobs SET target_id = ? WHERE id = ?", (normalized, row_id))
 
     def recover_orphaned_running_jobs(self):
         now = time.time()

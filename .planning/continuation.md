@@ -4,6 +4,21 @@ Date: 2026-10-13. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+Verified baseline: PR #154 merged at
+`429858de027cb6f573592e27b9c954656a0ab900`; actual-main
+[CI 38361010107](https://github.com/kefyusuf/llm-terminal/actions/runs/38361010107)
+passed 11/11. Startup ownership and isolated development smoke are complete.
+
+The next narrow branch is `fix/download-legacy-id-normalization`: a regression
+reproduced UNIQUE failure when a mixed-case record is newer than its canonical
+duplicate. Normalize within one immediate transaction, delete losers before
+updating retained IDs, and preserve the existing timestamp/row-ID winner policy.
+Focused tests verify full visible record preservation, idempotence and rollback
+on an injected database update failure. Check the current branch PR/CI before
+continuing. Saturated-queue cancellation and live acquisition remain separate.
+
+Earlier checkpoints below are historical.
+
 Current verified main baseline is now PR #153 at
 `34e1bbe0cea06247adaac7cab578e522ffdd511e`: actual-main
 [CI 38354647054](https://github.com/kefyusuf/llm-terminal/actions/runs/38354647054)

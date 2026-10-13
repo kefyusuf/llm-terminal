@@ -4,6 +4,8 @@
 
 ### Reliability and provider correctness
 
+- Normalize legacy download IDs atomically by removing duplicate loser records before updating the retained ID; preserve the existing newest-record selection and roll back all changes if normalization fails.
+
 - Acquire exclusive download-database ownership and bind the HTTP socket before recovery or worker startup; preserve live jobs when a second normal/smoke process starts and retain ownership through worker cleanup.
 
 - Show fully scored Ollama rows while remaining metadata is still loading; preserve selected model identity and suppress obsolete previews. Limit the optional installed-model lookup to one attempt while retaining remote retry defaults.
