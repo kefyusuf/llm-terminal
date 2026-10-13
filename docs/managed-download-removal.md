@@ -16,7 +16,14 @@ ownership so a replacement can perform the existing abandoned-job recovery.
 The sidecar is not the jobs database, so normal queue/API writes remain usable.
 Keep the sidecar file: removing it while a process owns it can break exclusivity.
 No download status rules, queue capacity, model destinations or protocol version
-change. Legacy normalization correctness is a separate follow-up.
+change.
+
+Legacy ID normalization retains the newest record by `updated_at`, then the
+highest row ID for ties. It holds one immediate SQLite transaction across the
+read and all mutations, removes duplicate loser records before normalizing the
+winner ID, and preserves the winner's other fields. An update failure rolls back
+the duplicate removals as well. Only duplicate database records are removed;
+model files are untouched. Repeating normalization is idempotent.
 
 Real-process regressions cover an occupied socket, a second normal/smoke process
 on the same database, owner death/recovery and independent databases. An injected

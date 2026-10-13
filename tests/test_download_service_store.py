@@ -1,3 +1,7 @@
+import sqlite3
+
+import pytest
+
 from downloads.download_service import DownloadStore
 
 
@@ -17,7 +21,14 @@ def test_upsert_job_rejects_duplicate_active_target(tmp_path):
     )
 
 
-def test_normalize_target_ids_merges_legacy_casing_duplicates(tmp_path):
+@pytest.mark.parametrize("legacy_updated, canonical_updated, winner", [
+    (1.0, 2.0, "ollama:qwen3-coder-next"),
+    (2.0, 1.0, "Ollama:Qwen3-Coder-Next"),
+    (1.0, 1.0, "ollama:qwen3-coder-next"),
+])
+def test_normalize_target_ids_merges_legacy_casing_duplicates(
+    tmp_path, legacy_updated, canonical_updated, winner
+):
     store = DownloadStore(tmp_path / "jobs.db")
     with store._connect() as conn:
         conn.execute(
@@ -37,7 +48,7 @@ def test_normalize_target_ids_merges_legacy_casing_duplicates(tmp_path):
                 "done",
                 "",
                 1.0,
-                1.0,
+                legacy_updated,
             ),
         )
         conn.execute(
@@ -57,15 +68,35 @@ def test_normalize_target_ids_merges_legacy_casing_duplicates(tmp_path):
                 "Downloading",
                 "40%",
                 2.0,
-                2.0,
+                canonical_updated,
             ),
         )
 
+    expected = store.get_job_by_target(winner)
+    expected["target_id"] = "ollama:qwen3-coder-next"
     store.normalize_target_ids()
     jobs = store.list_jobs(limit=10)
-    assert len(jobs) == 1
-    assert jobs[0] is not None
-    assert jobs[0]["target_id"] == "ollama:qwen3-coder-next"
+    assert jobs == [expected]
+    store.normalize_target_ids()
+    assert store.list_jobs(limit=10) == [expected]
+
+
+def test_normalize_target_ids_rolls_back_duplicate_removal_on_update_failure(tmp_path):
+    store = DownloadStore(tmp_path / "jobs.db")
+    with store._connect() as conn:
+        conn.executemany(
+            "INSERT INTO jobs (target_id, source, name, command_json, status, created_at, updated_at) "
+            "VALUES (?, 'Ollama', 'model', '[]', 'completed', 1, ?)",
+            [("ollama:model", 1), ("Ollama:Model", 2)],
+        )
+        conn.execute(
+            "CREATE TRIGGER fail_normalization BEFORE UPDATE OF target_id ON jobs "
+            "BEGIN SELECT RAISE(ABORT, 'injected normalization failure'); END"
+        )
+    expected = store.list_jobs(limit=10)
+    with pytest.raises(sqlite3.IntegrityError, match="injected normalization failure"):
+        store.normalize_target_ids()
+    assert store.list_jobs(limit=10) == expected
 
 
 def test_recover_orphaned_running_jobs_marks_failed(tmp_path):
