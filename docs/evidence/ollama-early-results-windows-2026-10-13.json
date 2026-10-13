@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-13",
+  "kind": "headless_tui_live_catalog_observation",
+  "query": "deepsek",
+  "hardware_preinitialized": true,
+  "metadata_cache_initially_empty": true,
+  "local_runtime": "unavailable_loopback_endpoint",
+  "before_optional_probe_correction": {
+    "first_visible_row_seconds": 4.9834005,
+    "completed_search_seconds": 6.1885981,
+    "returned_results": 14,
+    "error": false
+  },
+  "after_optional_probe_correction": {
+    "first_visible_row_seconds": 3.029137199977413,
+    "completed_search_seconds": 4.2490797999780625,
+    "returned_results": 14,
+    "error": false
+  },
+  "tested_source_sha256_normalized_lf": {
+    "core/http_client.py": "252094e806135fab389b14545e24192b71cc8abc21a5441403a55cd00ecd4d11",
+    "providers/ollama_provider.py": "5566b2252340164fb66c206945683fc70fe71b3b1d72c509530b3188b618dd04",
+    "search/search_orchestrator.py": "b95c4e300f9167fe4c0f9e91c6216ab08d4d6181cef87fefee4fe73b9817141f",
+    "tui_app.py": "b5cb1d68d6c9249ce5e7ced4f34d1f61e45bae0050300249f7729c902384db9e"
+  },
+  "limits": [
+    "Separate single live-network observations, not a controlled benchmark or p95.",
+    "Minimal mount disables periodic discovery/download polling; normal search, hardware, debounce, filtering and table rendering run.",
+    "No model acquisition or inference; remote HTTP timeouts/retries remain unchanged.",
+    "Participant retest of this change is unverified."
+  ]
+}

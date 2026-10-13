@@ -8,9 +8,9 @@ from urllib3.util.retry import Retry
 _session: requests.Session | None = None
 
 
-def _build_adapter() -> requests.adapters.HTTPAdapter:
+def _build_adapter(*, retry: bool = True) -> requests.adapters.HTTPAdapter:
     retry_strategy = Retry(
-        total=2,
+        total=2 if retry else 0,
         backoff_factor=0.5,
         status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods={"GET"},
@@ -23,10 +23,10 @@ def _build_adapter() -> requests.adapters.HTTPAdapter:
     return adapter
 
 
-def create_session() -> requests.Session:
-    """Create an independently owned client with the standard retry policy."""
+def create_session(*, retry: bool = True) -> requests.Session:
+    """Create an owned client; optional local probes can disable retries."""
     session = requests.Session()
-    adapter = _build_adapter()
+    adapter = _build_adapter(retry=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     return session

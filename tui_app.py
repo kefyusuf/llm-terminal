@@ -1399,6 +1399,9 @@ class AIModelViewer(App):
                 self.on_search_progress, sid, msg
             ),
             cancel_check=lambda: search_id != self.search_state.active_id,
+            on_results=lambda sid, results: self.call_from_thread(
+                self.on_search_results_ready, sid, results
+            ),
         )
 
         outcome = orchestrator.search(
@@ -1414,14 +1417,43 @@ class AIModelViewer(App):
         if outcome.cancelled or search_id != self.search_state.active_id:
             return
 
-        self.call_from_thread(self.on_search_progress, search_id, "Finalizing search results...")
+        self.call_from_thread(
+            self._apply_search_outcome, search_id, query_key, outcome, monitor.get_specs()
+        )
+
+    def on_search_results_ready(self, search_id: int, results: list[dict]) -> None:
+        """Render a ready prefix without completing or caching an active search."""
+        if search_id != self.active_search_id or self._search_inflight_signature is None:
+            return
+        self.all_results = [item.copy() for item in results]
+        self.dl.ensure_download_fields(self.all_results)
+        self.has_more_pages = False
+        self._search_progress_visible = True
+        self.query_one("#results-table", DataTable).loading = False
+        self._refresh_search_results()
+        self.update_status(f"Searching Ollama — {len(results)} results ready...")
+
+    def _refresh_search_results(self) -> None:
+        """Keep selection on the same model when newly ready rows sort ahead."""
+        table = self.query_one("#results-table", DataTable)
+        selected = None
+        if 0 <= table.cursor_row < table.row_count:
+            selected = table.ordered_rows[table.cursor_row].key
+        self.refresh_table()
+        if selected is not None and selected in table.rows:
+            table.move_cursor(row=table.get_row_index(selected), animate=False, scroll=False)
+
+    def _apply_search_outcome(self, search_id, query_key, outcome, specs) -> None:
+        """Commit only the current completed outcome on the UI thread."""
+        if search_id != self.active_search_id:
+            return
+        self.on_search_progress(search_id, "Finalizing search results...")
         self.all_results = outcome.results
         self.dl.ensure_download_fields(self.all_results)
         self.last_search_error = " | ".join(outcome.errors[:2])
         self.has_more_pages = outcome.has_more_pages
 
-        self.call_from_thread(
-            self.update_status,
+        self.update_status(
             provider_search_status(
                 outcome.providers,
                 result_count=outcome.result_count,
@@ -1435,9 +1467,9 @@ class AIModelViewer(App):
             results=self.all_results,
             error=self.last_search_error,
             has_more_pages=self.has_more_pages,
-            specs=monitor.get_specs(),
+            specs=specs,
         )
-        self.call_from_thread(self.on_search_completed, search_id)
+        self.on_search_completed(search_id)
 
     def _on_hardware_search_failed(self, search_id):
         """Finish the active search without terminating the app after a probe failure."""
@@ -1458,7 +1490,7 @@ class AIModelViewer(App):
 
         table = self.query_one("#results-table", DataTable)
         table.loading = False
-        self.refresh_table()
+        self._refresh_search_results()
 
         if table.row_count > 0:
             shown = table.row_count

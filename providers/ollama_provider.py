@@ -2,6 +2,7 @@ import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from copy import deepcopy
 
 from bs4 import BeautifulSoup
 from requests.exceptions import ConnectionError, RequestException, Timeout
@@ -70,6 +71,7 @@ class OllamaProvider:
             page=page,
             page_size=limit,
             _structured_error_sink=structured_errors.append,
+            _on_results=kwargs.get("on_results"),
         )
         return SearchResult(
             results=results,
@@ -133,11 +135,13 @@ def get_installed_ollama_models():
     Returns an empty list if Ollama is not running or the request fails.
     """
     try:
-        response = get_session().get(f"{config.settings.ollama_api_base}/api/tags", timeout=1)
-        if response.status_code == 200:
-            return [
-                model["name"].split(":")[0].lower() for model in response.json().get("models", [])
-            ]
+        with create_session(retry=False) as session:
+            response = session.get(f"{config.settings.ollama_api_base}/api/tags", timeout=1)
+            if response.status_code == 200:
+                return [
+                    model["name"].split(":")[0].lower()
+                    for model in response.json().get("models", [])
+                ]
     except (RequestException, ValueError):
         return []
     return []
@@ -299,6 +303,7 @@ def search_ollama_models(
     page=0,
     page_size=15,
     _structured_error_sink=None,
+    _on_results=None,
 ):
     """Search the Ollama model registry for models matching *query*.
 
@@ -459,6 +464,8 @@ def search_ollama_models(
                 }
                 enrich_result_with_scores(result_dict, specs)
                 results.append(result_dict)
+                if _on_results is not None and 0 < len(results) <= page_size:
+                    _on_results(deepcopy(results))
 
         if not results and "No models found." not in soup.get_text(" ", strip=True):
             _record_error(
