@@ -205,3 +205,27 @@ def test_smoke_thread_start_failure_stops_worker_before_releasing_ownership(monk
         state.stop_event.set()
         if state.worker_thread is not None:
             state.worker_thread.join(timeout=10)
+
+
+def test_development_smoke_is_isolated_from_a_running_download_service(tmp_path):
+    db = tmp_path / "jobs.db"
+    store = DownloadStore(db)
+    job, _ = store.upsert_job({"source": "Ollama", "name": "startup-test"})
+    store.update_job(job["target_id"], status="completed")
+    port = _port()
+    env = _environment(tmp_path, db, port)
+    owner = _launch(env)
+    try:
+        _ready(owner, port)
+        expected = store.update_job(job["target_id"], status="running",
+                                    detail="Downloading", progress="37%")
+        check = subprocess.run([sys.executable, str(ROOT / "scripts/dev.py"), "smoke"],
+                               cwd=ROOT, env=env, capture_output=True, text=True,
+                               timeout=60,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        assert check.returncode == 0, check.stdout + check.stderr
+        assert _api(port, "/jobs")["jobs"] == [expected]
+    finally:
+        if owner.poll() is None:
+            _api(port, "/shutdown", {})
+        _stop(owner)

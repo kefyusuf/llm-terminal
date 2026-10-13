@@ -23,6 +23,10 @@ on the same database, owner death/recovery and independent databases. An injecte
 thread-start failure verifies that the smoke worker stops before ownership is
 released. These tests do not acquire models or qualify live-provider downloads.
 
+`python scripts/dev.py smoke` uses a temporary, separate download database for
+its service check so an existing development service is preserved. Direct
+service smoke startup retains the same ownership rule as normal startup.
+
 ## Removal and shutdown
 
 Service protocol 2.1 adds authenticated `POST /jobs/delete` with an optional
