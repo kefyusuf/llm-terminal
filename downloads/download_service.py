@@ -24,11 +24,13 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import sqlite3
 import sys
 import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing, contextmanager
 from typing import Any
 
 from loguru import logger
@@ -99,15 +101,23 @@ class DownloadServiceState:
     """
 
     def __init__(self):
-        self.store = DownloadStore(download_db_path())
-        self.store.normalize_target_ids()
-        self.store.migrate_legacy_hf_commands()
-        self.store.recover_orphaned_running_jobs()
+        self._store: Any = None
         self.running_processes = {}
         self.running_lock = threading.Lock()
         self.stop_event = threading.Event()
         self.server: Any = None
         self.worker_thread: Any = None
+
+    @property
+    def store(self):
+        """Create persistence lazily so importing the service does not mutate it."""
+        if self._store is None:
+            self._store = DownloadStore(download_db_path())
+        return self._store
+
+    @store.setter
+    def store(self, value):
+        self._store = value
 
     def get_process(self, target_id):
         with self.running_lock:
@@ -125,10 +135,14 @@ class DownloadServiceState:
         with self.running_lock:
             return list(self.running_processes.keys())
 
-    def request_shutdown(self):
+    def request_worker_stop(self):
+        """Stop claims and cancel owned children without touching the HTTP loop."""
         self.stop_event.set()
         for target_id in self.snapshot_active_targets():
             self.store.mark_cancel_requested(target_id)
+
+    def request_shutdown(self):
+        self.request_worker_stop()
         server = self.server
         if server is not None:
             threading.Thread(target=server.shutdown, daemon=True).start()
@@ -191,6 +205,31 @@ def worker_loop():
             pool.submit(process_job, STATE, target_id)
 
 
+@contextmanager
+def _service_server(address, handler):
+    """Own the database and socket before recovery; hold ownership through shutdown."""
+    database = download_db_path().resolve()
+    database.parent.mkdir(parents=True, exist_ok=True)
+    # A separate SQLite file provides a process lock without blocking job writes.
+    # Keep this file: unlinking it could let a third process lock a different inode.
+    with closing(sqlite3.connect(str(database) + ".service-lock", timeout=0)) as owner:
+        try:
+            owner.execute("BEGIN EXCLUSIVE")
+        except sqlite3.OperationalError as exc:
+            raise RuntimeError("Download database ownership is unavailable") from exc
+        server = LocalThreadingHTTPServer(address, handler)
+        STATE.server = server
+        try:
+            STATE.store.normalize_target_ids()
+            STATE.store.migrate_legacy_hf_commands()
+            STATE.store.recover_orphaned_running_jobs()
+            STATE.stop_event.clear()
+            yield server
+        finally:
+            server.server_close()
+            STATE.server = None
+
+
 def main():
     """Run the configured download service or its smoke check."""
     validate_service_auth_boundary()
@@ -199,18 +238,20 @@ def main():
 
     from downloads.api import Handler
 
-    worker = threading.Thread(target=worker_loop, daemon=True)
-    worker.start()
-    STATE.worker_thread = worker
-
-    server = LocalThreadingHTTPServer(service_bind_address(), Handler)
-    STATE.server = server
-    try:
-        server.serve_forever(poll_interval=0.5)
-    finally:
-        STATE.request_shutdown()
-        worker.join(timeout=5)
-        server.server_close()
+    with _service_server(service_bind_address(), Handler) as server:
+        worker = threading.Thread(target=worker_loop, daemon=True)
+        STATE.worker_thread = worker
+        worker_started = False
+        try:
+            worker.start()
+            worker_started = True
+            server.serve_forever(poll_interval=0.5)
+        finally:
+            try:
+                STATE.request_worker_stop()
+            finally:
+                if worker_started:
+                    worker.join()
 
     return 0
 
@@ -219,39 +260,43 @@ def run_smoke_check() -> int:
     """Run bounded health and authenticated jobs checks against an ephemeral server."""
     from downloads.api import Handler
 
-    STATE.stop_event.clear()
-
-    worker = threading.Thread(target=worker_loop, daemon=True, name="download-service-smoke-worker")
-    worker.start()
-    STATE.worker_thread = worker
-
     host, _ = service_bind_address()
-    server = LocalThreadingHTTPServer((host, 0), Handler)
-    STATE.server = server
-    thread = threading.Thread(
-        target=server.serve_forever,
-        kwargs={"poll_interval": 0.1},
-        daemon=True,
-        name="download-service-smoke-server",
-    )
-    thread.start()
-    port = int(server.server_address[1])
-
-    try:
-        for path, expected_key in (("/health", "ok"), ("/jobs", "jobs")):
-            request = urllib.request.Request(f"http://{host}:{port}{path}")
-            token = config.settings.download_service_token
-            if token:
-                request.add_header("Authorization", f"Bearer {token}")
-            with urllib.request.urlopen(request, timeout=5) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            if expected_key not in payload:
-                raise SystemExit(f"[smoke] download service check failed for {path}")
-    finally:
-        STATE.request_shutdown()
-        thread.join(timeout=5)
-        worker.join(timeout=5)
-        server.server_close()
+    with _service_server((host, 0), Handler) as server:
+        worker = threading.Thread(target=worker_loop, daemon=True, name="download-service-smoke-worker")
+        STATE.worker_thread = worker
+        thread = threading.Thread(
+            target=server.serve_forever,
+            kwargs={"poll_interval": 0.1},
+            daemon=True,
+            name="download-service-smoke-server",
+        )
+        port = int(server.server_address[1])
+        worker_started = server_started = False
+        try:
+            worker.start()
+            worker_started = True
+            thread.start()
+            server_started = True
+            for path, expected_key in (("/health", "ok"), ("/jobs", "jobs")):
+                request = urllib.request.Request(f"http://{host}:{port}{path}")
+                token = config.settings.download_service_token
+                if token:
+                    request.add_header("Authorization", f"Bearer {token}")
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                if expected_key not in payload:
+                    raise SystemExit(f"[smoke] download service check failed for {path}")
+        finally:
+            try:
+                STATE.request_worker_stop()
+            finally:
+                try:
+                    if server_started:
+                        server.shutdown()
+                        thread.join()
+                finally:
+                    if worker_started:
+                        worker.join()
 
     print("[smoke] download service ok")
     return 0
