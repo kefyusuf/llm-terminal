@@ -2,6 +2,7 @@ import asyncio
 import socket
 
 import api_server
+import config
 import downloads.download_service as download_service
 import main
 from tui_app import AIModelViewer
@@ -38,19 +39,15 @@ def test_download_service_smoke_mode_exits_cleanly(monkeypatch):
     assert calls == ["smoke"]
 
 
-def test_download_service_smoke_bind_does_not_resolve_fqdn(monkeypatch):
+def test_download_service_smoke_bind_does_not_resolve_fqdn(monkeypatch, tmp_path):
     """Download-service loopback smoke must not depend on reverse/FQDN resolution."""
-
-    class _EmptyStore:
-        def list_jobs(self, limit=50):
-            return []
 
     def _unexpected_getfqdn(_host: str = "") -> str:
         raise AssertionError("download-service bind must not call socket.getfqdn")
 
     monkeypatch.setattr(socket, "getfqdn", _unexpected_getfqdn)
-    monkeypatch.setattr(download_service, "worker_loop", lambda: None)
-    monkeypatch.setattr(download_service.STATE, "store", _EmptyStore())
+    monkeypatch.setattr(config.settings, "download_db_path", tmp_path / "jobs.db")
+    monkeypatch.setattr(download_service, "STATE", download_service.DownloadServiceState())
 
     try:
         assert download_service.run_smoke_check() == 0

@@ -1,5 +1,30 @@
 # Managed selected-file removal and service shutdown
 
+## Startup ownership
+
+Normal and smoke service startup acquire an exclusive SQLite transaction on a
+separate `<resolved-download-db>.service-lock` file, then bind the HTTP socket.
+Only after both succeed does the service initialize/migrate the job store,
+recover abandoned running jobs and start its worker. Importing the service
+does not initialize or recover the store. A second process using the same
+database is rejected even when it selects another port or an ephemeral smoke
+port; independent databases can run separately.
+
+The ownership connection stays open until started workers finish. Failed binds
+and thread starts close their acquired resources. Process death releases SQLite
+ownership so a replacement can perform the existing abandoned-job recovery.
+The sidecar is not the jobs database, so normal queue/API writes remain usable.
+Keep the sidecar file: removing it while a process owns it can break exclusivity.
+No download status rules, queue capacity, model destinations or protocol version
+change. Legacy normalization correctness is a separate follow-up.
+
+Real-process regressions cover an occupied socket, a second normal/smoke process
+on the same database, owner death/recovery and independent databases. An injected
+thread-start failure verifies that the smoke worker stops before ownership is
+released. These tests do not acquire models or qualify live-provider downloads.
+
+## Removal and shutdown
+
 Service protocol 2.1 adds authenticated `POST /jobs/delete` with an optional
 boolean `delete_data`. Omitting it retains record-only deletion. The service
 derives the selected path from persisted HF artifact identity and the configured

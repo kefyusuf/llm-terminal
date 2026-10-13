@@ -4,6 +4,25 @@ Date: 2026-10-13. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+Current verified main baseline is now PR #153 at
+`34e1bbe0cea06247adaac7cab578e522ffdd511e`: actual-main
+[CI 38354647054](https://github.com/kefyusuf/llm-terminal/actions/runs/38354647054)
+passed 11/11; PR Package passed 19/19 and all 18 consumer reports matched the
+candidate bytes. The Windows participant reported that the updated search was
+better. The isolated launcher points to the qualified PR merge-source wheel,
+whose tracked tree equals actual main; publication remains separate.
+
+The user selected download-service startup ownership as the next narrow fix.
+Branch `fix/download-service-startup-ownership` moves initialization/recovery and
+worker start after database ownership and socket bind, including smoke startup.
+Process regressions reproduced losing-startup mutation and duplicate ownership;
+thread-start failure cleanup was independently reviewed and corrected.
+Check the branch PR/CI before continuing. Keep legacy normalization collision,
+saturated queue cancellation and live download acceptance as separate follow-ups;
+do not fold them into this startup correction.
+
+The earlier search checkpoint below is historical.
+
 Verified baseline: PR #152 merged at
 `3b82383af248e46fff45d19e8d8b3d58ed71dd4c`; actual-main
 [CI 38249673195](https://github.com/kefyusuf/llm-terminal/actions/runs/38249673195)
