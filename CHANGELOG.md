@@ -4,6 +4,8 @@
 
 ### Reliability and provider correctness
 
+- Show fully scored Ollama rows while remaining metadata is still loading; preserve selected model identity and suppress obsolete previews. Limit the optional installed-model lookup to one attempt while retaining remote retry defaults.
+
 - Overlapped Ollama catalog metadata requests with at most four search-owned HTTP clients; preserved catalog ordering, retry/timeouts, cached facts, estimated-size fallback and scoring while reducing sequential detail-request latency.
 
 - Separated bounded Ollama calibration model preload from generation, recorded preload timing separately, and identified safe failure stages for request and whole-worker timeouts without increasing budgets or changing scoring.

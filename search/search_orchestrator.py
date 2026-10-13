@@ -107,12 +107,14 @@ class SearchOrchestrator:
         ollama_provider,
         on_progress: Callable[[int, str], None],
         cancel_check: Callable[[], bool],
+        on_results: Callable[[int, list[dict]], None] | None = None,
     ) -> None:
         self.monitor = monitor
         self.hf_provider = hf_provider
         self.ollama_provider = ollama_provider
         self.on_progress = on_progress
         self.cancel_check = cancel_check
+        self.on_results = on_results
 
     def search(
         self,
@@ -174,8 +176,14 @@ class SearchOrchestrator:
             if self.cancel_check():
                 return SearchResult.empty()
             self.on_progress(search_id, "Fetching Ollama data...")
+            options = {}
+            if self.on_results is not None and providers == ["ollama"]:
+                def publish(results):
+                    if not self.cancel_check():
+                        self.on_results(search_id, results)
+                options["on_results"] = publish
             return self.ollama_provider.search_with_installed(
-                query, specs, limit=ollama_page_size or page_size, page=page
+                query, specs, limit=ollama_page_size or page_size, page=page, **options
             )
 
         def _search_hf():

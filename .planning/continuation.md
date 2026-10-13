@@ -1,6 +1,25 @@
 # Verified continuation record
 
-Date: 2026-10-08. Repository: `kefyusuf/llm-terminal`.
+Date: 2026-10-13. Repository: `kefyusuf/llm-terminal`.
+
+## Current narrow continuation
+
+Verified baseline: PR #152 merged at
+`3b82383af248e46fff45d19e8d8b3d58ed71dd4c`; actual-main
+[CI 38249673195](https://github.com/kefyusuf/llm-terminal/actions/runs/38249673195)
+passed 11/11. The Windows participant reported that search felt somewhat better,
+without a measured duration or competitor identity.
+
+Branch `fix/ollama-early-search-results` continues only the Ollama search wait:
+fully scored early rows, stable selection, obsolete-work rejection and a
+single-attempt optional installed-model probe. Remote retry defaults and final
+scoring remain unchanged. See [behavior and evidence](../docs/ollama-search-performance.md#early-visible-results-and-optional-local-probe-2026-10-13).
+Check the current PR and CI before continuing; do not infer merge or package
+qualification from the local observation. After green checks, merge is authorized
+by the user's existing instruction and the isolated Windows pilot may be refreshed.
+Participant retest, publication and release-version selection are separate gates.
+
+The records below are historical checkpoints.
 
 ## Current verified main checkpoint
 
