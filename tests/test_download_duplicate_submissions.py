@@ -72,6 +72,11 @@ def _start(tmp_path, *, pause_cleanup=False):
             "            time.sleep(.05)\n"
             "    original_clear(state,target)\n"
             "DownloadServiceState.clear_process=clear\n"
+            "original_stop=DownloadServiceState.request_worker_stop\n"
+            "def stop(state):\n"
+            "    original_stop(state)\n"
+            "    (root/'shutdown-applied').touch()\n"
+            "DownloadServiceState.request_worker_stop=stop\n"
         )
     bootstrap += "from downloads.download_service import main\nmain()\n"
     with socket.socket() as sock:
@@ -216,3 +221,58 @@ def test_cancel_retry_waits_for_old_cleanup_without_blocking_other_targets(tmp_p
             if process.poll() is None:
                 process.kill()
                 process.communicate(timeout=5)
+
+
+def test_shutdown_preserves_retry_queued_behind_cancelled_worker_cleanup(tmp_path):
+    process, port = _start(tmp_path, pause_cleanup=True)
+    owned = [(process, port)]
+    try:
+        def ready():
+            assert process.poll() is None, "Owned service exited before readiness"
+            try:
+                return _api(port, "/health")["ok"]
+            except OSError:
+                return False
+
+        _wait(ready)
+        model = {"source": "Ollama", "name": "duplicate-target"}
+        created = _api(port, "/jobs", {"model": model})["job"]
+        marker = tmp_path / "duplicate-target.started"
+        _wait(marker.exists)
+        _api(port, "/jobs/cancel", {"target_id": created["target_id"]})
+        _wait(lambda: (tmp_path / "cleanup-paused").exists())
+        assert _target(port)["status"] == "cancelled"
+        retry = _api(port, "/jobs", {"model": model})
+        assert retry["queued"] and retry["job"]["id"] == created["id"]
+        assert _target(port)["status"] == "queued"
+
+        _api(port, "/shutdown", {})
+        _wait(lambda: (tmp_path / "shutdown-applied").exists())
+        (tmp_path / "cleanup-release").touch()
+        process.communicate(timeout=10)
+        assert process.returncode == 0
+        assert len(marker.read_text().splitlines()) == 1
+
+        process, port = _start(tmp_path)
+        owned.append((process, port))
+        _wait(ready)
+        recovered = _target(port)
+        assert recovered["status"] in {"queued", "running"}, "Shutdown discarded the unstarted retry"
+        assert recovered["id"] == created["id"] and recovered["cancel_requested"] == 0
+        _wait(lambda: len(marker.read_text().splitlines()) == 2)
+        (tmp_path / "duplicate-target.release").touch()
+        _wait(lambda: _target(port)["status"] == "completed")
+        assert _target(port)["id"] == created["id"]
+        assert len(marker.read_text().splitlines()) == 2
+    finally:
+        (tmp_path / "cleanup-release").touch()
+        (tmp_path / "duplicate-target.release").touch()
+        for service, service_port in owned:
+            try:
+                if service.poll() is None:
+                    _api(service_port, "/shutdown", {})
+                service.communicate(timeout=10)
+            finally:
+                if service.poll() is None:
+                    service.kill()
+                    service.communicate(timeout=5)
