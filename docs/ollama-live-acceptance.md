@@ -1,5 +1,45 @@
 # Bounded native Windows Ollama acceptance
 
+## Installed daemon cancellation observation: 2026-10-14
+
+The [daemon cancellation report](evidence/ollama-daemon-cancel-windows-2026-10-14.json)
+uses the same PR #156 installed wheel and fixed `tinyllama:1.1b` identities.
+Main `8be863aafb6f91f2c2e370690cc885657a43c7b3` adds documentation only to
+that runtime. The receipt, five installed module hashes, stored manifest and
+five blob sizes/SHA-256 were independently verified again. The passing trial
+used Ollama 0.35.0 and took 90.234 seconds within the existing 900-second limit;
+peak observed size in its own model store was 637,700,989 bytes, below 1 GB.
+
+At CLI-reported 1% progress, the task-owned daemon had seven active external
+HTTPS connections. Managed cancellation stopped the pull CLI. The daemon stayed
+alive; after two seconds settling, 50 TCP observations over five seconds saw no
+active external HTTPS connections. Registry metadata relay counters also stayed
+unchanged. The daemon remained healthy with no completed model and the job was
+still cancelled before either service or daemon was stopped. Controlled reopen
+and same-ID explicit retry then completed and verified all artifact identities.
+All owned services, daemon descendants and the relay stopped; both attempts'
+files and earlier models were retained. Application code was unchanged.
+
+The first relay-only harness returned a nominal pass, but observed just 6,295
+encrypted server bytes while the model reported 1% progress. This is
+**inconclusive for daemon transfer termination**. Ollama's versioned
+[redirect transport](https://github.com/ollama/ollama/blob/v0.35.0/transfer/redirect.go#L154)
+does not configure the proxy field, explaining why that relay observed registry
+traffic while redirected model traffic bypassed it. The corrected trial uses a
+fresh store/database and reads connections only from the owned daemon PID. It
+requires a positive pre-cancel connection observation; the relay is secondary
+metadata evidence, not a model traffic meter. The report preserves this initial
+measurement limitation instead of presenting its nominal pass as acceptance.
+
+The connection filter covers active TCP states (ESTABLISHED, SYN_SENT,
+SYN_RECV), external port 443 and non-loopback addresses. Samples occur roughly
+every 100 ms; brief activity between samples is not excluded. This is a bounded
+observation on this runtime/model, not packet capture, exact cancellation latency,
+aggregate wire-byte measurement or an indefinite guarantee. Other protocols,
+network failures, concurrent pull clients, host/power loss and participant
+outcomes remain separate. TLS verification and host network settings were not
+changed; no inference, embedding or deletion occurred.
+
 ## Installed current candidate: 2026-10-14
 
 The [installed-candidate recovery report](evidence/ollama-installed-recovery-windows-2026-10-14.json)
