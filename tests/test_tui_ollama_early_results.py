@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 from urllib.parse import parse_qs, urlsplit
 
+import pytest
 import requests
 from textual.widgets import DataTable
 
@@ -35,7 +37,15 @@ class _Viewer(AIModelViewer):
         pass
 
 
-def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatch, tmp_path):
+async def _wait_for_ui(pilot, ready, description):
+    deadline = time.monotonic() + 2
+    while not ready():
+        assert time.monotonic() < deadline, f"Timed out waiting for {description}"
+        await pilot.pause(.02)
+
+
+@pytest.mark.parametrize("fast_delay", [0, 0.5])
+def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatch, tmp_path, fast_delay):
     from core import cache_db
 
     monkeypatch.setattr(cache_db, "_cache_db_path", tmp_path / "cache.db")
@@ -61,6 +71,9 @@ def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatc
             if name == "a-prefix-slow":
                 slow_entered.set()
                 assert release.wait(5), "test detail was not released"
+            elif name == "z-prefix-fast":
+                assert slow_entered.wait(2), "slow detail did not start"
+                time.sleep(fast_delay)
             response._content = (
                 '<table><tr><th>Name</th><th>Size</th></tr>'
                 f'<tr><td>{name}:latest</td><td>3 GB</td></tr></table>'
@@ -76,23 +89,23 @@ def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatc
             app.start_search("preview")
             try:
                 assert await asyncio.to_thread(slow_entered.wait, 2)
-                for _ in range(15):
-                    await pilot.pause(.02)
-                    if app.all_results:
-                        break
+                table = app.query_one("#results-table", DataTable)
+                await _wait_for_ui(
+                    pilot, lambda: not table.loading and table.row_count == 1,
+                    "the scored prefix to render",
+                )
                 assert [r["name"] for r in app.all_results] == ["z-prefix-fast"]
                 assert app.all_results[0]["size_source"] == "exact"
                 assert app.search_cache.get_stale("ollama:preview") is None
                 assert app._search_inflight_signature is not None
-                table = app.query_one("#results-table", DataTable)
                 assert table.loading is False and table.row_count == 1
                 selected = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
             finally:
                 release.set()
-            for _ in range(30):
-                await pilot.pause(.02)
-                if app._search_inflight_signature is None:
-                    break
+            await _wait_for_ui(
+                pilot, lambda: app._search_inflight_signature is None,
+                "the search to complete after releasing the slow detail",
+            )
             assert [r["name"] for r in app.all_results] == ["z-prefix-fast", "a-prefix-slow"]
             assert table.coordinate_to_cell_key(table.cursor_coordinate).row_key == selected
             assert len(app.search_cache.get_stale("ollama:preview")["results"]) == 2
