@@ -71,6 +71,7 @@ def test_service_shutdown_cancels_active_children_and_preserves_queued_jobs(tmp_
     state = DownloadServiceState.__new__(DownloadServiceState)
     state.store = DownloadStore(tmp_path / "jobs.db")
     active = queued(state.store, tmp_path / "models")
+    assert state.store.claim_next_queued()["target_id"] == active["target_id"]
     queued_job, _ = state.store.upsert_job({"source": "Ollama", "name": "test:small"})
     state.running_processes = {active["target_id"]: object()}
     state.running_lock = threading.Lock()

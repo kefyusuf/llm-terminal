@@ -139,7 +139,7 @@ class DownloadServiceState:
         """Stop claims and cancel owned children without touching the HTTP loop."""
         self.stop_event.set()
         for target_id in self.snapshot_active_targets():
-            self.store.mark_cancel_requested(target_id)
+            self.store.mark_cancel_requested(target_id, running_only=True)
 
     def request_shutdown(self):
         self.request_worker_stop()

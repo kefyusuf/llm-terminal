@@ -4,6 +4,26 @@ Date: 2026-10-15. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #164 is merged at `8e042117f4c6ecdd7d1b6562e4029d2a311f9cac`.
+PR and actual-main CI passed 11/11; Package passed 19/19 with 18 matching
+consumer reports. The isolated Windows pilot now uses its qualified wheel;
+previous environments and model files remain preserved.
+
+Branch `fix/download-shutdown-preserve-retry` fixes the next reproduced boundary:
+a queued retry behind cancelled-worker cleanup was wrongly cancelled by shutdown
+through the previous process registration. Shutdown now requests cancellation
+only when the current stored row is running, using an atomic SQL predicate.
+Explicit user cancellation of queued jobs retains its existing behavior.
+The real HTTP RED test reopened a cancelled retry; GREEN preserves the same ID,
+automatically runs it after restart and completes exactly the second invocation.
+Check current PR/CI/Package before merging and refresh the pilot only from the
+qualified candidate. No model acquisition or schema change is in this scope.
+Next separate scope: assess simultaneous download-service client startup with
+controlled local processes; do not broaden to provider networking or new UI.
+Participant/network/power-loss acceptance and prior HF live HTTP504 stay open.
+
+Earlier checkpoints below are historical.
+
 PR #163 is merged at `b5a24a41112d6e475e823746a21fc28cda81f217`; PR and
 actual-main CI passed 11/11 on their first attempts. Concurrent active duplicate
 submissions are covered through real HTTP and controlled local child processes.

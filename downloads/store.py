@@ -314,8 +314,9 @@ class DownloadStore:
             row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()
         return self._row_to_dict(row), True
 
-    def mark_cancel_requested(self, target_id):
+    def mark_cancel_requested(self, target_id, *, running_only=False):
         now = time.time()
+        status_guard = " AND status = 'running'" if running_only else ""
         with self.lock, self._connect() as conn:
             conn.execute(
                 """UPDATE jobs SET cancel_requested = 1, updated_at = ?,
@@ -323,7 +324,7 @@ class DownloadStore:
                     detail = CASE WHEN status = 'queued' THEN 'Canceled'
                                   WHEN status = 'running' THEN 'Cancel requested' ELSE detail END,
                     progress = CASE WHEN status = 'queued' THEN '' ELSE progress END
-                    WHERE target_id = ?""",
+                    WHERE target_id = ?""" + status_guard,
                 (now, target_id),
             )
             row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()
