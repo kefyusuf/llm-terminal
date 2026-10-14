@@ -1,5 +1,39 @@
 # Bounded native Windows Ollama acceptance
 
+## Installed runtime loss during pull: 2026-10-14
+
+The [runtime-loss report](evidence/ollama-runtime-loss-windows-2026-10-14.json)
+qualifies the same installed PR #156 wheel and fixed `tinyllama:1.1b`
+manifest/blob identities. Main `5c9d338ca48cd6b47dfcc23f35458478f9218060`
+adds only PR #157 through #160 documentation to that runtime. Receipt and five
+installed module hashes match the wheel; manifest and all five blob sizes and
+SHA-256 values were independently checked again.
+
+At CLI-reported 1% progress, the task-owned Ollama 0.35.0 daemon was killed via
+its exact `Popen` handle and its exit was observed. The managed download service
+stayed alive. The job became `failed` with a nonzero return code and diagnostic,
+its cancellation flag remained clear, and the captured pull CLI exited. Failure
+and health verification took 0.109 seconds in this trial. That timer starts after
+the daemon exit wait returns and includes job, CLI and service-health checks;
+it is not elapsed detection time from the kill request. Polling was nominally
+20 ms; no failure-detection latency guarantee is established.
+
+Only the daemon was restored; the download service was not restarted. No model
+was complete yet, and the original job ID, failed status, return code and
+diagnostic remained unchanged. An explicit retry reused that job and completed
+the expected manifest and all five blobs. The trial took 79.125 seconds; peak
+observed size in its fresh owned model store was 637,700,989 bytes, below the
+existing 1 GB limit and within the 900-second trial budget. All owned services,
+daemons and captured descendants stopped; earlier/new models and files were
+retained. No application defect or behavior change was found.
+
+This proves one abrupt owned-runtime failure and recovery path on this Windows
+runtime/model. It does not establish external network failure, host/power-loss
+durability, concurrent clients, automatic retry or participant acceptance.
+Preallocated partial file length is not downloaded bytes; transfer reuse and
+aggregate traffic were not measured. No inference, embedding, deletion, global
+configuration change or publication was performed.
+
 ## Installed daemon cancellation observation: 2026-10-14
 
 The [daemon cancellation report](evidence/ollama-daemon-cancel-windows-2026-10-14.json)

@@ -4,6 +4,24 @@ Date: 2026-10-14. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #160 is merged at `5c9d338ca48cd6b47dfcc23f35458478f9218060`; PR and
+actual-main CI passed 11/11. It archives the bounded daemon cancellation evidence.
+
+The next installed Windows Ollama runtime-loss acceptance passed on the same
+wheel, fixed model and budget. Kill of the owned daemon at 1% progress caused
+`failed`, nonzero exit/diagnostic and no cancellation flag while the download
+service stayed healthy. Restoring only the daemon preserved that failed record;
+explicit same-ID retry completed verified manifest/all five blobs. See
+[evidence and limits](../docs/ollama-live-acceptance.md#installed-runtime-loss-during-pull-2026-10-14).
+Application code is unchanged. Check this documentation PR/CI before continuing.
+Preserve user ignore edits, pilot and all trial/model files. Next narrow review:
+concurrent duplicate managed submissions, using a controlled local worker first
+without another model acquisition. Concurrent runtime clients, network/power
+failure and participant acceptance remain separate. The previous scheduled
+HF HTTP504 finding was not rechecked in this runtime-loss trial.
+
+Earlier checkpoints below are historical.
+
 PR #159 is merged at `8be863aafb6f91f2c2e370690cc885657a43c7b3`; PR and
 actual-main CI passed 11/11. Its changes only archive installed Ollama recovery.
 
