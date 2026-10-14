@@ -4,6 +4,24 @@ Date: 2026-10-14. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #158 is merged at `e2932534483feceb81530eca3915e2a4e642f45f`; PR and
+actual-main CI passed 11/11. Its changes archive HF connection interruption.
+
+Installed-candidate Windows Ollama acquisition/reopen passed on the same PR #156
+wheel and previously authorized `tinyllama:1.1b` identity/budgets. Managed cancel
+at CLI-reported 1% stopped the pull CLI; service/runtime reopen retained the
+cancelled job, same-ID retry completed, and manifest/all five blobs verified.
+See [evidence and limits](../docs/ollama-live-acceptance.md#installed-current-candidate-2026-10-14).
+Only the task-owned executable observation helper changed after an inconclusive
+first gate; application code is unchanged. Check the documentation PR/CI before
+continuing. Preserve user ignore changes, pilot and all trial/model files.
+Next narrow scope: observe Ollama daemon transfer termination after managed
+cancel while keeping the daemon alive; current CLI-exit evidence does not prove
+that latency. Participant recovery and Ollama network-failure acceptance remain
+separate. Do not expand into inference or model deletion.
+
+Earlier checkpoints below are historical.
+
 PR #157 is merged at `6e6832b6631f6aa01e3c5817df910a31ad1c5db5`; PR and
 actual-main CI passed 11/11. Its changes only archive interruption acceptance.
 

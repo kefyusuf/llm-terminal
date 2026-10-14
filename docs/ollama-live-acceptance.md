@@ -1,5 +1,43 @@
 # Bounded native Windows Ollama acceptance
 
+## Installed current candidate: 2026-10-14
+
+The [installed-candidate recovery report](evidence/ollama-installed-recovery-windows-2026-10-14.json)
+qualifies managed acquisition/reopen with the CI-produced PR #156 wheel
+`443e3681f69b78a27beb01d132985359177ea6439ca89820357e2618e94ff3c9`.
+Its source is `3a8c1ff99cb2c9a873116b0cf1238c11d1688192`; main
+`e2932534483feceb81530eca3915e2a4e642f45f` adds only PR #157/#158 documentation
+to the qualified runtime. The installed receipt and five service/worker module
+hashes were checked directly against the wheel. The report records Python,
+dependency and Ollama executable identity. No package was rebuilt.
+
+The trial repeats the previously authorized `tinyllama:1.1b` manifest and all
+five blob identities with the existing 1,000,000,000-byte model-store and
+900-second trial limits. Ollama 0.35.0 ran at a separate owned loopback endpoint,
+with an owned model store and `/api/status` cloud disabling. The installed
+download service retained an active duplicate, acknowledged cancellation at
+CLI-reported 1% progress, and the captured `ollama pull` CLI exited. After both
+service and runtime stopped and reopened, the cancelled job persisted; explicit
+retry reused its ID and completed. The stored manifest and every blob matched
+declared size/SHA-256. The passing trial took 74.125 seconds; peak observed store
+size was 637,700,989 bytes. All owned services, runtime processes and captured
+descendants stopped. Existing personal models, previous trials and new files
+were retained. No inference, embedding or model deletion was performed.
+
+The first harness stopped before cancellation because it compared CLI argv name
+to an executable filename. It saw 1% progress and cleaned up owned processes,
+but does not prove cancellation. The corrected harness uses the resolved
+executable path; a fresh service database reuses only that first trial's owned
+partial store. Application code was unchanged; no application defect was found.
+
+Cancellation here proves the managed acknowledgement and CLI exit. It does not
+measure when the Ollama daemon stops writing or transferring data; the owned
+daemon was explicitly stopped before reopening. Preallocated partial file size
+is not transferred bytes. Transfer reuse, aggregate traffic, network failures,
+host/power loss and participant outcomes remain separate acceptance scopes.
+
+## Historical acquisition and calibration
+
 On 2026-10-07, the user authorized `tinyllama:1.1b` with a 1,000,000,000-byte
 model-file limit and 900-second wall budget. Source
 `bc50cf1e6bbf2cf19b40833cbe0edae1b910d9ce` passed main CI 11/11 before the trial.
