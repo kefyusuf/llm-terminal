@@ -4,6 +4,26 @@ Date: 2026-10-14. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #159 is merged at `8be863aafb6f91f2c2e370690cc885657a43c7b3`; PR and
+actual-main CI passed 11/11. Its changes only archive installed Ollama recovery.
+
+The next daemon cancellation observation passed with the same installed wheel,
+fixed model and budget. Before cancel, seven actual owned-daemon external HTTPS
+connections were observed. After managed cancel and two seconds settling, all
+50 samples over five seconds had zero active connections while the daemon
+remained healthy, no model completed and the job stayed cancelled. Reopen/retry
+and manifest/five-blob identities passed. See [evidence and limits](../docs/ollama-live-acceptance.md#installed-daemon-cancellation-observation-2026-10-14).
+The first proxy-only nominal pass was inconclusive because redirected blob
+traffic bypassed it; the corrected helper inspects actual owned-daemon sockets.
+No application changes. Check the documentation PR/CI before continuing; preserve
+pilot, user ignore edits and all trial files. Next separate scope: failed Ollama
+runtime during a managed pull and explicit retry after runtime restoration.
+Concurrent pulls, participant outcomes and network/power failure remain separate.
+Prior scheduled live run 38534034347 failed HF search HTTP 504; that finding was
+not rechecked or repaired as part of this Ollama observation.
+
+Earlier checkpoints below are historical.
+
 PR #158 is merged at `e2932534483feceb81530eca3915e2a4e642f45f`; PR and
 actual-main CI passed 11/11. Its changes archive HF connection interruption.
 
