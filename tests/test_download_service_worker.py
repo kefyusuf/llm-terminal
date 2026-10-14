@@ -26,7 +26,7 @@ def set_claim_return(value):
     _claim_return = value
 
 
-def _claim_and_stop():
+def _claim_and_stop(*, exclude_targets=()):
     STATE.stop_event.set()
     return _claim_return
 
@@ -87,6 +87,18 @@ class TestWorkerLoop:
 
 
 class TestClaimNextQueued:
+    @pytest.mark.parametrize("names", [["retry'quoted"], ["retry'quoted", "other-blocked"]])
+    def test_excluded_targets_remain_queued_until_eligible(self, store, names):
+        excluded = [store.upsert_job({"source": "Ollama", "name": name})[0]
+                    for name in names]
+        eligible, _ = store.upsert_job({"source": "Ollama", "name": "eligible"})
+        targets = {job["target_id"] for job in excluded}
+        assert store.claim_next_queued(exclude_targets=targets)["id"] == eligible["id"]
+        assert store.claim_next_queued(exclude_targets=targets) is None
+        assert all(store.get_job_by_target(job["target_id"])["status"] == "queued"
+                   for job in excluded)
+        assert store.claim_next_queued()["id"] == excluded[0]["id"]
+
     def test_returns_queued_job(self, store):
         model = {"source": "Ollama", "name": "test-model", "publisher": "ollama"}
         job, _ = store.upsert_job(model)
