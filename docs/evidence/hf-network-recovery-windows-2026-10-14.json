@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-14",
+  "kind": "installed_candidate_network_interruption_acceptance",
+  "status": "passed",
+  "actual_main_source": "6e6832b6631f6aa01e3c5817df910a31ad1c5db5",
+  "candidate_source": "3a8c1ff99cb2c9a873116b0cf1238c11d1688192",
+  "wheel_sha256": "443e3681f69b78a27beb01d132985359177ea6439ca89820357e2618e94ff3c9",
+  "package_run": 38499876070,
+  "source_relationship": "PR #157 changed only documentation after the qualified PR #156 runtime; application source remained unchanged.",
+  "runtime": {
+    "python_version": "3.12.14",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "dependencies": {"ai-model-explorer": "1.0.1", "huggingface-hub": "0.36.2", "requests": "2.34.2", "psutil": "6.1.1"}
+  },
+  "artifact": {
+    "repository": "ggml-org/models-moved",
+    "filename": "tinyllamas/stories15M-q4_0.gguf",
+    "revision": "499bc8821c6b12b4e53c5bffcb21ec206f212d81",
+    "size_bytes": 19077344,
+    "sha256": "66967fbece6dbe97886593fdbb73589584927e29119ec31f08090732d1861739",
+    "license_status": "unknown",
+    "identity_source": "preserved pinned-file metadata from the previous bounded trial"
+  },
+  "installed_runtime_matches_wheel_sha256": {
+    "downloads.download_service": "b171f4a3fcc82afedc3b3e2e919119da8ebafaec569b7bf754a2c9be35020e5f",
+    "downloads.store": "5a2e23e7a7d763e5a056138c5b7338a1ec3e0593d99fcf17a71e29fc461c5bf8",
+    "downloads.runner": "4cd001d531108efa0b0a59f3576e428165f29f59d101a7a1dc9a39f7fea7a04f",
+    "downloads.parent_lifetime": "3989b2982d0b06a04cac82c918b4e0359100616cf5a6e7894c40ca63ada32756",
+    "downloads.preflight": "5cf37c51204c6e1f798f95e894ba4826a28dab5f048a33afd94b500b2971008e"
+  },
+  "injection": {
+    "method": "owned loopback HTTPS CONNECT relay, end-to-end TLS verification retained",
+    "scope": "proxy environment of owned service and HF children only; host network unchanged",
+    "cutoff_server_bytes": 12582912,
+    "observed_server_bytes_at_cut": 12584812,
+    "action": "shutdown active tunnel sockets and reject subsequent CONNECT requests until explicit restoration",
+    "subsequent_connections_blocked": 0,
+    "measurement": "encrypted server bytes across initial tunnels, not artifact payload or aggregate trial traffic"
+  },
+  "results": [
+    {"mode": "network_drop", "status": "passed", "installed_receipt_verified": true,
+     "active_duplicate_preserved": true, "partial_bytes_before_interruption": 10485760,
+     "network_failure_persisted": true, "nonzero_return_code": true,
+     "failure_detail_present": true, "service_remained_healthy": true,
+     "incomplete_artifact_not_completed": true, "owned_child_exited": true,
+     "reopened_status": "failed", "reopened_plan_preserved": true,
+     "retry_reused_job": true, "restart_retry_completed": true,
+     "verified_bytes_and_sha256": true, "owned_cleanup_passed": true}
+  ],
+  "limits": [
+    "Named public file and installed candidate on Windows only; no inference, Ollama or participant-task proof.",
+    "Injected established-tunnel disconnection, not DNS failure, host network outage, timeout exhaustion or power-loss durability.",
+    "No subsequent CONNECT request occurred during the blocked interval; SDK automatic reconnection behavior is unassessed.",
+    "SDK transfer-byte reuse and aggregate wire bytes were not measured.",
+    "64 MiB limits selected-file size; each transfer attempt has a 120-second deadline plus bounded cleanup.",
+    "Trial partial/auxiliary files and final model files are retained; no production rollback or publication is qualified."
+  ]
+}

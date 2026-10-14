@@ -1,5 +1,35 @@
 # Bounded Hugging Face recovery acceptance
 
+## Installed network interruption: 2026-10-14
+
+The [Windows network interruption report](evidence/hf-network-recovery-windows-2026-10-14.json)
+uses the same pinned sample and installed PR #156 wheel as the current-candidate
+trial below. Main `6e6832b6631f6aa01e3c5817df910a31ad1c5db5` adds only PR #157
+documentation to the qualified runtime. The installed receipt, five module
+hashes and final file size/SHA-256 were independently checked again.
+
+A task-owned loopback HTTPS CONNECT relay routes only the trial service and its
+HF children. TLS remains end-to-end and certificate verification stays enabled;
+no host network setting changes. The relay shuts down active tunnel sockets when
+observed encrypted server bytes reach 12 MiB and rejects new tunnels until
+restored. The SDK had written a 10 MiB `.incomplete` file when this gate was seen.
+
+The worker exited nonzero, the job persisted `failed` with a diagnostic, the
+incomplete artifact was not marked completed, and the service remained healthy.
+Service restart retained the failed status and exact download plan. Restoring
+the relay and explicitly retrying reused the original job and completed the
+19,077,344-byte artifact with its expected digest. All owned services, children
+and the relay stopped; new and previous trial files were retained. Application
+code was unchanged because this acceptance found no application defect.
+
+This proves handling of an established transfer connection being closed. No
+subsequent tunnel request occurred while blocked, so SDK automatic reconnection
+is unassessed. DNS failures, timeout exhaustion, host network outage, power loss,
+Ollama and participant outcomes remain separate. The cutoff counts encrypted
+server traffic across initial tunnels, not artifact payload or total trial
+traffic. SDK transfer-byte reuse was not measured. The existing 64 MiB selected
+file limit and 120-second per-attempt deadline plus bounded cleanup apply.
+
 ## Installed current candidate: 2026-10-14
 
 The [Windows installed-candidate report](evidence/hf-installed-recovery-windows-2026-10-14.json)
