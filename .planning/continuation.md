@@ -4,6 +4,21 @@ Date: 2026-10-13. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #156 is merged at `3ca8ad0db805ac0c15c9b20d7297e4ce880aa6a2`; actual-main
+CI passed 11/11, Package passed 19/19 and all 18 consumer reports matched the
+candidate. Queue cancellation is complete and the isolated pilot was refreshed.
+
+The next Windows installed-candidate HF acceptance passed early cancellation,
+controlled partial-transfer shutdown and forced service-process stop/restart
+with the same pinned 19 MB public sample. Each explicit retry verified bytes and
+digest; see [current evidence and limits](../docs/hf-recovery-acceptance.md#installed-current-candidate-2026-10-14).
+Application code was unchanged; only a task-owned Windows launcher observation
+assumption was corrected. Evidence is bound to the PR #156 wheel, not future
+package builds. Preserve user ignore changes and trial files. Network failure,
+Ollama and participant acquisition/recovery remain separate acceptance scopes.
+
+Older continuation checkpoints below are historical.
+
 Current verified baseline: PR #155 merged at
 `d00e615b9244f2466e4dad5b4ed43515622d18e1`; actual-main CI passed 11/11,
 Package passed 19/19 and all 18 consumer reports matched the candidate bytes.
