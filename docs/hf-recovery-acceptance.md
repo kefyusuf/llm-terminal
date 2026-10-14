@@ -1,5 +1,33 @@
 # Bounded Hugging Face recovery acceptance
 
+## Installed current candidate: 2026-10-14
+
+The [Windows installed-candidate report](evidence/hf-installed-recovery-windows-2026-10-14.json)
+repeats the fixed 19,077,344-byte sample with the CI-produced PR #156 wheel.
+Its source is `3a8c1ff99cb2c9a873116b0cf1238c11d1688192`, whose tracked tree
+equals actual main `3ca8ad0db805ac0c15c9b20d7297e4ce880aa6a2`.
+The installed receipt and five service/worker module hashes match the wheel;
+the report records the interpreter and SDK versions. No distribution was rebuilt.
+
+Three separate owned database/model/SDK-cache roots passed: early cancellation,
+controlled HTTP shutdown after 10 MiB partial output, and forced service process
+stop after 10 MiB partial output. The recorded HF descendants exited, restart
+preserved each plan and its expected cancelled/failed status, and explicit retry
+completed with independently verified final size and SHA-256. Active duplicate
+requests retained their original job. All owned services and children stopped;
+trial output and previous model files remain available.
+
+The first harness assumed a single descendant; Windows venv launcher trees
+contained multiple service/HF processes and the file completed before the gate
+was recognized. That attempt does not prove interruption. The corrected harness
+identifies only HF worker descendants of its owned process and, for forced stop,
+stops the actual service interpreter behind the launcher. Application code was
+unchanged. This qualifies these candidate bytes for the named Windows HF paths;
+network disconnection, host/power loss, Ollama, inference and participant outcomes
+remain separate. SDK byte reuse and aggregate network traffic were not measured.
+
+## Checkout tool and historical evidence
+
 This opt-in checkout tool acquires a public single file through the production
 HF runner. It never performs inference or removes files. Normal tests do not
 contact model services. Use a fresh empty work directory and a known small
