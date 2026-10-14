@@ -1,8 +1,23 @@
 # Verified continuation record
 
-Date: 2026-10-13. Repository: `kefyusuf/llm-terminal`.
+Date: 2026-10-14. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
+
+PR #157 is merged at `6e6832b6631f6aa01e3c5817df910a31ad1c5db5`; PR and
+actual-main CI passed 11/11. Its changes only archive interruption acceptance.
+
+The next installed Windows HF network-interruption trial passed on the same
+PR #156 wheel. An owned CONNECT relay closed the transfer after a 10 MiB partial
+file appeared; the service remained healthy and persisted a failed job.
+Restart retained the plan/status; explicit retry reused the job and verified
+final size/SHA-256. See [evidence and limits](../docs/hf-recovery-acceptance.md#installed-network-interruption-2026-10-14).
+Application code was unchanged. Check the documentation branch/PR CI before
+continuing. Preserve user ignore changes, the installed pilot and trial files.
+Ollama download acceptance is the next separate stabilization scope; participant,
+DNS/timeout, host-outage and SDK automatic-reconnection proof remain unassessed.
+
+Earlier verified runtime checkpoints below are historical.
 
 PR #156 is merged at `3ca8ad0db805ac0c15c9b20d7297e4ce880aa6a2`; actual-main
 CI passed 11/11, Package passed 19/19 and all 18 consumer reports matched the
