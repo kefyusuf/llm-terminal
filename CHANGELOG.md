@@ -4,6 +4,8 @@
 
 ### Reliability and provider correctness
 
+- Leave download jobs queued until a worker slot is available, so saturated-queue cancellation completes immediately; reuse completed slots and preserve unclaimed jobs during shutdown.
+
 - Normalize legacy download IDs atomically by removing duplicate loser records before updating the retained ID; preserve the existing newest-record selection and roll back all changes if normalization fails.
 
 - Acquire exclusive download-database ownership and bind the HTTP socket before recovery or worker startup; preserve live jobs when a second normal/smoke process starts and retain ownership through worker cleanup.

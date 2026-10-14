@@ -53,6 +53,13 @@ file can safely clear the remaining record.
 The TUI's HF action is labeled **Delete File**. Cancellation must be confirmed
 before requesting data removal; a pending/uncertain cancellation preserves data.
 
+The dispatcher claims a job only
+when execution capacity is available. A saturated pool leaves later jobs queued,
+so they can be cancelled and their records removed immediately. A completed
+worker frees a slot without waiting for the other workers. Shutdown preserves
+unclaimed queued jobs. Real-service tests exercise these paths with harmless
+controlled child processes; no model acquisition is implied.
+
 Queued cancellation and worker claim are serialized by the store. Cancellation
 can terminalize an unclaimed queued job immediately; a claimed running job stays
 active even before its child process is registered. Only the worker can acknowledge

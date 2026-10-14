@@ -29,7 +29,7 @@ import sys
 import threading
 import time
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import closing, contextmanager
 from typing import Any
 
@@ -197,12 +197,18 @@ def worker_loop():
 
         return None
 
-    with ThreadPoolExecutor(max_workers=_max_workers()) as pool:
+    max_workers = _max_workers()
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        active = set()
         while not STATE.stop_event.is_set():
+            active = {future for future in active if not future.done()}
+            if len(active) >= max_workers:
+                wait(active, timeout=0.25, return_when=FIRST_COMPLETED)
+                continue
             target_id = _claim()
             if target_id is None:
                 continue
-            pool.submit(process_job, STATE, target_id)
+            active.add(pool.submit(process_job, STATE, target_id))
 
 
 @contextmanager
