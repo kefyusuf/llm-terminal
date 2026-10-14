@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-14",
+  "status": "passed",
+  "actual_main_source": "5c9d338ca48cd6b47dfcc23f35458478f9218060",
+  "candidate_source": "3a8c1ff99cb2c9a873116b0cf1238c11d1688192",
+  "wheel_sha256": "443e3681f69b78a27beb01d132985359177ea6439ca89820357e2618e94ff3c9",
+  "package_run": 38499876070,
+  "model": "tinyllama:1.1b",
+  "registry_manifest_sha256": "2644915ede352ea7bdfaff0bfac0be74c719d5d5202acb63a6fb095b52f394a4",
+  "declared_artifact_bytes": 637700138,
+  "budget": {
+    "model_file_bytes": 1000000000,
+    "wall_seconds": 900
+  },
+  "limits": [
+    "Ollama reports progress; preallocated file length is not downloaded bytes.",
+    "Abrupt owned daemon stop during pull; service remains alive for failure and explicit retry.",
+    "Runtime-process loss, not host/power-loss or external network-failure recovery.",
+    "No inference, model deletion, publication or participant acceptance.",
+    "SDK transfer reuse and aggregate network traffic are unmeasured."
+  ],
+  "installed_receipt_verified": true,
+  "ollama_version": "0.35.0",
+  "cloud_disabled": true,
+  "active_duplicate_preserved": true,
+  "partial_progress_percent": 1,
+  "owned_daemon_forced_exit_observed": true,
+  "managed_failure_persisted": true,
+  "nonzero_return_code": true,
+  "failure_detail_present": true,
+  "cancel_not_requested": true,
+  "owned_pull_cli_exited": true,
+  "download_service_remained_healthy": true,
+  "failure_acknowledgement_seconds": 0.109,
+  "partial_store_bytes_after_stop": 637699853,
+  "failed_job_preserved_after_runtime_restore": true,
+  "runtime_restored_without_completed_model": true,
+  "retry_reused_job": true,
+  "managed_retry_completed": true,
+  "installed_manifest_and_all_blobs_verified": true,
+  "verified_blob_count": 5,
+  "owned_cleanup_passed": true,
+  "peak_model_store_bytes": 637700989,
+  "elapsed_seconds": 79.125,
+  "runtime": {
+    "python_version": "3.12.14",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "dependencies": {
+      "ai-model-explorer": "1.0.1",
+      "huggingface-hub": "0.36.2",
+      "requests": "2.34.2",
+      "psutil": "6.1.1"
+    }
+  },
+  "installed_runtime_matches_wheel_sha256": {
+    "downloads.download_service": "b171f4a3fcc82afedc3b3e2e919119da8ebafaec569b7bf754a2c9be35020e5f",
+    "downloads.store": "5a2e23e7a7d763e5a056138c5b7338a1ec3e0593d99fcf17a71e29fc461c5bf8",
+    "downloads.runner": "4cd001d531108efa0b0a59f3576e428165f29f59d101a7a1dc9a39f7fea7a04f",
+    "downloads.parent_lifetime": "3989b2982d0b06a04cac82c918b4e0359100616cf5a6e7894c40ca63ada32756",
+    "downloads.preflight": "5cf37c51204c6e1f798f95e894ba4826a28dab5f048a33afd94b500b2971008e"
+  },
+  "verified_blobs": [
+    {
+      "digest": "sha256:6331358be52a6ebc2fd0755a51ad1175734fd17a628ab5ea6897109396245362",
+      "size_bytes": 483
+    },
+    {
+      "digest": "sha256:2af3b81862c6be03c769683af18efdadb2c33f60ff32ab6f83e42c043d6c7816",
+      "size_bytes": 637699456
+    },
+    {
+      "digest": "sha256:af0ddbdaaa26f30d54d727f9dd944b76bdb926fdaf9a58f63f78c532f57c191f",
+      "size_bytes": 70
+    },
+    {
+      "digest": "sha256:c8472cd9daed5e7c20aa53689e441e10620a002aacd58686aeac2cb188addb5c",
+      "size_bytes": 31
+    },
+    {
+      "digest": "sha256:fa956ab37b8c21152f975a7fcdd095c4fee8754674b21d9b44d710435697a00d",
+      "size_bytes": 98
+    }
+  ],
+  "ollama_executable_sha256": "ecdb9fe1c52a08a0629d8ca658f9577b24f83a1600857fe31646f41b5dec52fc",
+  "kind": "installed_candidate_ollama_runtime_loss_acceptance",
+  "source_relationship": "Actual main adds only PR #157 through #160 documentation to the PR #156 qualified runtime.",
+  "injection": {
+    "method": "kill and wait on owned Ollama serve Popen handle only",
+    "trigger": "CLI-reported partial progress before pull completion",
+    "download_service": "kept alive through failure, daemon restoration and explicit retry"
+  },
+  "timing_measurement": "Timer began after owned daemon wait returned and ended after job failure, CLI exit and service health checks; not detection latency from kill request.",
+  "timing_limit": "One post-exit verification sequence at 20-ms nominal polling interval, not a failure-detection latency guarantee."
+}
