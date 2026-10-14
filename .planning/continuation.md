@@ -4,6 +4,22 @@ Date: 2026-10-14. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #161 is merged at `8f946f9e6a42a169c8a2a3f1047986c735fc2f14`.
+PR CI passed 11/11; actual-main run 38586122191 passed 11/11 on attempt 2.
+Attempt 1 failed the Windows 3.12 early-results TUI test; rerun alone did not
+establish a permanent fix, so that test took priority over concurrency review.
+
+Branch `test/ollama-preview-synchronization` reproduces the same empty-prefix
+assertion with a controlled 500-ms fast-detail response. The original fixed
+15-pause wait failed; bounded waits for the visible prefix and completed search
+pass both immediate/delayed responses while preserving all existing assertions.
+Application code and installed pilot are unchanged; no model was acquired.
+Check this branch's current PR/CI before continuing. Preserve user ignore edits
+and trial files. Next separate scope remains concurrent duplicate managed
+submissions with a controlled local worker; network/participant gates stay separate.
+
+Earlier checkpoints below are historical.
+
 PR #160 is merged at `5c9d338ca48cd6b47dfcc23f35458478f9218060`; PR and
 actual-main CI passed 11/11. It archives the bounded daemon cancellation evidence.
 
