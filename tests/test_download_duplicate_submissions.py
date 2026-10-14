@@ -32,7 +32,7 @@ def _wait(ready):
     raise AssertionError("Duplicate submission deadline exceeded")
 
 
-def _start(tmp_path):
+def _start(tmp_path, *, pause_cleanup=False):
     # Substitute only the external provider command with a real, bounded child.
     # Store, HTTP handler, claiming, dispatcher and streamed runner remain real.
     child = (
@@ -56,8 +56,24 @@ def _start(tmp_path):
         "    return original([sys.executable,'-c',child,str(root/(name+'.started')),"
         "str(root/(name+'.release'))],**kwargs)\n"
         "runner.subprocess.Popen=start\n"
-        "from downloads.download_service import main\nmain()\n"
     )
+    if pause_cleanup:
+        # Hold the first real cleanup after its terminal status becomes visible.
+        bootstrap += (
+            "import time\nfrom downloads.download_service import DownloadServiceState\n"
+            "original_clear=DownloadServiceState.clear_process\npaused=False\n"
+            "def clear(state,target):\n"
+            "    global paused\n"
+            "    if target=='ollama:duplicate-target' and not paused:\n"
+            "        paused=True\n        (root/'cleanup-paused').touch()\n"
+            "        deadline=time.monotonic()+60\n"
+            "        while not (root/'cleanup-release').exists():\n"
+            "            if time.monotonic()>deadline: raise RuntimeError('cleanup gate timeout')\n"
+            "            time.sleep(.05)\n"
+            "    original_clear(state,target)\n"
+            "DownloadServiceState.clear_process=clear\n"
+        )
+    bootstrap += "from downloads.download_service import main\nmain()\n"
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
@@ -140,6 +156,56 @@ def test_concurrent_duplicates_keep_one_queued_and_running_download(tmp_path):
         process.communicate(timeout=10)
         assert process.returncode == 0
     finally:
+        for name in ("duplicate-blocker-0", "duplicate-blocker-1", "duplicate-target"):
+            (tmp_path / f"{name}.release").touch()
+        try:
+            if process.poll() is None:
+                _api(port, "/shutdown", {})
+            process.communicate(timeout=10)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.communicate(timeout=5)
+
+
+def test_cancel_retry_waits_for_old_cleanup_without_blocking_other_targets(tmp_path):
+    process, port = _start(tmp_path, pause_cleanup=True)
+    try:
+        def ready():
+            assert process.poll() is None, "Owned service exited before readiness"
+            try:
+                return _api(port, "/health")["ok"]
+            except OSError:
+                return False
+
+        _wait(ready)
+        model = {"source": "Ollama", "name": "duplicate-target"}
+        created = _api(port, "/jobs", {"model": model})["job"]
+        marker = tmp_path / "duplicate-target.started"
+        _wait(marker.exists)
+        _api(port, "/jobs/cancel", {"target_id": created["target_id"]})
+        _wait(lambda: (tmp_path / "cleanup-paused").exists())
+        assert _target(port)["status"] == "cancelled"
+        retry = _api(port, "/jobs", {"model": model})
+        assert retry["queued"] and retry["job"]["id"] == created["id"]
+        _api(port, "/jobs", {"model": {"source": "Ollama", "name": "duplicate-blocker-0"}})
+        probe = tmp_path / "duplicate-blocker-0.started"
+        _wait(lambda: probe.exists() or len(marker.read_text().splitlines()) > 1)
+        assert len(marker.read_text().splitlines()) == 1, "Retry overtook old worker cleanup"
+        assert probe.exists(), "Other targets were blocked by the same-target retry"
+        assert _target(port)["status"] == "queued"
+
+        (tmp_path / "cleanup-release").touch()
+        _wait(lambda: len(marker.read_text().splitlines()) == 2)
+        _wait(lambda: "ollama:duplicate-target" in _api(port, "/debug/active")["active_targets"])
+        assert _target(port)["status"] == "running"
+        assert _target(port)["cancel_requested"] == 0
+        (tmp_path / "duplicate-target.release").touch()
+        _wait(lambda: _target(port)["status"] == "completed")
+        assert _target(port)["id"] == created["id"]
+        assert len(marker.read_text().splitlines()) == 2
+    finally:
+        (tmp_path / "cleanup-release").touch()
         for name in ("duplicate-blocker-0", "duplicate-blocker-1", "duplicate-target"):
             (tmp_path / f"{name}.release").touch()
         try:

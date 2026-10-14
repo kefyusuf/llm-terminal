@@ -177,7 +177,10 @@ def worker_loop():
     def _claim():
         while not STATE.stop_event.is_set():
             try:
-                job = STATE.store.claim_next_queued()
+                # A visible terminal record may be retried before its previous
+                # future finishes clearing the registered child process.
+                excluded = {target for future, target in active.items() if not future.done()}
+                job = STATE.store.claim_next_queued(exclude_targets=excluded)
             except Exception:
                 logger.warning("Failed to claim next queued job, retrying")
                 time.sleep(0.5)
@@ -199,16 +202,16 @@ def worker_loop():
 
     max_workers = _max_workers()
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        active = set()
+        active = {}
         while not STATE.stop_event.is_set():
-            active = {future for future in active if not future.done()}
+            active = {future: target for future, target in active.items() if not future.done()}
             if len(active) >= max_workers:
                 wait(active, timeout=0.25, return_when=FIRST_COMPLETED)
                 continue
             target_id = _claim()
             if target_id is None:
                 continue
-            active.add(pool.submit(process_job, STATE, target_id))
+            active[pool.submit(process_job, STATE, target_id)] = target_id
 
 
 @contextmanager

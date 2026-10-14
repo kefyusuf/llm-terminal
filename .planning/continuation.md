@@ -1,8 +1,27 @@
 # Verified continuation record
 
-Date: 2026-10-14. Repository: `kefyusuf/llm-terminal`.
+Date: 2026-10-15. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
+
+PR #163 is merged at `b5a24a41112d6e475e823746a21fc28cda81f217`; PR and
+actual-main CI passed 11/11 on their first attempts. Concurrent active duplicate
+submissions are covered through real HTTP and controlled local child processes.
+
+Branch `fix/download-cancel-retry-serialization` fixes a reproduced same-target
+retry race: a visible cancelled record could be retried before the previous
+future finished clearing its process. Track future-to-target ownership and
+exclude unfinished targets during atomic claims, recomputing exclusions each
+poll so completed futures do not stall retries. Other targets remain eligible.
+The real-service RED test observed a second child overtaking old cleanup; GREEN
+keeps the retry queued while another target runs, then verifies tracked restart,
+same job ID and completion after cleanup. Claim tests cover quoted/multiple
+exclusions and unchanged default behavior. Check current CI/Package and refresh
+the isolated pilot only from qualified candidate bytes; preserve previous models,
+trial roots and user ignore changes. No model acquisition is part of this fix.
+Network/participant acceptance and prior HF live HTTP504 remain separate.
+
+Earlier checkpoints below are historical.
 
 PR #162 is merged at `47993fae64167abdd652b08449be63627e6f73d8`; PR and
 actual-main CI passed 11/11 on their first attempts. Early-results TUI test

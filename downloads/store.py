@@ -329,11 +329,17 @@ class DownloadStore:
             row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()
         return self._row_to_dict(row)
 
-    def claim_next_queued(self):
+    def claim_next_queued(self, *, exclude_targets=()):
         now = time.time()
+        excluded = tuple(exclude_targets)
+        exclusion = ""
+        if excluded:
+            placeholders = ",".join("?" for _ in excluded)
+            exclusion = f" AND target_id NOT IN ({placeholders})"
         with self.lock, self._connect() as conn:
             row = conn.execute(
-                "SELECT * FROM jobs WHERE status = 'queued' ORDER BY updated_at ASC LIMIT 1"
+                "SELECT * FROM jobs WHERE status = 'queued'" + exclusion
+                + " ORDER BY updated_at ASC LIMIT 1", excluded,
             ).fetchone()
             if row is None:
                 return None
