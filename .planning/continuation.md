@@ -4,6 +4,21 @@ Date: 2026-10-13. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+Current verified baseline: PR #155 merged at
+`d00e615b9244f2466e4dad5b4ed43515622d18e1`; actual-main CI passed 11/11,
+Package passed 19/19 and all 18 consumer reports matched the candidate bytes.
+Legacy normalization is complete; the isolated Windows pilot was refreshed.
+
+Branch `fix/download-queued-cancellation` addresses only saturated queues:
+claim a job only when a worker slot is available, keep later jobs queued for
+immediate cancellation, reuse a completed slot and preserve unclaimed jobs at
+shutdown. A real-service regression reproduced premature running status; the
+fix and existing worker tests passed. No live model was acquired.
+Check this branch's current PR/CI before continuing. Keep real-provider
+acquisition/recovery acceptance separate; preserve current user ignore changes.
+
+Previous checkpoints below are historical.
+
 Verified baseline: PR #154 merged at
 `429858de027cb6f573592e27b9c954656a0ab900`; actual-main
 [CI 38361010107](https://github.com/kefyusuf/llm-terminal/actions/runs/38361010107)
