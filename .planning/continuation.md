@@ -4,6 +4,24 @@ Date: 2026-10-14. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #162 is merged at `47993fae64167abdd652b08449be63627e6f73d8`; PR and
+actual-main CI passed 11/11 on their first attempts. Early-results TUI test
+synchronization is complete; application and installed pilot are unchanged.
+
+Branch `test/download-concurrent-duplicates` adds a real-service HTTP regression:
+eight mixed-case duplicate submissions while queued, then eight while running
+with a free worker slot. Exactly one submission queues the target, all responses
+retain one job ID, and the controlled external child runs once before completion.
+Two isolated child-only mutation checks detect missing queued/running guards;
+they are not existing application defects and change no repository application
+files. The related queue/store suite passed; no model was acquired. Check this
+branch's current PR/CI before continuing. Preserve user ignore edits, pilot and
+all trial files. Next separate scope: same-target cancellation followed by prompt
+explicit retry with controlled local processes. HF live HTTP504, concurrent
+runtime clients and participant/network/power-loss acceptance remain separate.
+
+Earlier checkpoints below are historical.
+
 PR #161 is merged at `8f946f9e6a42a169c8a2a3f1047986c735fc2f14`.
 PR CI passed 11/11; actual-main run 38586122191 passed 11/11 on attempt 2.
 Attempt 1 failed the Windows 3.12 early-results TUI test; rerun alone did not
