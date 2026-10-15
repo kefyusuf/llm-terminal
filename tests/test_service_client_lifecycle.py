@@ -11,7 +11,13 @@ import pytest
 from downloads import service_client
 
 
-def test_is_service_running_distinguishes_healthy_and_failed_requests(monkeypatch):
+@pytest.fixture(autouse=True)
+def isolated_client_database(monkeypatch, tmp_path):
+    monkeypatch.setattr(service_client.config.settings, "download_db_path", tmp_path / "jobs.db")
+
+
+@pytest.mark.parametrize("error", [URLError("offline"), ConnectionResetError("closed")])
+def test_is_service_running_distinguishes_healthy_and_failed_requests(monkeypatch, error):
     """Reachability should require an explicit truthy health flag and contain request failures."""
     monkeypatch.setattr(service_client, "_request", lambda *_args, **_kwargs: {"ok": True})
     assert service_client.is_service_running() is True
@@ -20,7 +26,7 @@ def test_is_service_running_distinguishes_healthy_and_failed_requests(monkeypatc
     assert service_client.is_service_running() is False
 
     def _raise(*_args, **_kwargs):
-        raise URLError("offline")
+        raise error
 
     monkeypatch.setattr(service_client, "_request", _raise)
     assert service_client.is_service_running() is False

@@ -4,6 +4,31 @@ Date: 2026-10-15. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #166 is merged at `3c4460a3be2e42d828b8782d9d69912cc912d44c`.
+PR/main CI passed 11/11. Four real client processes passed cold startup and
+reuse on source and the existing installed pilot; production code was unchanged.
+
+Branch `fix/download-concurrent-service-upgrade` fixes a reproduced legacy-idle
+upgrade race. Serialize participating clients with a separate SQLite
+`.client-lock` (6-second acquisition limit), then recheck health/version/jobs.
+Before spawning, wait up to 3 seconds for actual `.service-lock` ownership to
+be released, since HTTP shutdown can precede old worker cleanup. Keep both lock
+files and close connections on all paths. Health/reset errors are contained.
+Real four-client cases cover cold start, legacy idle replacement, legacy
+queued/running snapshots refusing replacement, and delayed old-worker cleanup.
+Exactly one legacy retirement is required; bypassing client coordination is
+detected. Legacy protocol/version and passive busy states are controlled fixtures,
+not an installed historical binary or live-provider workload.
+Check current PR/CI/Package; refresh the pilot only from qualified candidate bytes.
+Preserve user ignore changes, previous environments and model files. No model
+acquisition, schema change or UI work belongs to this scope.
+Next separate boundary: a new job submitted after the legacy idle snapshot but
+before retirement. Participating `ensure_service_running` callers are serialized;
+independent job submission/manual shutdown is not made atomic by this fix.
+Participant/network/power-loss acceptance and prior HF HTTP504 remain separate.
+
+Earlier checkpoints below are historical.
+
 PR #165 is merged at `ca5a81ed2de5773cd9877f26cbe602ff937ccbeb`.
 PR/main CI passed 11/11; Package passed 19/19 with 18 matching consumer reports.
 The qualified installed Windows wheel passed the queued-retry shutdown/restart

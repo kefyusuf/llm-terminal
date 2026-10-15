@@ -232,7 +232,14 @@ def test_development_smoke_is_isolated_from_a_running_download_service(tmp_path)
         _stop(owner)
 
 
-def test_concurrent_clients_start_and_reuse_one_service_without_changing_history(tmp_path):
+@pytest.mark.parametrize("existing_version,job_status,slow_cleanup", [
+    (None, "completed", False), ("1.7", "completed", False),
+    ("1.7", "queued", False), ("1.7", "running", False),
+    ("1.7", "completed", True),
+])
+def test_concurrent_clients_start_and_reuse_one_service_without_changing_history(
+    tmp_path, existing_version, job_status, slow_cleanup,
+):
     db = tmp_path / "jobs.db"
     store = DownloadStore(db)
     job, _ = store.upsert_job({"source": "Ollama", "name": "startup-history"})
@@ -250,6 +257,18 @@ def test_concurrent_clients_start_and_reuse_one_service_without_changing_history
         "        if (root/name).exists(): return\n"
         "        if time.monotonic()>deadline: raise RuntimeError('client gate timeout')\n"
         "        time.sleep(.02)\n"
+        "from downloads import service_client\n"
+        "original_stop=service_client.stop_service\n"
+        "def stop():\n"
+        "    result=original_stop()\n"
+        "    (root/'legacy-stop-returned').touch()\n"
+        "    return result\n"
+        "service_client.stop_service=stop\n"
+        "original_popen=service_client.subprocess.Popen\n"
+        "def launch(*args,**kwargs):\n"
+        "    (root/(index+'.spawn')).touch()\n"
+        "    return original_popen(*args,**kwargs)\n"
+        "service_client.subprocess.Popen=launch\n"
         "ready=root/(index+'.ready')\n"
         "pending=ready.with_suffix('.tmp')\n"
         "pending.write_text(str(os.getpid()))\n"
@@ -267,6 +286,8 @@ def test_concurrent_clients_start_and_reuse_one_service_without_changing_history
     clients = []
     children = {}
     client_workers = {}
+    previous = None
+    previous_children = []
 
     def descendants():
         for index in range(len(clients)):
@@ -286,7 +307,10 @@ def test_concurrent_clients_start_and_reuse_one_service_without_changing_history
     def wait_for(predicate):
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
-            assert all(client.poll() is None for client in clients), "Startup client exited early"
+            for client in clients:
+                if client.poll() is not None:
+                    output, _ = client.communicate(timeout=5)
+                    raise AssertionError("Startup client exited early: " + output.decode(errors="replace"))
             descendants()
             if predicate():
                 return
@@ -317,6 +341,44 @@ def test_concurrent_clients_start_and_reuse_one_service_without_changing_history
         return roots
 
     try:
+        if existing_version:
+            bootstrap = (
+                "from downloads import download_service\n"
+                f"download_service.SERVICE_VERSION={existing_version!r}\n"
+                # Advertise legacy job states without invoking a provider.
+                "download_service.worker_loop=download_service.STATE.stop_event.wait\n"
+                "from downloads.api import Handler\n"
+                "import threading,time\nfrom pathlib import Path\n"
+                f"retirements=Path({str(tmp_path / 'legacy-retirements')!r})\n"
+                "original_post=Handler.do_POST\npost_lock=threading.Lock()\n"
+                "def post(handler):\n"
+                "    if handler.path=='/shutdown':\n"
+                "        with post_lock,retirements.open('a') as handle: handle.write('shutdown\\n')\n"
+                # Widen a real request overlap; delegate shutdown unchanged.
+                "        time.sleep(.2)\n"
+                "    original_post(handler)\n"
+                "Handler.do_POST=post\n"
+            )
+            if slow_cleanup:
+                bootstrap += (
+                    f"root=Path({str(tmp_path)!r})\n"
+                    "def worker():\n"
+                    "    download_service.STATE.stop_event.wait()\n"
+                    "    (root/'legacy-cleanup-paused').touch()\n"
+                    "    deadline=time.monotonic()+30\n"
+                    "    while not (root/'legacy-cleanup-release').exists():\n"
+                    "        if time.monotonic()>deadline: raise RuntimeError('cleanup gate timeout')\n"
+                    "        time.sleep(.02)\n"
+                    "download_service.worker_loop=worker\n"
+                )
+            bootstrap += "download_service.main()\n"
+            previous = subprocess.Popen(
+                [sys.executable, "-c", bootstrap], cwd=ROOT, env=env,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            _ready(previous, port)
+            previous_children = psutil.Process(previous.pid).children(recursive=True)
+            expected = store.update_job(job["target_id"], status=job_status, detail="Preserved")
         for index in range(4):
             clients.append(subprocess.Popen(
                 [sys.executable, "-c", script, str(tmp_path), str(index)],
@@ -324,13 +386,36 @@ def test_concurrent_clients_start_and_reuse_one_service_without_changing_history
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)))
         wait_for(lambda: all((tmp_path / f"{index}.ready").exists() for index in range(4)))
         (tmp_path / "start").touch()
+        if slow_cleanup:
+            wait_for(lambda: (tmp_path / "legacy-cleanup-paused").exists())
+            wait_for(lambda: (tmp_path / "legacy-stop-returned").exists())
+            # Observe the interval after HTTP stop returned while old worker
+            # ownership is still held; no replacement launch is permitted.
+            deadline = time.monotonic() + 1
+            while time.monotonic() < deadline:
+                assert previous.poll() is None
+                assert not list(tmp_path.glob("*.spawn")), "Replacement started before legacy ownership release"
+                time.sleep(.02)
+            (tmp_path / "legacy-cleanup-release").touch()
         wait_for(lambda: all((tmp_path / f"{index}.start.json").exists() for index in range(4)))
+        allowed = job_status == "completed"
         for index in range(4):
             assert json.loads((tmp_path / f"{index}.start.json").read_text()) == {
-                "ok": True, "jobs": [expected]}
+                "ok": allowed, "jobs": [expected] if allowed else []}
+        if not allowed:
+            assert previous.poll() is None
+            assert _api(port, "/health")["version"] == "1.7"
+            assert _api(port, "/jobs")["jobs"] == [expected]
+            assert not (tmp_path / "legacy-retirements").exists()
+            assert not living_children()
+            return
         wait_for(lambda: len(service_roots()) == 1)
         owner = service_roots()
         assert _api(port, "/debug/active")["worker_alive"]
+        if previous is not None:
+            previous.communicate(timeout=10)
+            assert previous.returncode == 0
+            assert (tmp_path / "legacy-retirements").read_text().splitlines() == ["shutdown"]
 
         (tmp_path / "reuse").touch()
         wait_for(lambda: all((tmp_path / f"{index}.reuse.json").exists() for index in range(4)))
@@ -345,13 +430,14 @@ def test_concurrent_clients_start_and_reuse_one_service_without_changing_history
             output, _ = client.communicate(timeout=10)
             assert client.returncode == 0, output.decode(errors="replace")
     finally:
+        (tmp_path / "legacy-cleanup-release").touch()
         # Capture owned descendants before their parents can exit.
         for client in clients:
             if client.poll() is None:
                 descendants()
                 break
         try:
-            if living_children():
+            if living_children() or (previous is not None and previous.poll() is None):
                 _api(port, "/shutdown", {})
         except OSError:
             pass
@@ -360,10 +446,12 @@ def test_concurrent_clients_start_and_reuse_one_service_without_changing_history
             for client in clients:
                 _stop(client)
         finally:
-            for child in [*children.values(), *client_workers.values()]:
+            for child in [*children.values(), *client_workers.values(), *previous_children]:
                 if child.is_running():
                     try:
                         child.kill()
                         child.wait(timeout=5)
                     except psutil.NoSuchProcess:
                         pass
+            if previous is not None:
+                _stop(previous)

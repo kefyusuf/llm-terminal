@@ -1,8 +1,10 @@
 import ipaddress
 import json
+import sqlite3
 import subprocess
 import sys
 import time
+from contextlib import closing
 from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
@@ -93,7 +95,7 @@ def is_service_running():
     try:
         data = _request("GET", "/health", timeout=1.0)
         return bool(data.get("ok"))
-    except (URLError, HTTPError, TimeoutError, ValueError, RuntimeError):
+    except (URLError, HTTPError, TimeoutError, ConnectionError, ValueError, RuntimeError):
         return False
 
 
@@ -141,7 +143,7 @@ def _wait_for_service(deadline_seconds=6.0):
             health = get_service_health()
             if health.get("ok") and is_service_compatible(health):
                 return True
-        except (URLError, HTTPError, TimeoutError, ValueError, RuntimeError):
+        except (URLError, HTTPError, TimeoutError, ConnectionError, ValueError, RuntimeError):
             pass
         time.sleep(0.2)
     return False
@@ -189,6 +191,24 @@ def ensure_service_running():
 
     Returns ``True`` when the service is ready to accept requests.
     """
+    database = config.settings.download_db_path.resolve()
+    try:
+        database.parent.mkdir(parents=True, exist_ok=True)
+        owner = sqlite3.connect(str(database) + ".client-lock", timeout=6.0)
+    except (OSError, sqlite3.Error):
+        return False
+    # Separate from the service's lifetime lock; retain the file to keep one
+    # lock identity. Recheck health/jobs only after acquiring client ownership.
+    with closing(owner):
+        try:
+            owner.execute("BEGIN EXCLUSIVE")
+        except sqlite3.Error:
+            return False
+        return _ensure_service_running_locked()
+
+
+def _ensure_service_running_locked():
+    """Inspect and replace a service while holding client lifecycle ownership."""
     if is_service_running():
         try:
             health = get_service_health()
@@ -199,9 +219,17 @@ def ensure_service_running():
                 return False
             if not stop_service():
                 return False
-        except (URLError, HTTPError, TimeoutError, ValueError, RuntimeError):
+        except (URLError, HTTPError, TimeoutError, ConnectionError, ValueError, RuntimeError):
             return False
 
+    # HTTP shutdown can precede worker cleanup. Wait for actual database
+    # ownership to be released before launching a replacement process.
+    try:
+        database = config.settings.download_db_path.resolve()
+        with closing(sqlite3.connect(str(database) + ".service-lock", timeout=3.0)) as previous:
+            previous.execute("BEGIN EXCLUSIVE")
+    except sqlite3.Error:
+        return False
     _start_service_process()
     return _wait_for_service(deadline_seconds=6.0)
 
