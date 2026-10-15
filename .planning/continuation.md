@@ -4,6 +4,26 @@ Date: 2026-10-15. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #165 is merged at `ca5a81ed2de5773cd9877f26cbe602ff937ccbeb`.
+PR/main CI passed 11/11; Package passed 19/19 with 18 matching consumer reports.
+The qualified installed Windows wheel passed the queued-retry shutdown/restart
+scenario. The pilot uses that wheel; previous environments and models remain.
+
+Branch `test/download-concurrent-client-startup` adds a real four-process client
+acceptance test: simultaneous cold start against one isolated database/port,
+authenticated history reads from every client, exactly one surviving service
+process tree, and a second synchronized call reusing the same tree. Terminal
+history remains unchanged and controlled shutdown removes all owned descendants.
+Windows venv forwarding processes are accounted for using actual client PIDs.
+This acceptance found no application defect; production code is unchanged.
+Check current PR/main CI before continuing; the installed pilot needs no refresh
+for this test-only increment. No model acquisition or provider calls are involved.
+Next separate scope: assess concurrent clients facing an incompatible idle
+service, using a controlled local fixture. Active-job preservation remains a
+required boundary. Participant/network/power-loss and prior HF HTTP504 stay open.
+
+Earlier checkpoints below are historical.
+
 PR #164 is merged at `8e042117f4c6ecdd7d1b6562e4029d2a311f9cac`.
 PR and actual-main CI passed 11/11; Package passed 19/19 with 18 matching
 consumer reports. The isolated Windows pilot now uses its qualified wheel;
