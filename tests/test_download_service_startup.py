@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from urllib.request import ProxyHandler, Request, build_opener
 
+import psutil
 import pytest
 
 from downloads.store import DownloadStore
@@ -229,3 +230,140 @@ def test_development_smoke_is_isolated_from_a_running_download_service(tmp_path)
         if owner.poll() is None:
             _api(port, "/shutdown", {})
         _stop(owner)
+
+
+def test_concurrent_clients_start_and_reuse_one_service_without_changing_history(tmp_path):
+    db = tmp_path / "jobs.db"
+    store = DownloadStore(db)
+    job, _ = store.upsert_job({"source": "Ollama", "name": "startup-history"})
+    expected = store.update_job(job["target_id"], status="completed", detail="Done")
+    port = _port()
+    env = _environment(tmp_path, db, port)
+    script = (
+        "import json,os,sys,time\nfrom pathlib import Path\n"
+        "from downloads.service_client import ensure_service_running,list_jobs\n"
+        "root=Path(sys.argv[1]); index=sys.argv[2]\n"
+        "def wait(name):\n"
+        "    deadline=time.monotonic()+30\n"
+        "    while True:\n"
+        "        if (root/'exit').exists(): raise SystemExit(0)\n"
+        "        if (root/name).exists(): return\n"
+        "        if time.monotonic()>deadline: raise RuntimeError('client gate timeout')\n"
+        "        time.sleep(.02)\n"
+        "ready=root/(index+'.ready')\n"
+        "pending=ready.with_suffix('.tmp')\n"
+        "pending.write_text(str(os.getpid()))\n"
+        "pending.replace(ready)\n"
+        "for phase in ('start','reuse'):\n"
+        "    wait(phase)\n"
+        "    ok=ensure_service_running()\n"
+        "    jobs=list_jobs() if ok else []\n"
+        "    result=root/(index+'.'+phase+'.json')\n"
+        "    pending=result.with_suffix('.tmp')\n"
+        "    pending.write_text(json.dumps({'ok':ok,'jobs':jobs}))\n"
+        "    pending.replace(result)\n"
+        "wait('exit')\n"
+    )
+    clients = []
+    children = {}
+    client_workers = {}
+
+    def descendants():
+        for index in range(len(clients)):
+            marker = tmp_path / f"{index}.ready"
+            pid = marker.read_text().strip() if marker.exists() else ""
+            if not pid:
+                continue
+            try:
+                worker = psutil.Process(int(pid))
+                client_workers[int(pid)] = worker
+                owned = worker.children(recursive=True)
+            except psutil.NoSuchProcess:
+                continue
+            for child in owned:
+                children[child.pid] = child
+
+    def wait_for(predicate):
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            assert all(client.poll() is None for client in clients), "Startup client exited early"
+            descendants()
+            if predicate():
+                return
+            time.sleep(.05)
+        raise AssertionError("Concurrent startup deadline exceeded")
+
+    def living_children():
+        # Only inspect descendants of the clients created by this test.
+        alive = set()
+        for pid, child in children.items():
+            try:
+                if child.is_running() and child.status() != psutil.STATUS_ZOMBIE:
+                    alive.add(pid)
+            except psutil.NoSuchProcess:
+                pass
+        return alive
+
+    def service_roots():
+        # Count service process trees, allowing Windows venv forwarding parents.
+        alive = living_children()
+        roots = set()
+        for pid in alive:
+            try:
+                if children[pid].ppid() not in alive:
+                    roots.add(pid)
+            except psutil.NoSuchProcess:
+                pass
+        return roots
+
+    try:
+        for index in range(4):
+            clients.append(subprocess.Popen(
+                [sys.executable, "-c", script, str(tmp_path), str(index)],
+                cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)))
+        wait_for(lambda: all((tmp_path / f"{index}.ready").exists() for index in range(4)))
+        (tmp_path / "start").touch()
+        wait_for(lambda: all((tmp_path / f"{index}.start.json").exists() for index in range(4)))
+        for index in range(4):
+            assert json.loads((tmp_path / f"{index}.start.json").read_text()) == {
+                "ok": True, "jobs": [expected]}
+        wait_for(lambda: len(service_roots()) == 1)
+        owner = service_roots()
+        assert _api(port, "/debug/active")["worker_alive"]
+
+        (tmp_path / "reuse").touch()
+        wait_for(lambda: all((tmp_path / f"{index}.reuse.json").exists() for index in range(4)))
+        for index in range(4):
+            assert json.loads((tmp_path / f"{index}.reuse.json").read_text()) == {
+                "ok": True, "jobs": [expected]}
+        assert service_roots() == owner
+        _api(port, "/shutdown", {})
+        wait_for(lambda: not living_children())
+        (tmp_path / "exit").touch()
+        for client in clients:
+            output, _ = client.communicate(timeout=10)
+            assert client.returncode == 0, output.decode(errors="replace")
+    finally:
+        # Capture owned descendants before their parents can exit.
+        for client in clients:
+            if client.poll() is None:
+                descendants()
+                break
+        try:
+            if living_children():
+                _api(port, "/shutdown", {})
+        except OSError:
+            pass
+        (tmp_path / "exit").touch()
+        try:
+            for client in clients:
+                _stop(client)
+        finally:
+            for child in [*children.values(), *client_workers.values()]:
+                if child.is_running():
+                    try:
+                        child.kill()
+                        child.wait(timeout=5)
+                    except psutil.NoSuchProcess:
+                        pass
