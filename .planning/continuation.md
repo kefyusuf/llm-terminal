@@ -4,6 +4,29 @@ Date: 2026-10-15. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #169 is merged at `45c7f7bfb9e39b6fdb8dc31917c2ac2213074a40`.
+PR CI `38800503323` and actual-main CI `38801477126` passed 11/11.
+The pilot now uses the PR #168 qualified wheel; its 62 runtime modules match
+that main, the wheel and the installed environment. Nine installed lifecycle
+cases and final startup/owned cleanup passed. Previous pilot environments and
+models remain preserved; `.venv/idle-retirement-completed-1015.json` records proof.
+
+Branch `fix/download-admission-feedback` stays within user-visible download
+startup refusal and HTTP 503 admission handling. The real client with an invalid
+database path reproduced an uncaught ValueError; readiness failures now return a
+safe-upgrade/retry message. A controlled loopback HTTP 503 reproduced raw technical
+feedback; report temporary refusal, no queued download, and manual retry guidance.
+Do not automatically resubmit. Real client/HTTP tests cover busy queued/running
+legacy services without POST/shutdown, rejected admission followed by manual
+success, unchanged local download state and non-503 error distinction.
+Five new cases plus existing manager/sync/startup cases passed (49 total), Ruff
+and 38-file mypy passed. Check full verify, independent review, PR CI, Package
+and actual-main CI before claiming completion or refreshing the pilot.
+No service protocol, provider, storage, retry policy or startup-threading change
+is in scope. Preserve user ignore changes, previous environments and model files.
+
+Earlier checkpoints below are historical.
+
 PR #168 is merged at `f9d40a1a870a02102e1522893e6602d194c57451`.
 PR CI passed 11/11 and Package 19/19, with 18 matching consumer reports.
 The candidate passed nine installed Windows lifecycle cases. Its source tree
