@@ -37,8 +37,8 @@ class _Viewer(AIModelViewer):
         pass
 
 
-async def _wait_for_ui(pilot, ready, description):
-    deadline = time.monotonic() + 2
+async def _wait_for_ui(pilot, ready, description, *, timeout=2):
+    deadline = time.monotonic() + timeout
     while not ready():
         assert time.monotonic() < deadline, f"Timed out waiting for {description}"
         await pilot.pause(.02)
@@ -116,7 +116,8 @@ def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatc
     asyncio.run(run())
 
 
-def test_new_search_ignores_late_rows_from_cancelled_search(monkeypatch, tmp_path):
+@pytest.mark.parametrize("new_delay", [0, 1.5])
+def test_new_search_ignores_late_rows_from_cancelled_search(monkeypatch, tmp_path, new_delay):
     from core import cache_db
 
     monkeypatch.setattr(cache_db, "_cache_db_path", tmp_path / "cache.db")
@@ -140,8 +141,10 @@ def test_new_search_ignores_late_rows_from_cancelled_search(monkeypatch, tmp_pat
             name = parsed.path.rsplit("/", 1)[-1]
             if name == "old-blocked":
                 entered.set()
-                assert release.wait(5)
+                assert release.wait(10)
                 returned.set()
+            else:
+                time.sleep(new_delay)
             response._content = (
                 '<table><tr><th>Name</th><th>Size</th></tr>'
                 f'<tr><td>{name}:latest</td><td>3 GB</td></tr></table>'
@@ -158,10 +161,13 @@ def test_new_search_ignores_late_rows_from_cancelled_search(monkeypatch, tmp_pat
                 assert await asyncio.to_thread(entered.wait, 2)
                 old_id = app.active_search_id
                 app.start_search("new")
-                for _ in range(35):
-                    await pilot.pause(.02)
-                    if app.active_search_id != old_id and app._search_inflight_signature is None:
-                        break
+                await _wait_for_ui(
+                    pilot,
+                    lambda: app.active_search_id != old_id
+                    and app._search_inflight_signature is None,
+                    "the replacement search to complete",
+                    timeout=5,
+                )
                 assert [r["name"] for r in app.all_results] == ["new-ready"]
                 app.on_search_results_ready(old_id, [{"name": "old-late"}])
                 release.set()

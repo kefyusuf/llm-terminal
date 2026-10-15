@@ -4,6 +4,28 @@ Date: 2026-10-15. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #168 is merged at `f9d40a1a870a02102e1522893e6602d194c57451`.
+PR CI passed 11/11 and Package 19/19, with 18 matching consumer reports.
+The candidate passed nine installed Windows lifecycle cases. Its source tree
+matches that merge; the default pilot still points to PR #167 until main is green.
+Actual-main CI `38724926008` passed 10/11: Windows 3.12 failed the cancelled-search
+UI test before the replacement result arrived. Do not report that run as green.
+
+Branch `test/cancelled-search-result-synchronization` changes only tests and this
+record. A controlled 1.5-second detail response reproduces the same empty-result
+assertion with the old fixed 35-pause loop. Reuse the bounded UI condition helper
+to require a new search ID and completed search before checking rows and cache.
+Cover immediate and delayed responses; keep old-result rejection assertions.
+The blocked old response has a 10-second guard to outlast the 5-second completion
+bound and is always released in cleanup. Focused four-case tests and Ruff passed.
+Check PR CI and actual-main CI before refreshing the pilot. Application and
+distribution inputs are unchanged by this test-only follow-up; do not claim the
+entire later main tree equals the earlier candidate after this test/doc change.
+User-visible startup-refusal/503 work remains the next separate scope after this
+CI gate. Preserve user ignore files, previous environments and model files.
+
+Earlier checkpoints below are historical.
+
 PR #167 is merged at `78268a258562cfc6c729735abf0c2a2892314aed`;
 PR/main CI passed 11/11 and Package 19/19 with 18 matching consumer reports.
 The installed pilot passed five four-client lifecycle scenarios and uses the
