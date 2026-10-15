@@ -2,6 +2,10 @@
 
 AI Model Explorer is a terminal-first workspace for discovering, scoring, comparing, and downloading local LLM models across Ollama, Hugging Face, LM Studio, Docker Model Runner, and MLX.
 
+> **Measured (2026-10-15):** 127 `test_*.py` files (808 test functions) · coverage 67.44% on the canonical Ubuntu/Python 3.12 lane, with a 60% merge floor — recorded under [Installation](#installation) · MIT · CI on `main`: [ci.yml](.github/workflows/ci.yml) · [live.yml](.github/workflows/live.yml) · [package.yml](.github/workflows/package.yml) · startup and provider-discovery latency are measured in [docs/startup-measurements.md](docs/startup-measurements.md) and [docs/provider-discovery.md](docs/provider-discovery.md) · one ADR in [docs/adr/](docs/adr/) · `pyproject.toml` says `1.0.1`, no GitHub Release has been published from that version yet.
+
+This is a tooling repository: it answers "which local model fits this machine" for me, in Python, and it is not a service I run for other people. The production-facing work in my profile is the PHP/Laravel and Go repositories; this one is where the same discipline (evidence in CI, ADRs, a security policy) is applied to a tool rather than to a product.
+
 ## About
 
 AI Model Explorer helps answer three practical questions:
