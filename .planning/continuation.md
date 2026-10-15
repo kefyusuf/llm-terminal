@@ -1,8 +1,36 @@
 # Verified continuation record
 
-Date: 2026-10-15. Repository: `kefyusuf/llm-terminal`.
+Date: 2026-10-16. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
+
+PR #171 is merged at `2267ad7f8165809ba0123807026896866b2bc2aa`.
+PR/main CI passed 11/11, Package 19/19 with 18 matching consumer reports.
+The qualified pilot passed 19 installed feedback/response cases, 62 module hashes
+and startup/owned cleanup. Candidate and main Git trees match; details are in
+`.venv/admission-response-completed-1016.json`. Previous environments/models and
+user ignore files remain preserved.
+
+Branch `fix/download-admission-response-loss` covers server acceptance followed
+by missing/corrupt/timed-out response. Real HTTP admission committed a queued job
+but the UI reported failure. Expected transport/body errors now report unknown
+outcome and direct the user to history before retrying, without resubmission.
+Four real store/HTTP cases cover connection loss, truncated response, invalid
+JSON and timeout; each preserves local state, proves exactly one accepted POST
+and recovers the actual queued job through history/synchronization. Together
+with existing admission/manager/sync/startup cases, 67 tests pass; Ruff and
+38-file mypy passed. Check full verify, review, PR CI, Package and actual-main
+CI before completion or pilot refresh. No worker, protocol, storage or automatic
+retry changes are in scope.
+
+Remaining product acceptance is distinct from code TODOs: participant pilot,
+live provider/network download/recovery and power-loss evidence remain open.
+Release version/account/name ownership, protected publishing approval and
+qualification of the actual release/rollback byte pair remain separate gates.
+Do not reopen completed roadmap features or publish/promote from development
+candidate evidence. See `.planning/roadmap.md` and `docs/release-readiness.md`.
+
+Earlier checkpoints below are historical.
 
 PR #170 is merged at `03e68d55937272b5d9b20f7b43c3ffcff1d6a1d6`.
 PR/main CI passed 11/11, Package 19/19 with 18 matching consumer reports.

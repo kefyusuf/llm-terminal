@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from http.client import HTTPException
 from typing import Any
 from urllib.error import HTTPError
 
@@ -379,6 +380,11 @@ class DownloadManager:
                     "Download was not queued; retry shortly."
                 )
             return False, f"Failed to queue download: {exc}"
+        except (OSError, HTTPException, ValueError):
+            return False, (
+                "Download request outcome is unknown. "
+                "Check download history before retrying."
+            )
         except Exception as exc:
             return False, f"Failed to queue download: {exc}"
 
