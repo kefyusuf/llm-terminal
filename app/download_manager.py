@@ -351,8 +351,15 @@ class DownloadManager:
         if not _source_is_downloadable(source):
             label = str(source or "this provider").strip() or "this provider"
             return False, f"Downloads are not supported for {label}."
-        if not ensure_service_running():
-            return False, "Download service is unavailable."
+        try:
+            service_ready = ensure_service_running()
+        except (OSError, ValueError, RuntimeError):
+            service_ready = False
+        if not service_ready:
+            return False, (
+                "Download service is unavailable or cannot be upgraded safely. "
+                "Let active downloads finish, then retry."
+            )
         target_id = download_target_id(model)
         try:
             response = create_job(model)
@@ -360,6 +367,13 @@ class DownloadManager:
             if queued:
                 return True, f"Download queued: {model.get('name', target_id)}"
             return True, f"Download already active: {model.get('name', target_id)}"
+        except HTTPError as exc:
+            if exc.code == 503:
+                return False, (
+                    "Download service is temporarily unavailable (HTTP 503). "
+                    "Download was not queued; retry shortly."
+                )
+            return False, f"Failed to queue download: {exc}"
         except Exception as exc:
             return False, f"Failed to queue download: {exc}"
 
