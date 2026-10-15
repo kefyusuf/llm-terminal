@@ -22,9 +22,10 @@ def forbid_service_process_start(monkeypatch):
 
 
 @contextmanager
-def controlled_service(monkeypatch, tmp_path, *, version="2.1", jobs=None, statuses=None):
+def controlled_service(monkeypatch, tmp_path, *, version="2.1", jobs=None, statuses=None, bodies=None):
     requests = []
     responses = [503, 200] if statuses is None else list(statuses)
+    response_bodies = None if bodies is None else list(bodies)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -54,7 +55,11 @@ def controlled_service(monkeypatch, tmp_path, *, version="2.1", jobs=None, statu
                 self.respond(404, {})
                 return
             status = responses.pop(0)
-            self.respond(status, {"queued": True} if status == 200 else {"error": "Request refused"})
+            body = (
+                response_bodies.pop(0) if response_bodies is not None
+                else {"queued": True} if status == 200 else {"error": "Request refused"}
+            )
+            self.respond(status, body)
 
     server = LocalThreadingHTTPServer(("127.0.0.1", 0), Handler)
     monkeypatch.setattr(service_client.config.settings, "download_db_path", tmp_path / "jobs.db")
@@ -147,4 +152,40 @@ def test_other_http_errors_are_not_reported_as_temporary_retirement(monkeypatch,
 
         assert ok is False
         assert message == "Failed to queue download: HTTP Error 401: Unauthorized"
+        assert [r for r in requests if r[0] == "POST"] == [("POST", "/jobs")]
+
+
+@pytest.mark.parametrize("body", [
+    {}, {"error": "refused"}, {"queued": None}, {"queued": "false"},
+    {"queued": 0}, {"queued": 1}, {"queued": []}, {"queued": {}},
+    None, [], True, "accepted",
+])
+def test_invalid_admission_result_does_not_claim_download_success(monkeypatch, tmp_path, body):
+    manager = make_manager()
+    model = {"source": "Ollama", "name": "new-model"}
+    with controlled_service(monkeypatch, tmp_path, statuses=[200], bodies=[body]) as requests:
+        ok, message = manager.start_download(model)
+
+        assert ok is False
+        assert message == (
+            "Download service returned an invalid queue response. "
+            "Check download history before retrying."
+        )
+        assert [r for r in requests if r[0] == "POST"] == [("POST", "/jobs")]
+        assert manager.download_registry == {"ollama:existing": {"state": "downloading"}}
+        assert manager.active_downloads == {"ollama:existing"}
+        assert "download_state" not in model
+
+
+@pytest.mark.parametrize("queued, expected_message", [
+    (True, "Download queued: new-model"),
+    (False, "Download already active: new-model"),
+])
+def test_explicit_boolean_admission_result_retains_success_feedback(monkeypatch, tmp_path, queued, expected_message):
+    manager = make_manager()
+    with controlled_service(monkeypatch, tmp_path, statuses=[200], bodies=[{"queued": queued}]) as requests:
+        ok, message = manager.start_download({"source": "Ollama", "name": "new-model"})
+
+        assert ok is True
+        assert message == expected_message
         assert [r for r in requests if r[0] == "POST"] == [("POST", "/jobs")]

@@ -363,7 +363,12 @@ class DownloadManager:
         target_id = download_target_id(model)
         try:
             response = create_job(model)
-            queued = bool(response.get("queued"))
+            if not isinstance(response, dict) or type(response.get("queued")) is not bool:
+                return False, (
+                    "Download service returned an invalid queue response. "
+                    "Check download history before retrying."
+                )
+            queued = response["queued"]
             if queued:
                 return True, f"Download queued: {model.get('name', target_id)}"
             return True, f"Download already active: {model.get('name', target_id)}"

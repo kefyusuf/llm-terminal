@@ -4,6 +4,27 @@ Date: 2026-10-15. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #170 is merged at `03e68d55937272b5d9b20f7b43c3ffcff1d6a1d6`.
+PR/main CI passed 11/11, Package 19/19 with 18 matching consumer reports.
+The pilot uses that qualified wheel; five installed feedback cases, 62 module
+hashes and startup/owned cleanup passed. Candidate and main Git trees match.
+See `.venv/admission-feedback-completed-1015.json`; previous environments/models
+and user ignore files remain preserved.
+
+Branch `fix/download-admission-response-validation` addresses a reproduced false
+success: real HTTP 200 with `{}` reported an already-active download. Require a
+JSON object containing an actual boolean `queued`; never coerce strings/numbers
+or treat a missing field as success. Invalid response shape gives no acceptance
+claim and asks the user to check download history before retrying. Do not retry
+automatically because the server may already have accepted the request.
+Twelve malformed shapes and two explicit boolean results pass through the real
+client/HTTP seam; existing feedback, manager, sync and startup tests also pass
+(63 total). Ruff, 38-file mypy and independent review passed. Check full verify,
+PR CI, Package and actual-main CI before completion/pilot refresh. No protocol,
+provider, worker, storage or automatic retry behavior changes are in scope.
+
+Earlier checkpoints below are historical.
+
 PR #169 is merged at `45c7f7bfb9e39b6fdb8dc31917c2ac2213074a40`.
 PR CI `38800503323` and actual-main CI `38801477126` passed 11/11.
 The pilot now uses the PR #168 qualified wheel; its 62 runtime modules match
