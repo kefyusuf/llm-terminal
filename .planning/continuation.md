@@ -4,6 +4,32 @@ Date: 2026-10-15. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #167 is merged at `78268a258562cfc6c729735abf0c2a2892314aed`;
+PR/main CI passed 11/11 and Package 19/19 with 18 matching consumer reports.
+The installed pilot passed five four-client lifecycle scenarios and uses the
+qualified wheel. Remote `bc8483c` adds README text only; it is retained here.
+
+Branch `fix/download-idle-retirement-admission` fixes a reproduced independent
+HTTP job admitted after an empty startup snapshot being overtaken by automatic
+service replacement. Authenticated `POST /shutdown-if-idle` checks actual active
+jobs and fences further admissions under the same per-handler-factory lock as
+`POST /jobs`. Busy returns 409 without shutdown; retirement returns 200, rejects
+late jobs with 503, and initiates shutdown even if its response write fails.
+Clients never fall back to unconditional shutdown or process killing when
+conditional retirement is unsupported or uncertain. Explicit stop is unchanged.
+The additive endpoint keeps protocol floor 2.1; actual incompatible historical
+services without it require an explicit operator restart after downloads finish.
+See `docs/hf-download-identity.md` for this compatibility boundary.
+Real HTTP regression gates both admission orderings and response loss; the old
+path attempted replacement after accepting a new job. Check current PR/CI/Package
+and refresh the pilot only from qualified bytes. Preserve all previous model,
+environment and user ignore files. No model acquisition or UI change is in scope.
+Next separate scope: verify user-visible handling of refused service startup and
+503 admission with controlled responses. Participant/network/power-loss acceptance
+and prior HF HTTP504 remain separate.
+
+Earlier checkpoints below are historical.
+
 PR #166 is merged at `3c4460a3be2e42d828b8782d9d69912cc912d44c`.
 PR/main CI passed 11/11. Four real client processes passed cold startup and
 reuse on source and the existing installed pilot; production code was unchanged.

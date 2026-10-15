@@ -223,6 +223,12 @@ class DownloadStore:
             ).fetchall()
         return [self._row_to_dict(row) for row in rows]
 
+    def has_active_jobs(self):
+        with self.lock, self._connect() as conn:
+            return conn.execute(
+                "SELECT 1 FROM jobs WHERE status IN ('queued', 'running', 'canceling') LIMIT 1"
+            ).fetchone() is not None
+
     def get_job_by_target(self, target_id):
         with self.lock, self._connect() as conn:
             row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()

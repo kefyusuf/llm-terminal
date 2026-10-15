@@ -172,7 +172,7 @@ def test_ensure_service_running_restarts_incompatible_service(monkeypatch):
     monkeypatch.setattr(service_client, "is_service_running", lambda: True)
     monkeypatch.setattr(service_client, "get_service_health", lambda: {"ok": True, "version": "1.7"})
     monkeypatch.setattr(service_client, "list_jobs", lambda **kwargs: [])
-    monkeypatch.setattr(service_client, "stop_service", lambda: actions.append("stop") or True)
+    monkeypatch.setattr(service_client, "_request", lambda *args, **kwargs: actions.append("stop") or {"ok": True})
     monkeypatch.setattr(service_client, "_start_service_process", lambda: actions.append("start"))
     monkeypatch.setattr(
         service_client,
@@ -203,6 +203,21 @@ def test_ensure_service_running_preserves_service_on_health_error(monkeypatch):
 
     assert service_client.ensure_service_running() is False
     assert actions == []
+
+
+@pytest.mark.parametrize("response", [None, [], {"ok": False}, {"ok": 1}])
+def test_uncertain_idle_retirement_response_preserves_service(monkeypatch, response):
+    monkeypatch.setattr(service_client, "is_service_running", lambda: True)
+    monkeypatch.setattr(service_client, "get_service_health", lambda: {"ok": True, "version": "1.7"})
+    monkeypatch.setattr(service_client, "list_jobs", lambda **kwargs: [])
+    monkeypatch.setattr(service_client, "_request", lambda *args, **kwargs: response)
+
+    def forbidden():
+        raise AssertionError("Unconfirmed retirement must not force-stop or replace a service")
+
+    monkeypatch.setattr(service_client, "stop_service", forbidden)
+    monkeypatch.setattr(service_client, "_start_service_process", forbidden)
+    assert service_client.ensure_service_running() is False
 
 
 def test_request_wrappers_preserve_methods_paths_payloads_and_timeouts(monkeypatch):

@@ -217,7 +217,10 @@ def _ensure_service_running_locked():
             jobs = list_jobs(limit=1000, timeout=1.0)
             if len(jobs) >= 1000 or any(job.get("status") in {"queued", "running"} for job in jobs):
                 return False
-            if not stop_service():
+            # Legacy services without atomic retirement must remain running.
+            # Never fall back to unconditional shutdown or process termination.
+            response = _request("POST", "/shutdown-if-idle", payload={}, timeout=1.0)
+            if not isinstance(response, dict) or response.get("ok") is not True:
                 return False
         except (URLError, HTTPError, TimeoutError, ConnectionError, ValueError, RuntimeError):
             return False
