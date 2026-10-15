@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import threading
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -42,6 +43,10 @@ def _make_handler(state, auth_token: str | None = None):
     from .download_service import SERVICE_VERSION
 
     _can_term = _can_terminate_process
+    # Shared by every request handler of this service, including independent
+    # clients. Retirement fences job admission before any shutdown response.
+    admission_lock = threading.Lock()
+    retiring = False
 
     class Handler(BaseHTTPRequestHandler):
         """Serve download-service requests against the factory-bound state."""
@@ -122,6 +127,7 @@ def _make_handler(state, auth_token: str | None = None):
 
         def do_POST(self):
             """Dispatch authenticated mutation requests."""
+            nonlocal retiring
             if not self._require_auth():
                 return
 
@@ -139,7 +145,15 @@ def _make_handler(state, auth_token: str | None = None):
                         plan = state.store.plan_job(model, config.settings.hf_models_dir)
                         self._json_response(200, {"plan": plan})
                         return
-                    job, created_or_queued = state.store.upsert_job(model, models_dir=config.settings.hf_models_dir)
+                    job = None
+                    with admission_lock:
+                        if not retiring:
+                            job, created_or_queued = state.store.upsert_job(
+                                model, models_dir=config.settings.hf_models_dir
+                            )
+                    if job is None:
+                        self._json_response(503, {"error": "download service is retiring"})
+                        return
                     self._json_response(
                         200,
                         {
@@ -203,6 +217,20 @@ def _make_handler(state, auth_token: str | None = None):
                     return
 
                 self._json_response(200, {"ok": True})
+                return
+
+            if self.path == "/shutdown-if-idle":
+                with admission_lock:
+                    allowed = not state.store.has_active_jobs()
+                    if allowed:
+                        retiring = True
+                if not allowed:
+                    self._json_response(409, {"error": "download service has active jobs"})
+                    return
+                try:
+                    self._json_response(200, {"ok": True})
+                finally:
+                    state.request_shutdown()
                 return
 
             if self.path == "/shutdown":

@@ -100,8 +100,16 @@ guard; inspect the plan and license before using it.
 
 Service protocol 2.1 is required for current plan/removal-aware clients. Automatic upgrade does
 not stop an incompatible service with active jobs or uncertain job history.
+It uses authenticated `POST /shutdown-if-idle`: job admission and the current
+busy check are serialized by the server. An accepted retirement fences later
+job submissions with HTTP 503; a busy service returns HTTP 409 and keeps running.
+An incompatible service without this endpoint is left running and automatic
+startup reports unavailable. Finish or cancel its downloads, then explicitly
+restart the configured service before retrying. There is no unconditional
+shutdown or process-kill fallback during automatic upgrade.
 Graceful shutdown addresses only the configured service; fallback force-stop
-is limited to the process launched by this client, never a system-wide scan.
+for an explicit stop is limited to the process launched by this client, never
+a system-wide scan.
 
 ## Limits and remaining release gates
 
