@@ -18,9 +18,10 @@ to require a new search ID and completed search before checking rows and cache.
 Cover immediate and delayed responses; keep old-result rejection assertions.
 The blocked old response has a 10-second guard to outlast the 5-second completion
 bound and is always released in cleanup. Focused four-case tests and Ruff passed.
-Check PR CI and actual-main CI before refreshing the pilot. Application and
-distribution inputs are unchanged by this test-only follow-up; do not claim the
-entire later main tree equals the earlier candidate after this test/doc change.
+Check PR CI and actual-main CI before refreshing the pilot. Application source
+and build configuration are unchanged by this follow-up. The sdist includes
+tests, so its earlier qualification applies to the recorded candidate only;
+do not claim the entire later main tree equals that earlier test/doc tree.
 User-visible startup-refusal/503 work remains the next separate scope after this
 CI gate. Preserve user ignore files, previous environments and model files.
 
