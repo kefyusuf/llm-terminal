@@ -8,7 +8,10 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label
 
+from app.download_progress import DownloadProgressPanel
 from core.logging_ import get_logger
+from downloads.download_manager import download_target_id
+from downloads.download_status import is_active_state
 from downloads.preflight import hf_download_command
 
 logger = get_logger(__name__)
@@ -77,6 +80,25 @@ class ModelDetailModal(ModalScreen):
         set_pause = getattr(self.app, "_set_modal_poll_pause", None)
         if callable(set_pause):
             set_pause(True)
+        self._refresh_live_download()
+        self.set_interval(0.5, self._refresh_live_download)
+
+    def _refresh_live_download(self) -> None:
+        """Refresh this transfer while keeping unrelated modal polling paused."""
+        manager = getattr(self.app, "dl", None)
+        if manager is None:
+            return
+        entry = manager.download_registry.get(download_target_id(self.data))
+        self.query_one("#model-download-progress", DownloadProgressPanel).show_entry(entry)
+        active = entry is not None and is_active_state(entry.get("state"))
+        if active and not manager._download_poll_running:
+            self.app.request_download_poll(force=True)
+        buttons = self.query("#cancel-download-btn")
+        if buttons and entry:
+            button = buttons.first(Button)
+            button.disabled = not active or entry.get("state") == "canceling"
+            if entry.get("state") == "canceling":
+                button.label = "Canceling..."
 
     def on_unmount(self) -> None:
         set_pause = getattr(self.app, "_set_modal_poll_pause", None)
@@ -112,6 +134,7 @@ class ModelDetailModal(ModalScreen):
         current_download_state = self.data.get("download_state", "idle")
 
         with VerticalScroll(id="modal-container"):
+            yield DownloadProgressPanel(id="model-download-progress", show_cancel=False)
             if blocked and current_download_state not in {"queued", "downloading", "running", "canceling"}:
                 reason = {
                     "insufficient_disk": "Insufficient disk space for this download.",

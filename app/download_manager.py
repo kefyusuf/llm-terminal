@@ -194,7 +194,8 @@ class DownloadManager:
                 detail=job.get("detail", ""),
             )
             label = label_for_state(mapped_status)
-            detail = job.get("progress") or job.get("detail") or ""
+            provider_detail = str(job.get("detail") or "")
+            detail = provider_detail if provider_detail.startswith("pulling ") else job.get("progress") or provider_detail
             self._record_entry(
                 target_id,
                 model={

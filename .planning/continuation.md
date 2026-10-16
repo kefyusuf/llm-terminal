@@ -4,6 +4,46 @@ Date: 2026-10-16. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #176 merged at `534770688041fd11231c9580b59360990a6828c8`; PR/main CI
+11/11 and Package 19/19 with 18 matching reports. The participant subsequently
+confirmed actual download and cancellation work, but percentage is still unclear
+and requested transfer size, rate and remaining time. That feedback is not proof
+that every provider cancellation/recovery scenario is accepted.
+
+Branch `fix/live-download-progress` now retains sanitized, bounded Ollama CLI
+transfer/phase detail alongside percentage, without a database migration.
+The manager previously preferred percentage and discarded the richer detail.
+A shared four-row progress panel is visible in compact mode and model details;
+model details poll active transfers while other modal polling remains paused.
+The main panel docks at the bottom, lowers the results minimum height when shown,
+and exposes Cancel. The displayed percentage and last-reported ETA refer to the
+current Ollama layer, not a promised model-wide completion time. Unknown metrics
+show preparing/calculating; verification remains pending until successful exit.
+Terminal states hide the animated bar and disable Cancel.
+
+RED cases cover the absent panel, terminal animation, discarded telemetry and
+canonical Ollama fixture commands. Runtime UI/HTTP/store tests at 80x24/120x24
+assert rendered percentage, bytes, rate and ETA while details remain open, then
+cancel through either panel or modal. Native Ollama CLI uses a controlled local
+stream, without external model acquisition. Qualify the exact commit CI, package
+reports and installed candidate before switching the user's `.venv/windows-app.py`.
+Preserve existing pilot databases/models and user-owned ignore-file changes.
+The first hosted macOS pass exposed a shutdown race: a final poll snapshot could
+arrive after table removal. A deterministic RED regression now covers this edge;
+panel refresh skips missing/unmounted screen widgets without swallowing update
+errors. Requalify the follow-up commit and its new package, not the first candidate.
+The next Windows run exposed an existing hardware-test isolation race: its
+fixture also forced an unrelated download-service startup failure, which could
+overwrite the asserted hardware error. The test-only follow-up supplies a healthy
+empty service snapshot; hardware failure/redaction/input assertions stay intact.
+No production startup/search behavior was changed for that failure.
+Windows also exposed the hardware test's fixed 0.4-second wait. A 0.6-second
+hardware-worker regression reproduces that timing assumption. The test now waits
+for startup workers and the actual operation failure, forces the intended cache
+miss, and retains the redaction/loading/input checks; no production change.
+
+Earlier checkpoint details follow.
+
 PR #175 merged at `6aac5ea80929fac0d6fd59510ff981061cbbdc7d` with PR/main CI
 11/11 and Package 19/19 (18 matching reports). The following participant report
 exposed Ollama progress/cancellation gaps; those earlier checks did not prove

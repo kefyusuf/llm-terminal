@@ -39,9 +39,9 @@ def controlled_cli_service(monkeypatch, tmp_path):
     stage = tmp_path / 'advance'
     script.write_text(
         "import pathlib,sys,time\n"
-        "print('pulling layer 17%',flush=True)\n"
+        "print('pulling abcdef123456 17% 170 MB/1.0 GB 10 MB/s 1m23s',flush=True)\n"
         "while not pathlib.Path(sys.argv[1]).exists(): time.sleep(.01)\n"
-        "print('pulling layer 42%',flush=True)\n"
+        "print('pulling abcdef123456 42% 420 MB/1.0 GB 10 MB/s 58s',flush=True)\n"
         "time.sleep(30)\n", encoding='utf-8')
     monkeypatch.setattr('downloads.store.build_download_command',
                         lambda model: [sys.executable, '-u', str(script), str(stage)])
@@ -154,6 +154,8 @@ async def wait_until(pilot, predicate, timeout=5):
 
 @pytest.mark.parametrize('width', [80, 120])
 def test_ollama_start_live_percentage_and_cancel_through_runtime_ui(monkeypatch, tmp_path, width):
+    from textual.widgets import ProgressBar
+
     monkeypatch.setattr('app.viewer.get_provider_filter_labels', lambda: ('Ollama',))
     with controlled_cli_service(monkeypatch, tmp_path) as (state, advance):
         async def run():
@@ -174,6 +176,9 @@ def test_ollama_start_live_percentage_and_cancel_through_runtime_ui(monkeypatch,
                 await wait_until(pilot, lambda: '17%' in str(table.get_cell(key, 'download')))
                 advance.touch()
                 await wait_until(pilot, lambda: '42%' in str(table.get_cell(key, 'download')))
+                panel = app.query_one('#active-download-progress')
+                assert panel.query_one(ProgressBar).progress == 42
+                assert panel.is_on_screen
                 assert table.virtual_size.width <= table.scrollable_content_region.width
 
                 table.focus()
@@ -181,6 +186,8 @@ def test_ollama_start_live_percentage_and_cancel_through_runtime_ui(monkeypatch,
                 await pilot.press('enter')
                 await pilot.pause()
                 assert len(app.screen_stack) == 2, 'Selecting one download must open exactly one modal'
+                live = app.screen.query_one('#model-download-progress')
+                assert live.query_one(ProgressBar).progress == 42
                 assert app.screen.query_one('#cancel-download-btn').is_on_screen
                 await pilot.click('#cancel-download-btn')
                 await wait_until(pilot, lambda: state.store.get_job_by_target('ollama:fixture:tiny')['status'] == 'cancelled')
@@ -189,5 +196,73 @@ def test_ollama_start_live_percentage_and_cancel_through_runtime_ui(monkeypatch,
                 assert job['cancel_requested'] == 1
                 assert not app.dl.active_downloads
                 assert state.get_process('ollama:fixture:tiny') is None
+
+        asyncio.run(run())
+
+
+def test_late_download_snapshot_during_widget_removal_is_ignored(monkeypatch, tmp_path):
+    """A worker may finish after the results table starts unmounting."""
+    monkeypatch.delenv('AIMODEL_TEST_OLLAMA_BINARY', raising=False)
+    with controlled_cli_service(monkeypatch, tmp_path):
+        async def run():
+            app = ControlsViewer()
+            async with app.run_test(size=(80, 24)):
+                await app.query_one('#results-table', DataTable).remove()
+                app._apply_download_poll_snapshot([], None, None)
+
+        asyncio.run(run())
+
+
+@pytest.mark.parametrize('width', [80, 120])
+@pytest.mark.parametrize('cancel_from', ['modal', 'panel'])
+def test_live_panel_retains_metrics_and_updates_while_model_details_open(monkeypatch, tmp_path, width, cancel_from):
+    from textual.geometry import Region
+    from textual.widgets import ProgressBar, Static
+
+    monkeypatch.delenv('AIMODEL_TEST_OLLAMA_BINARY', raising=False)
+    with controlled_cli_service(monkeypatch, tmp_path) as (state, advance):
+        async def run():
+            app = ControlsViewer()
+            model = {'source': 'Ollama', 'id': 'fixture:tiny', 'name': 'fixture:tiny',
+                     'download_state': 'idle'}
+            async with app.run_test(size=(width, 24)) as pilot:
+                app.current_filter = 'Ollama'
+                app.all_results = [model]
+                app.refresh_table()
+                app.open_model_detail_modal(model)
+                await pilot.pause()
+                await pilot.click('#download-btn')
+                panel = app.query_one('#active-download-progress')
+                summary = panel.query_one(Static)
+                await wait_until(pilot, lambda: '170 MB' in str(summary.renderable))
+                assert '1.0 GB' in str(summary.renderable)
+                assert '10 MB/s' in str(summary.renderable)
+                assert '1m23s' in str(summary.renderable)
+                assert panel.query_one(ProgressBar).progress == 17
+                assert panel.is_on_screen
+                assert panel.query_one('#progress-cancel-btn').is_on_screen
+
+                app.open_model_detail_modal(model)
+                await pilot.pause()
+                modal = app.screen
+                live = modal.query_one('#model-download-progress')
+                advance.touch()
+                await wait_until(pilot, lambda: '420 MB' in str(live.query_one(Static).renderable))
+                assert '58s' in str(live.query_one(Static).renderable)
+                assert live.query_one(ProgressBar).progress == 42
+                assert live.is_on_screen
+                rendered = live.query_one(Static)
+                visible = '\n'.join(strip.text for strip in rendered.render_lines(
+                    Region(0, 0, rendered.content_size.width, rendered.content_size.height)))
+                assert all(value in visible for value in ['42%', '420 MB', '10 MB/s', '58s'])
+                if cancel_from == 'panel':
+                    await pilot.click('#close-btn')
+                    await wait_until(pilot, lambda: len(app.screen_stack) == 1)
+                    await pilot.click(panel.query_one('#progress-cancel-btn'))
+                else:
+                    await pilot.click('#cancel-download-btn')
+                await wait_until(pilot, lambda: state.store.get_job_by_target('ollama:fixture:tiny')['status'] == 'cancelled')
+                await wait_until(pilot, lambda: 'Canceled' in str(summary.renderable))
+                assert panel.query_one('#progress-cancel-btn').disabled
 
         asyncio.run(run())

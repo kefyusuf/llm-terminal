@@ -33,7 +33,9 @@ def configure(monkeypatch, cached=None):
     monkeypatch.setattr(
         viewer_module, "get_provider_filter_labels", lambda: ["Ollama", "Hugging Face"]
     )
-    monkeypatch.setattr(startup_module, "ensure_service_running", lambda: False)
+    # Keep an unrelated startup failure from racing the hardware-status assertions.
+    monkeypatch.setattr(startup_module, "ensure_service_running", lambda: True)
+    monkeypatch.setattr(startup_module, "list_jobs", lambda **kwargs: [])
     monkeypatch.setattr(startup_module.cache_db, "get_hardware_snapshot", lambda: cached)
     monkeypatch.setattr(startup_module.cache_db, "set_hardware_snapshot", lambda specs: None)
     monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)
@@ -196,22 +198,36 @@ def test_failed_hardware_initialization_reports_pending_retry_and_recovers(monke
 
 
 @pytest.mark.parametrize("operation", ["search", "detail"])
-def test_hardware_failure_in_user_workers_keeps_application_open(monkeypatch, operation):
+@pytest.mark.parametrize("worker_delay", [0.0, 0.6])
+def test_hardware_failure_in_user_workers_keeps_application_open(monkeypatch, operation, worker_delay):
     configure(monkeypatch)
 
     def unavailable():
+        if worker_delay:
+            threading.Event().wait(worker_delay)
         raise OSError("private probe path")
 
     monkeypatch.setattr(tui_app, "HardwareMonitor", unavailable)
 
     async def run():
         app = AIModelViewer()
+        monkeypatch.setattr(app.search_cache, "get", lambda *args: None)
+        monkeypatch.setattr(app.search_cache, "get_stale", lambda *args: None)
         async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await asyncio.wait_for(app.workers.wait_for_complete(), timeout=5)
+            await pilot.pause()
             if operation == "search":
                 app.start_search("example")
             else:
                 app.open_hf_detail_worker({"id": "example/model"})
-            await pilot.pause(0.4)
+
+            async def wait_for_hardware_failure():
+                while "Hardware detection unavailable" not in str(app.query_one("#status-bar").render()):
+                    await pilot.pause(0.02)
+
+            await asyncio.wait_for(wait_for_hardware_failure(), timeout=5)
+            await asyncio.wait_for(app.workers.wait_for_complete(), timeout=5)
             assert "Hardware detection unavailable" in str(app.query_one("#status-bar").render())
             assert "private probe path" not in str(app.query_one("#status-bar").render())
             assert not app.query_one("#results-table", DataTable).loading
@@ -219,5 +235,7 @@ def test_hardware_failure_in_user_workers_keeps_application_open(monkeypatch, op
             search_input.focus()
             await pilot.press("x")
             assert search_input.value == "x"
+            if app._search_debounce_timer is not None:
+                app._search_debounce_timer.stop()
 
     asyncio.run(run())
