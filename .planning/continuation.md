@@ -32,6 +32,11 @@ The first hosted macOS pass exposed a shutdown race: a final poll snapshot could
 arrive after table removal. A deterministic RED regression now covers this edge;
 panel refresh skips missing/unmounted screen widgets without swallowing update
 errors. Requalify the follow-up commit and its new package, not the first candidate.
+The next Windows run exposed an existing hardware-test isolation race: its
+fixture also forced an unrelated download-service startup failure, which could
+overwrite the asserted hardware error. The test-only follow-up supplies a healthy
+empty service snapshot; hardware failure/redaction/input assertions stay intact.
+No production startup/search behavior was changed for that failure.
 
 Earlier checkpoint details follow.
 

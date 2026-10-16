@@ -33,7 +33,9 @@ def configure(monkeypatch, cached=None):
     monkeypatch.setattr(
         viewer_module, "get_provider_filter_labels", lambda: ["Ollama", "Hugging Face"]
     )
-    monkeypatch.setattr(startup_module, "ensure_service_running", lambda: False)
+    # Keep an unrelated startup failure from racing the hardware-status assertions.
+    monkeypatch.setattr(startup_module, "ensure_service_running", lambda: True)
+    monkeypatch.setattr(startup_module, "list_jobs", lambda **kwargs: [])
     monkeypatch.setattr(startup_module.cache_db, "get_hardware_snapshot", lambda: cached)
     monkeypatch.setattr(startup_module.cache_db, "set_hardware_snapshot", lambda specs: None)
     monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)
