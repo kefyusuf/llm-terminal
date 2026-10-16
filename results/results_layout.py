@@ -87,10 +87,10 @@ def column_keys_for_width(available_width: int, *, compact: bool = False) -> lis
         if available_width >= 122:
             return ["inst", "name", "params", "score", "quant", "fit", "use_case", "download"]
         if available_width >= 108:
-            return ["inst", "name", "params", "score", "quant", "fit", "use_case"]
+            return ["inst", "name", "params", "score", "quant", "fit", "download"]
         if available_width >= 96:
-            return ["inst", "name", "score", "quant", "fit", "use_case"]
-        return ["inst", "name", "score", "fit"]
+            return ["inst", "name", "score", "quant", "fit", "download"]
+        return ["inst", "name", "score", "fit", "download"]
 
     if available_width >= 140:
         return [
@@ -127,7 +127,7 @@ def compute_column_widths(
     next_keys: list[str], available_width: int, *, compact: bool = False
 ) -> dict[str, int]:
     """Compute responsive widths for visible result-table columns."""
-    separator_budget = len(next_keys) + 2
+    separator_budget = 2 * len(next_keys)
     target_content_width = max(40, available_width - separator_budget)
     min_widths = dict(MIN_COLUMN_WIDTHS)
     if compact:

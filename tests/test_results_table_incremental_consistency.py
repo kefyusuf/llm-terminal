@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import pytest
-from textual.widgets import DataTable
+from textual.widgets import DataTable, Static
 
 from app.viewer import AIModelViewer
 
@@ -21,6 +22,100 @@ class _LayoutOnlyViewer(AIModelViewer):
     def _apply_resize_reflow(self, _generation: int) -> None:
         """Neutralize callbacks already queued before the resize handler override takes effect."""
         pass
+
+
+@pytest.mark.parametrize("width, compact", [(80, True), (100, True), (120, True), (160, True), (100, False), (140, False)])
+def test_download_column_remains_visible_without_horizontal_overflow(monkeypatch, width, compact):
+    monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ("Ollama",))
+
+    async def run():
+        app = _LayoutOnlyViewer()
+        async with app.run_test(size=(width, 40)) as pilot:
+            app.compact_mode = compact
+            app.current_filter = "Ollama"
+            app.all_results = [
+                _result(model_id=f"model-{index}", name=f"model-{index}", publisher="Test", quality=10)
+                for index in range(50)
+            ]
+            app.refresh_table()
+            await pilot.pause()
+            app.refresh_table()
+            await pilot.pause()
+
+            table = app.query_one("#results-table", DataTable)
+            assert "download" in app.results_column_keys
+            assert table.row_count == 50
+            assert table.virtual_size.width <= table.scrollable_content_region.width
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("terminal_state", ["completed", "failed", "cancelled"])
+@pytest.mark.parametrize("independent_status", [False, True])
+def test_terminal_download_snapshot_refreshes_history_and_owned_status(terminal_state, independent_status):
+    async def run():
+        app = _LayoutOnlyViewer()
+        async with app.run_test(size=(100, 40)) as pilot:
+            history = app.query_one("#download-history-table", DataTable)
+            history.add_columns("Source", "Publisher", "Model", "Status", "Detail", "Action")
+            job = {
+                "target_id": "Ollama:fixture", "source": "Ollama",
+                "name": "fixture", "status": "running", "detail": "Downloading",
+            }
+            app._apply_download_poll_snapshot([job], None, None)
+            await pilot.pause()
+            status = app.query_one("#status-bar", Static)
+            assert status.renderable == "1 download(s) active"
+            if independent_status:
+                app.update_status("Search completed")
+            app.dl.download_history_refresh_pending = False
+            app.dl.last_download_history_refresh_at = time.time()
+
+            app._apply_download_poll_snapshot([{**job, "status": terminal_state, "detail": "Finished"}], None, None)
+            await pilot.pause()
+
+            assert not app.dl.active_downloads
+            assert app.dl.download_registry["ollama:fixture"]["state"] == terminal_state
+            history = app.query_one("#download-history-table", DataTable)
+            assert "Downloading" not in str(history.get_row_at(0)[3])
+            assert str(history.get_row_at(0)[4]) == "Finished"
+            expected = "Search completed" if independent_status else "No active downloads"
+            assert status.renderable == expected
+
+    asyncio.run(run())
+
+
+def test_terminal_resize_preserves_selected_model_and_scroll():
+    class ResizableViewer(_LayoutOnlyViewer):
+        on_resize = AIModelViewer.on_resize
+        _apply_resize_reflow = AIModelViewer._apply_resize_reflow
+
+    async def run():
+        app = ResizableViewer()
+        async with app.run_test(size=(160, 40)) as pilot:
+            app.current_filter = "Ollama"
+            app.sort_mode = "name"
+            app.all_results = [
+                _result(model_id=f"model-{index:03d}", name=f"model-{index:03d}", publisher="Test", quality=10)
+                for index in range(100)
+            ]
+            app.refresh_table()
+            await pilot.pause(.3)
+            table = app.query_one("#results-table", DataTable)
+            table.move_cursor(row=35, animate=False, scroll=False)
+            table.scroll_to(y=30, animate=False, immediate=True)
+            await pilot.pause()
+            before = table.cursor_row, table.scroll_y
+
+            await pilot.resize_terminal(100, 40)
+            await pilot.pause(.3)
+
+            assert app._get_selected_model()["id"] == "model-035"
+            assert (table.cursor_row, table.scroll_y) == before
+            assert "download" in app.results_column_keys
+            assert table.virtual_size.width <= table.scrollable_content_region.width
+
+    asyncio.run(run())
 
 
 def _result(

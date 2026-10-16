@@ -4,6 +4,27 @@ Date: 2026-10-16. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #172 is merged at `49f9b32f4f34657d734699abc3b79e32021a46d2`.
+PR/main CI passed 11/11; Package passed 19/19 with 18 matching consumer reports.
+The Windows participant selected the pinned 19,077,344-byte HF sample. Its job
+completed and the downloaded file matches the expected SHA-256. The participant
+reported stale active-download feedback and a clipped results table; this is
+not yet a successful participant UI acceptance result.
+
+Branch `fix/pilot-download-status-visibility` addresses those two UI issues.
+Use the actual scroll viewport, budget both cell-padding edges and reserve the
+vertical scrollbar; keep Download visible in narrow compact layouts. Invalidate
+row keys after a column rebuild and retain selection/scroll before clearing,
+including the real resize entry path. On an active-to-terminal job snapshot,
+refresh history immediately and replace only the owned active-download message.
+Unrelated status messages remain intact. Mounted UI regressions first failed for
+clipping, terminal feedback and resize selection loss; all 27 focused checks now
+pass. Check full verify, independent review, PR CI, Package and actual-main CI
+before completion or installed pilot refresh. Preserve the existing participant
+session, model file, prior environments and user ignore changes.
+
+Earlier checkpoints below are historical.
+
 PR #171 is merged at `2267ad7f8165809ba0123807026896866b2bc2aa`.
 PR/main CI passed 11/11, Package 19/19 with 18 matching consumer reports.
 The qualified pilot passed 19 installed feedback/response cases, 62 module hashes

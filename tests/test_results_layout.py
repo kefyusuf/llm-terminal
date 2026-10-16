@@ -30,7 +30,7 @@ def test_column_keys_for_width_compact_mode_layout():
         "score",
         "quant",
         "fit",
-        "use_case",
+        "download",
     ]
 
 
@@ -78,6 +78,6 @@ def test_compute_column_widths_compact_consumes_extra_space():
     keys = ["inst", "name", "params", "score", "quant", "fit", "use_case"]
     available_width = 150
     widths = compute_column_widths(keys, available_width=available_width, compact=True)
-    separator_budget = len(keys) + 2
+    separator_budget = 2 * len(keys)
     target_content_width = max(40, available_width - separator_budget)
     assert sum(widths.values()) == target_content_width
