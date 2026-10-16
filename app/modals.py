@@ -57,6 +57,13 @@ class ModelDetailModal(ModalScreen):
     #button-row Button {
         margin: 0 1;
     }
+    #download-block-reason {
+        dock: top;
+        height: auto;
+        padding: 0 0 1 0;
+        background: #0f141f;
+        color: #ecc94b;
+    }
     .fit-perfect { color: #48bb78; }
     .fit-partial { color: #ecc94b; }
     .fit-no-fit { color: #f56565; }
@@ -99,7 +106,23 @@ class ModelDetailModal(ModalScreen):
             else "fit-no-fit"
         )
 
+        plan = self.data.get("download_plan") or {}
+        unknown = plan.get("status") == "unknown_size"
+        blocked = self.data.get("source") == "Hugging Face" and not plan.get("allowed") and not unknown
+        current_download_state = self.data.get("download_state", "idle")
+
         with VerticalScroll(id="modal-container"):
+            if blocked and current_download_state not in {"queued", "downloading"}:
+                reason = {
+                    "insufficient_disk": "Insufficient disk space for this download.",
+                    "disk_unavailable": "Cannot check free disk space. Check the destination folder and retry.",
+                    "unsafe_destination": "Download destination is unsafe or unavailable. Check the destination folder.",
+                }.get(plan.get("status"), "Download plan unavailable. Close this window and retry.")
+                if plan.get("status") == "insufficient_disk":
+                    required, free = plan.get("required_bytes"), plan.get("free_bytes")
+                    if isinstance(required, int) and isinstance(free, int):
+                        reason += f"\nRequired: {required / 1024**3:.1f} GiB; free: {free / 1024**3:.1f} GiB."
+                yield Label(reason, id="download-block-reason", markup=False)
             yield Label(f"🤖 {self.data['name']}", id="modal-title")
 
             yield Label("")
@@ -161,13 +184,9 @@ class ModelDetailModal(ModalScreen):
                 )
 
             with Horizontal(id="button-row"):
-                current_download_state = self.data.get("download_state", "idle")
                 if current_download_state in {"queued", "downloading"}:
                     yield Button("⏸ Cancel", variant="warning", id="cancel-download-btn")
                 else:
-                    plan = self.data.get("download_plan") or {}
-                    unknown = plan.get("status") == "unknown_size"
-                    blocked = self.data.get("source") == "Hugging Face" and not plan.get("allowed") and not unknown
                     yield Button("⬇ Unknown size" if unknown else "⬇ Download", id="download-btn", disabled=blocked)
                 yield Button("📋 Copy", id="copy-btn")
                 yield Button("✕ Close", id="close-btn")
