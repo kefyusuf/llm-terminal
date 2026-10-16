@@ -200,6 +200,19 @@ def test_ollama_start_live_percentage_and_cancel_through_runtime_ui(monkeypatch,
         asyncio.run(run())
 
 
+def test_late_download_snapshot_during_widget_removal_is_ignored(monkeypatch, tmp_path):
+    """A worker may finish after the results table starts unmounting."""
+    monkeypatch.delenv('AIMODEL_TEST_OLLAMA_BINARY', raising=False)
+    with controlled_cli_service(monkeypatch, tmp_path):
+        async def run():
+            app = ControlsViewer()
+            async with app.run_test(size=(80, 24)):
+                await app.query_one('#results-table', DataTable).remove()
+                app._apply_download_poll_snapshot([], None, None)
+
+        asyncio.run(run())
+
+
 @pytest.mark.parametrize('width', [80, 120])
 @pytest.mark.parametrize('cancel_from', ['modal', 'panel'])
 def test_live_panel_retains_metrics_and_updates_while_model_details_open(monkeypatch, tmp_path, width, cancel_from):

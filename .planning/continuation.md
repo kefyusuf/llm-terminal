@@ -28,6 +28,10 @@ cancel through either panel or modal. Native Ollama CLI uses a controlled local
 stream, without external model acquisition. Qualify the exact commit CI, package
 reports and installed candidate before switching the user's `.venv/windows-app.py`.
 Preserve existing pilot databases/models and user-owned ignore-file changes.
+The first hosted macOS pass exposed a shutdown race: a final poll snapshot could
+arrive after table removal. A deterministic RED regression now covers this edge;
+panel refresh skips missing/unmounted screen widgets without swallowing update
+errors. Requalify the follow-up commit and its new package, not the first candidate.
 
 Earlier checkpoint details follow.
 

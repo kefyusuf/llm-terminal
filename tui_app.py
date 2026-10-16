@@ -5,6 +5,7 @@ import time
 from textual import events, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.widgets import (
     Button,
     Checkbox,
@@ -1317,16 +1318,18 @@ class AIModelViewer(App):
 
     def _refresh_download_progress_panel(self):
         """Expose current transfer details even when compact history is hidden."""
-        root_screen = self.screen_stack[0]
-        panels = root_screen.query("#active-download-progress")
-        if not panels:
+        try:
+            root_screen = self.screen_stack[0]
+            panel = root_screen.query_one("#active-download-progress", DownloadProgressPanel)
+            table = root_screen.query_one("#results-table", DataTable)
+        except (NoMatches, IndexError):
+            # Poll workers can finish after shutdown has removed these widgets.
             return
         entries = list(self.dl.download_registry.values())
         active = [entry for entry in entries if is_active_state(entry.get("state"))]
         entry = max(active or entries, key=lambda item: item.get("updated_at", 0), default=None)
-        root_screen.query_one("#results-table", DataTable).styles.min_height = 5 if entry else 15
-        root_screen.query_one("#active-download-progress", DownloadProgressPanel).show_entry(
-            entry, other_active=max(0, len(active) - 1))
+        table.styles.min_height = 5 if entry else 15
+        panel.show_entry(entry, other_active=max(0, len(active) - 1))
 
     def refresh_download_debug(self):
         self.request_download_poll(force=True)
