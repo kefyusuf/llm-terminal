@@ -361,6 +361,7 @@ class AIModelViewer(BaseAIModelViewer):
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Use the responsive runtime modal for download-history detail rows."""
+        event.prevent_default()
         data_table = getattr(event, "data_table", None)
         if data_table is not None and data_table.id == "download-history-table":
             target_id = str(event.row_key.value)

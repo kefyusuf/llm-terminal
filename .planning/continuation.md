@@ -4,6 +4,40 @@ Date: 2026-10-16. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #175 merged at `6aac5ea80929fac0d6fd59510ff981061cbbdc7d` with PR/main CI
+11/11 and Package 19/19 (18 matching reports). The following participant report
+exposed Ollama progress/cancellation gaps; those earlier checks did not prove
+this user flow. The participant explicitly identified Ollama, not HF.
+
+Branch `fix/ollama-progress-and-cancel` addresses the reproduced chain:
+streamed stdout could wait forever for a descendant's inherited pipe after the
+owned CLI exited; unterminated output did not update percentage; detail-only
+changes did not refresh the table; one actual Enter event opened two modals and
+left polling paused after Cancel. Canceling jobs also offered Download again.
+The reader now polls ready binary bytes without reader threads, handles split
+UTF-8/CR/unterminated percentages and bounds post-exit drain to 0.2 s / 64 KiB.
+It stops only its owned CLI on errors/cancel; shared daemons are not killed.
+
+Real subprocess/SQLite RED cases cover inherited stdout, unterminated progress
+and read-error cleanup. Runtime UI + actual HTTP/store + controlled subprocess
+tests cover 17% -> 42% -> one modal -> Cancel -> cancelled at widths 80/120.
+The same UI tests passed with the installed Ollama executable against a controlled
+loopback NDJSON pull stream, including client disconnect; no external model was
+acquired. This is not proof that a real Ollama daemon's external transfer stopped.
+Full verify, focused suites, 38-file mypy and independent read-only review pass;
+check current commit CI/Package and actual-main CI before final pilot refresh.
+
+The normal task launcher also retained HF-pilot runtime-disable settings. Its
+environment now respects configured/default runtime keys while keeping app state
+isolated. A dedicated environment check failed before that repair and passes now.
+The old participant job was read-only: running/Cancel requested, progress `3s`
+(not a percentage), no surviving owned pull CLI. A surviving Ollama `serve` was
+listening on the pilot's port 1 with no external HTTPS connections in that sample.
+Do not edit that database or kill its daemon. Preserve all prior data and bind
+the repaired launcher to the newly qualified candidate before user retest.
+
+Earlier checkpoints below are historical.
+
 PR #174 recorded the partial participant acceptance and merged at
 `57449a48dd6622a905377cd40bbdddf5ab64c558`; its PR CI passed 11/11.
 The subsequent participant report concerns a different HF selection, not a

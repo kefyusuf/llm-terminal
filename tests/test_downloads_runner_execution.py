@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from io import StringIO
+from io import BytesIO, StringIO
 from types import SimpleNamespace
 
 import pytest
@@ -73,7 +73,8 @@ class _HFProcess:
 
 class _StreamProcess:
     def __init__(self, lines, *, return_code=0):
-        self.stdout = list(lines) if lines is not None else None
+        self.lines = [line.encode() for line in lines] if lines is not None else []
+        self.stdout = BytesIO() if lines is not None else None
         self.return_code = return_code
         self.terminate_calls = 0
 
@@ -82,6 +83,22 @@ class _StreamProcess:
 
     def wait(self):
         return self.return_code
+
+    def poll(self):
+        return None if self.lines else self.return_code
+
+
+def _install_stream_reader(monkeypatch, process):
+    clock = {"now": 0.0}
+
+    def read(_stream):
+        if not process.lines:
+            return b""
+        clock["now"] = 0.1 if clock["now"] == 0.0 else 1.2
+        return process.lines.pop(0)
+
+    monkeypatch.setattr(runner, "_read_stream_chunk", read)
+    monkeypatch.setattr(runner.time, "monotonic", lambda: clock["now"])
 
 
 def _install_fake_config(monkeypatch, models_dir):
@@ -306,11 +323,10 @@ def test_streamed_command_reports_progress_heartbeat_and_completion(monkeypatch)
     process = _StreamProcess(["downloading 42%\n", "waiting for data\n"], return_code=0)
     store = _Store(cancel_values=[False])
     state = _State(store)
-    monotonic_values = iter([0.0, 0.1, 1.2])
 
     monkeypatch.setattr(runner.subprocess, "Popen", lambda *args, **kwargs: process)
     monkeypatch.setattr(runner, "_service_popen_kwargs", lambda: {})
-    monkeypatch.setattr(runner.time, "monotonic", lambda: next(monotonic_values))
+    _install_stream_reader(monkeypatch, process)
 
     runner.run_streamed_command(state, "ollama:progress", ["ollama", "pull", "model"])
 
@@ -321,8 +337,7 @@ def test_streamed_command_reports_progress_heartbeat_and_completion(monkeypatch)
     }
     assert store.updates[1][1] == {
         "status": "running",
-        "detail": "Downloading",
-        "progress": "1s",
+        "detail": "Downloading (1s)",
     }
     assert _last_update(store) == {
         "status": "completed",
@@ -337,11 +352,10 @@ def test_streamed_command_cancel_terminates_and_finalizes_cancelled(monkeypatch)
     process = _StreamProcess(["cancel requested\n"], return_code=-15)
     store = _Store(cancel_values=[False, True])
     state = _State(store)
-    monotonic_values = iter([0.0, 0.1])
 
     monkeypatch.setattr(runner.subprocess, "Popen", lambda *args, **kwargs: process)
     monkeypatch.setattr(runner, "_service_popen_kwargs", lambda: {})
-    monkeypatch.setattr(runner.time, "monotonic", lambda: next(monotonic_values))
+    _install_stream_reader(monkeypatch, process)
 
     runner.run_streamed_command(state, "ollama:cancel", ["ollama", "pull", "model"])
 
@@ -359,11 +373,10 @@ def test_streamed_command_failure_preserves_last_output_line(monkeypatch):
     process = _StreamProcess(["fatal registry failure\n"], return_code=3)
     store = _Store(cancel_values=[False])
     state = _State(store)
-    monotonic_values = iter([0.0, 0.1])
 
     monkeypatch.setattr(runner.subprocess, "Popen", lambda *args, **kwargs: process)
     monkeypatch.setattr(runner, "_service_popen_kwargs", lambda: {})
-    monkeypatch.setattr(runner.time, "monotonic", lambda: next(monotonic_values))
+    _install_stream_reader(monkeypatch, process)
 
     runner.run_streamed_command(state, "ollama:failed", ["ollama", "pull", "model"])
 

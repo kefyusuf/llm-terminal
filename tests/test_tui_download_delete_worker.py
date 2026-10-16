@@ -109,6 +109,7 @@ def test_download_history_detail_row_opens_runtime_modal(monkeypatch):
     monkeypatch.setattr(viewer, "push_screen", pushed.append)
 
     event = SimpleNamespace(
+        prevent_default=lambda: None,
         data_table=SimpleNamespace(id="download-history-table", cursor_column=0),
         row_key=SimpleNamespace(value=target_id),
     )
