@@ -149,6 +149,7 @@ class AIModelViewer(App):
         text-style: bold;
     }
     #results-table {
+        scrollbar-gutter: stable;
         height: 2fr;
         min-height: 15;
         border: round #3a4666;
@@ -753,7 +754,7 @@ class AIModelViewer(App):
 
     def _configure_results_table_columns(self, force: bool = False, refresh_rows: bool = False):
         table = self.query_one("#results-table", DataTable)
-        available_width = max(table.size.width, self.size.width, 80)
+        available_width = table.scrollable_content_region.width or max(1, self.size.width - 4)
         next_keys = column_keys_for_width(available_width, compact=self.compact_mode)
         base_widths = compute_column_widths(
             next_keys,
@@ -769,7 +770,12 @@ class AIModelViewer(App):
         ):
             return
 
+        if refresh_rows:
+            self.refresh_table()
+            return
+
         table.clear(columns=True)
+        self._table_row_keys = set()
         for key in next_keys:
             width = base_widths[key]
             table.add_column(
@@ -781,8 +787,6 @@ class AIModelViewer(App):
         self.results_column_keys = next_keys
         self.results_column_widths = {key: base_widths[key] for key in next_keys}
 
-        if refresh_rows:
-            self.refresh_table()
 
     def _truncate_cell(self, value, max_len):
         return truncate_cell(value, max_len)
@@ -1245,7 +1249,12 @@ class AIModelViewer(App):
         table.clear()
         active_count = len(self.dl.active_downloads)
         if active_count > 0:
-            self.update_status(f"{active_count} download(s) active")
+            self._download_activity_status = f"{active_count} download(s) active"
+            self.update_status(self._download_activity_status)
+        else:
+            status = self.query_one("#status-bar", Static)
+            if status.renderable == getattr(self, "_download_activity_status", None):
+                self.update_status("No active downloads")
         rows = self.dl.refresh_history_table(self.dl.download_registry)
         for r in rows:
             table.add_row(
@@ -1278,6 +1287,7 @@ class AIModelViewer(App):
 
     def _apply_download_poll_snapshot(self, jobs, debug, health):
         self.dl.set_poll_running(False)
+        previous_active = set(self.dl.active_downloads)
         if jobs is not None:
             self.dl.sync_jobs(force=False, jobs=jobs)
             changed = self.dl.ensure_download_fields(self.all_results)
@@ -1285,6 +1295,9 @@ class AIModelViewer(App):
                 self.refresh_table()
         self._render_download_debug(debug, health)
 
+        if jobs is not None and previous_active - self.dl.active_downloads:
+            self._request_download_history_refresh_ui(force=True)
+            return
         if not self.dl.active_downloads:
             if self.dl.download_history_refresh_pending:
                 self._request_download_history_refresh_ui()
@@ -1522,13 +1535,13 @@ class AIModelViewer(App):
 
     def refresh_table(self):
         try:
-            self._configure_results_table_columns()
             table = self.query_one("#results-table", DataTable)
+            prev_cursor_row = table.cursor_row
+            prev_scroll_x = table.scroll_x
+            prev_scroll_y = table.scroll_y
+            self._configure_results_table_columns()
         except Exception:
             return
-        prev_cursor_row = table.cursor_row
-        prev_scroll_x = table.scroll_x
-        prev_scroll_y = table.scroll_y
 
         # Incremental path: only update download column when row keys match
         if self._table_row_keys and len(self.all_results) > 0:
