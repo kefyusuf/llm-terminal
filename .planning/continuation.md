@@ -37,6 +37,10 @@ fixture also forced an unrelated download-service startup failure, which could
 overwrite the asserted hardware error. The test-only follow-up supplies a healthy
 empty service snapshot; hardware failure/redaction/input assertions stay intact.
 No production startup/search behavior was changed for that failure.
+Windows also exposed the hardware test's fixed 0.4-second wait. A 0.6-second
+hardware-worker regression reproduces that timing assumption. The test now waits
+for startup workers and the actual operation failure, forces the intended cache
+miss, and retains the redaction/loading/input checks; no production change.
 
 Earlier checkpoint details follow.
 
