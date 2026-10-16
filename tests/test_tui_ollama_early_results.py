@@ -26,7 +26,8 @@ class _Monitor:
 
 
 class _Viewer(AIModelViewer):
-    async def on_mount(self):
+    async def on_mount(self, event):
+        event.prevent_default()
         self._apply_ui_mode()
         self._configure_results_table_columns(force=True)
 
@@ -45,7 +46,8 @@ async def _wait_for_ui(pilot, ready, description, *, timeout=2):
 
 
 @pytest.mark.parametrize("fast_delay", [0, 0.5])
-def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatch, tmp_path, fast_delay):
+@pytest.mark.parametrize("completion_delay", [0, 2.2])
+def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatch, tmp_path, fast_delay, completion_delay):
     from core import cache_db
 
     monkeypatch.setattr(cache_db, "_cache_db_path", tmp_path / "cache.db")
@@ -71,6 +73,7 @@ def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatc
             if name == "a-prefix-slow":
                 slow_entered.set()
                 assert release.wait(5), "test detail was not released"
+                time.sleep(completion_delay)
             elif name == "z-prefix-fast":
                 assert slow_entered.wait(2), "slow detail did not start"
                 time.sleep(fast_delay)
@@ -102,6 +105,7 @@ def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatc
                 selected = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
             finally:
                 release.set()
+            await asyncio.wait_for(app.workers.wait_for_complete(), timeout=5)
             await _wait_for_ui(
                 pilot, lambda: app._search_inflight_signature is None,
                 "the search to complete after releasing the slow detail",
