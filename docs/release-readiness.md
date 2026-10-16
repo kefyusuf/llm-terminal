@@ -55,7 +55,10 @@ outcome. Request only participant-submitted redacted diagnostics such as offline
 doctor JSON. Exclude credentials, private model identities and unrelated files.
 Do not invent feedback or automatically message participants. Resolve blocking
 defects before stable promotion and publish the tested/experimental support
-matrix with known limits. No participant outcomes have been collected here.
+matrix with known limits. The [Windows participant record](windows-download-pilot-2026-10-16.md)
+now confirms the pinned HF transfer and resolution of two download UI blockers.
+Cancellation/retry and the remaining participant tasks are still unverified;
+this partial result is not stable-release acceptance.
 
 Use the [pilot acceptance form](pilot-acceptance.md) to bind submitted outcomes
 to candidate bytes and to keep failed, blocked and unverified tasks explicit.

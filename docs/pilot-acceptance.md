@@ -1,15 +1,22 @@
 # Candidate-bound pilot acceptance
 
-Status: partial pilot. The Windows participant reported successful application
-startup and search, plus slow Ollama results for `deepsek`. No participant latency
-value or competitor repository was supplied. The [maintainer investigation](ollama-search-performance.md)
-is separate from this qualitative feedback. Acquisition/recovery, upgrade and
-uninstall outcomes remain unverified; installation was prepared by the maintainer.
-The participant's input remains the original `88fed3f` wheel below. This form
-implements the evidence contract in [release readiness](release-readiness.md).
-It is not an invitation, publication authorization or completed pilot report.
+Status: partial pilot. The Windows participant completed the agreed pinned HF
+download on the PR #173 candidate and confirmed both UI blockers resolved:
+the Download column is visible and the active message clears after completion.
+The [2026-10-16 participant record](windows-download-pilot-2026-10-16.md) binds
+these results to exact candidate bytes and separates them from maintainer checks.
+Participant cancel/reopen/retry, upgrade and uninstall remain unverified;
+installation was prepared by the maintainer. This form implements the evidence
+contract in [release readiness](release-readiness.md). The pilot remains partial
+and does not authorize publication or promotion.
 
-A qualified development input is now available: source
+Earlier startup/search feedback used the original `88fed3f` input below. The
+participant reported slow Ollama results for `deepsek`, without latency values
+or a competitor repository. The [maintainer investigation](ollama-search-performance.md)
+is separate from that qualitative feedback; do not attribute the old search
+observation to the new download candidate.
+
+The earlier qualified development input was source
 `88fed3f02bf8607407fbbe4250106c52971147cb`, version 1.0.1, with
 [exact distribution hashes and 18 installation reports](build-once-candidates.md#2026-10-08-exact-main-candidate-checkpoint).
 The candidate-manifest SHA-256 is
