@@ -4,6 +4,24 @@ Date: 2026-10-16. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #177 merged at `f19e890808f33c743a8548665a6252c805b92631` after PR CI
+11/11 and Package 19/19, with 18 matching installation reports. Seven installed
+UI cases passed using controlled loopback streams, including native Ollama CLI
+percentage/rate/ETA and both cancellation controls. The user's launcher remains
+on the previous pilot until the final main check passes.
+
+The actual-main Windows Python 3.12 run exposed an existing early-search test's
+two-second completion deadline. A controlled 2.2-second final-detail delay
+reproduces two failures. Branch `test/early-search-worker-completion` changes only
+that fixture and this record: prevent inherited mount handlers from starting
+unrelated services, then await actual worker completion within five seconds.
+The early-prefix deadline and cache, ordering, cursor and late-result assertions
+remain intact. No production search or download behavior changes. Requalify PR
+and actual-main checks before switching the launcher. Runtime provenance must
+compare all 64 modules; whole source trees differ in this test and record.
+
+The feature checkpoint below describes the merged implementation.
+
 PR #176 merged at `534770688041fd11231c9580b59360990a6828c8`; PR/main CI
 11/11 and Package 19/19 with 18 matching reports. The participant subsequently
 confirmed actual download and cancellation work, but percentage is still unclear
