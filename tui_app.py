@@ -62,6 +62,7 @@ from downloads.download_manager import download_target_id
 from downloads.download_status import is_active_state
 from downloads.service_client import ensure_service_running
 from app.download_manager import DownloadManager
+from app.download_progress import DownloadProgressPanel
 from app.search_constants import (
     FIT_COMPACT_TAGS,
     FIT_OPTIONS,
@@ -536,6 +537,7 @@ class AIModelViewer(App):
         yield Label("Recent Downloads", id="downloads-label")
         yield Static("Workers: - | Duplicates: -", id="downloads-debug")
         yield DataTable(id="download-history-table", cursor_type="row")
+        yield DownloadProgressPanel(id="active-download-progress")
         yield Static("", id="status-bar")
         yield Footer()
 
@@ -1242,6 +1244,7 @@ class AIModelViewer(App):
             self._refresh_download_history_table_ui()
 
     def _refresh_download_history_table_ui(self):
+        self._refresh_download_progress_panel()
         try:
             table = self.query_one("#download-history-table", DataTable)
         except Exception:
@@ -1294,6 +1297,7 @@ class AIModelViewer(App):
             if changed:
                 self.refresh_table()
         self._render_download_debug(debug, health)
+        self._refresh_download_progress_panel()
 
         if jobs is not None and previous_active - self.dl.active_downloads:
             self._request_download_history_refresh_ui(force=True)
@@ -1310,6 +1314,19 @@ class AIModelViewer(App):
 
     def refresh_download_progress(self):
         self.request_download_poll()
+
+    def _refresh_download_progress_panel(self):
+        """Expose current transfer details even when compact history is hidden."""
+        root_screen = self.screen_stack[0]
+        panels = root_screen.query("#active-download-progress")
+        if not panels:
+            return
+        entries = list(self.dl.download_registry.values())
+        active = [entry for entry in entries if is_active_state(entry.get("state"))]
+        entry = max(active or entries, key=lambda item: item.get("updated_at", 0), default=None)
+        root_screen.query_one("#results-table", DataTable).styles.min_height = 5 if entry else 15
+        root_screen.query_one("#active-download-progress", DownloadProgressPanel).show_entry(
+            entry, other_active=max(0, len(active) - 1))
 
     def refresh_download_debug(self):
         self.request_download_poll(force=True)

@@ -30,6 +30,7 @@ from loguru import logger
 from core.utils import extract_download_progress
 from downloads.download_manager import prepare_hf_destination
 from downloads.preflight import plan_hf_download
+from downloads.progress import ollama_transfer_detail
 
 
 def _service_popen_kwargs() -> dict[str, Any]:
@@ -374,9 +375,14 @@ def run_streamed_command(state, target_id: str, command) -> None:
     eof = process.stdout is None
     decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     pending = ""
+    ollama_command = target_id.startswith("ollama:") or (
+        isinstance(command, list) and bool(command)
+        and os.path.basename(str(command[0])).lower() in {"ollama", "ollama.exe"}
+    )
+    transfer_snapshot: tuple[str, str] | None = None
 
     def record_line(line, *, partial=False):
-        nonlocal last_line, last_update
+        nonlocal last_line, last_update, transfer_snapshot
         line = line.strip()
         if line:
             last_line = line
@@ -385,7 +391,19 @@ def run_streamed_command(state, target_id: str, command) -> None:
         percentages = re.findall(r"(?<!\d)(?:100|\d{1,2})%", line)
         progress = percentages[-1] if percentages else None
         now = time.monotonic()
-        if progress is not None:
+        detail = ollama_transfer_detail(line) if ollama_command else None
+        if detail is not None:
+            snapshot = (detail, progress or "")
+            if snapshot != transfer_snapshot:
+                state.store.update_job(
+                    target_id, status="running", detail=detail, progress=progress or "",
+                )
+                transfer_snapshot = snapshot
+                last_update = now
+        elif transfer_snapshot is not None:
+            # A generic heartbeat must not discard current provider telemetry.
+            return
+        elif progress is not None:
             state.store.update_job(
                 target_id, status="running", detail="Downloading", progress=progress,
             )
