@@ -16,7 +16,9 @@ Both write status to ``STATE.store.update_job()`` and respect
 
 from __future__ import annotations
 
+import codecs
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -305,60 +307,42 @@ def run_hf_download(state, target_id: str, command) -> None:
         state.clear_process(target_id)
 
 
-def _watch_streamed_cancellation(
-    state,
-    target_id: str,
-    process,
-    stop_event: threading.Event,
-    ready_event: threading.Event,
-    started_at: float,
-) -> None:
-    """Cancel a streamed subprocess even while its stdout reader is blocked."""
-    cancel_sent_at = None
-    kill_sent = False
-    first_check = True
+def _read_stream_chunk(stream, timeout: float = 0.1) -> bytes | None:
+    """Read ready pipe bytes; None means idle and empty bytes mean EOF.
 
-    try:
-        while not stop_event.is_set():
-            if _cancel_requested(state, target_id):
-                if cancel_sent_at is None:
-                    cancel_sent_at = started_at if first_check else time.monotonic()
-                    if _can_terminate_process(process):
-                        try:
-                            process.terminate()
-                        except OSError:
-                            pass
-                elif not kill_sent and (time.monotonic() - cancel_sent_at) > 1.5:
-                    poll_fn = getattr(process, "poll", None)
-                    running = True
-                    if callable(poll_fn):
-                        try:
-                            running = poll_fn() is None
-                        except OSError:
-                            running = True
-                    if running:
-                        kill_fn = getattr(process, "kill", None)
-                        if callable(kill_fn):
-                            try:
-                                kill_fn()
-                            except OSError:
-                                pass
-                    kill_sent = True
+    This is the pipe's only reader. Do not mix buffered reads with os.read:
+    buffered text reads can wait for another line or inherited writer's EOF.
+    """
+    descriptor = stream.fileno()
+    if sys.platform.startswith("win"):
+        import ctypes
+        import msvcrt
+        from ctypes import wintypes
 
-            first_check = False
-            ready_event.set()
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        peek = kernel.PeekNamedPipe
+        peek.argtypes = (
+            wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD),
+            ctypes.POINTER(wintypes.DWORD),
+        )
+        peek.restype = wintypes.BOOL
+        available = wintypes.DWORD()
+        handle = msvcrt.get_osfhandle(descriptor)
+        if not peek(handle, None, 0, None, ctypes.byref(available), None):
+            error = ctypes.get_last_error()
+            if error in {109, 232, 233}:  # Broken, closing, or disconnected pipe.
+                return b""
+            raise ctypes.WinError(error)
+        if not available.value:
+            time.sleep(timeout)
+            return None
+        return os.read(descriptor, min(4096, available.value))
 
-            poll_fn = getattr(process, "poll", None)
-            if callable(poll_fn):
-                try:
-                    if poll_fn() is not None:
-                        return
-                except OSError:
-                    return
+    import select
 
-            stop_event.wait(0.1)
-    finally:
-        ready_event.set()
+    readable, _, _ = select.select([descriptor], [], [], timeout)
+    return os.read(descriptor, 4096) if readable else None
 
 
 def run_streamed_command(state, target_id: str, command) -> None:
@@ -366,8 +350,8 @@ def run_streamed_command(state, target_id: str, command) -> None:
 
     Used for ``ollama pull`` and any non-HF command. Progress is
     parsed from stdout lines via :func:`extract_download_progress`;
-    cancellation is monitored independently so a silent stdout pipe
-    cannot prevent terminate/kill escalation.
+    Readiness polling keeps cancellation independent of line endings and EOF.
+    An inherited writer cannot keep the job alive after its owned CLI exits.
     """
     if _cancel_requested(state, target_id):
         _finalize_terminal(state, target_id, None, cancelled=True)
@@ -376,63 +360,112 @@ def run_streamed_command(state, target_id: str, command) -> None:
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
+        bufsize=0,
         **_service_popen_kwargs(),
     )
     state.set_process(target_id, process)
     start = time.monotonic()
     last_update = start
     last_line = ""
-    cancel_stop = threading.Event()
-    cancel_ready = threading.Event()
-    cancel_watcher = threading.Thread(
-        target=_watch_streamed_cancellation,
-        args=(state, target_id, process, cancel_stop, cancel_ready, start),
-        daemon=True,
-        name=f"download-cancel-{target_id}",
-    )
-    cancel_watcher.start()
-    cancel_ready.wait()
+    cancel_sent_at = None
+    kill_sent = False
+    exit_drain_deadline = None
+    exit_drain_bytes = 0
+    eof = process.stdout is None
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    pending = ""
+
+    def record_line(line, *, partial=False):
+        nonlocal last_line, last_update
+        line = line.strip()
+        if line:
+            last_line = line
+        # ANSI redraws may have no line delimiter: use the latest complete
+        # percentage, including one split across successive byte reads.
+        percentages = re.findall(r"(?<!\d)(?:100|\d{1,2})%", line)
+        progress = percentages[-1] if percentages else None
+        now = time.monotonic()
+        if progress is not None:
+            state.store.update_job(
+                target_id, status="running", detail="Downloading", progress=progress,
+            )
+            last_update = now
+        elif not partial and now - last_update >= 1.0:
+            state.store.update_job(
+                target_id, status="running", detail=f"Downloading ({int(now - start)}s)",
+            )
+            last_update = now
+
+    def consume(text):
+        nonlocal pending
+        for part in (pending + text).splitlines(keepends=True):
+            if part.endswith(("\r", "\n")):
+                record_line(part)
+                pending = ""
+            else:
+                # Bound a child that never emits a line ending.
+                pending = part[-4096:]
+        if pending:
+            record_line(pending, partial=True)
 
     try:
-        if process.stdout is not None:
-            for raw_line in process.stdout:
-                line = raw_line.strip()
-                if line:
-                    last_line = line
+        while True:
+            now = time.monotonic()
+            return_code = process.poll()
+            if return_code is None and _cancel_requested(state, target_id):
+                if cancel_sent_at is None:
+                    cancel_sent_at = now
+                    try:
+                        process.terminate()
+                    except OSError:
+                        pass
+                elif not kill_sent and now - cancel_sent_at > 1.5:
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
+                    kill_sent = True
+            if return_code is not None:
+                if exit_drain_deadline is None:
+                    exit_drain_deadline = now + 0.2
+                # Bound both silent inherited writers and continuously noisy ones.
+                if eof or now >= exit_drain_deadline or exit_drain_bytes >= 65536:
+                    break
+            if eof:
+                time.sleep(0.1)
+                continue
+            chunk = _read_stream_chunk(process.stdout)
+            if chunk == b"":
+                eof = True
+            elif chunk:
+                if exit_drain_deadline is not None:
+                    exit_drain_bytes += len(chunk)
+                consume(decoder.decode(chunk))
 
-                progress = _extract_progress(line)
-                now = time.monotonic()
-                if progress is not None:
-                    state.store.update_job(
-                        target_id,
-                        status="running",
-                        detail="Downloading",
-                        progress=progress,
-                    )
-                    last_update = now
-                    continue
-
-                if now - last_update >= 1.0:
-                    elapsed = int(now - start)
-                    state.store.update_job(
-                        target_id,
-                        status="running",
-                        detail="Downloading",
-                        progress=f"{elapsed}s",
-                    )
-                    last_update = now
-
-        return_code = process.wait()
+        consume(decoder.decode(b"", final=True))
+        if pending:
+            record_line(pending)
         cancelled = _cancel_requested(state, target_id)
         _finalize_terminal(state, target_id, return_code, cancelled, last_line=last_line)
     finally:
-        cancel_stop.set()
-        cancel_watcher.join(timeout=0.5)
-        state.clear_process(target_id)
+        try:
+            # A pipe/decoder/store failure must not abandon our still-running CLI.
+            if process.poll() is None:
+                try:
+                    process.terminate()
+                except OSError:
+                    pass
+                try:
+                    process.wait(timeout=1.5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=1.5)
+        finally:
+            try:
+                if process.stdout is not None:
+                    process.stdout.close()
+            finally:
+                state.clear_process(target_id)
 
 
 def process_job(state, target_id: str) -> None:

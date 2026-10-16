@@ -1,94 +1,75 @@
+"""Cancellation of real, silent, task-owned local processes."""
+
 from __future__ import annotations
 
+import sys
 import threading
+import time
+
+import pytest
 
 from downloads import runner
+from downloads.store import DownloadStore
 
 
-class _Store:
-    def __init__(self):
-        self.updates = []
-        self.cancel_requested = False
-
-    def update_job(self, target_id, **fields):
-        self.updates.append((target_id, fields))
-
-    def get_job_by_target(self, _target_id):
-        return {"cancel_requested": self.cancel_requested}
-
-
-class _State:
-    def __init__(self, store):
-        self.store = store
-        self.set_calls = []
-        self.clear_calls = []
-
-    def set_process(self, target_id, process):
-        self.set_calls.append((target_id, process))
-        # Exercise cancellation of a started silent child, not prelaunch refusal.
-        self.store.cancel_requested = True
-
-    def clear_process(self, target_id):
-        self.clear_calls.append(target_id)
-
-
-class _SilentProcess:
-    def __init__(self):
-        self.stdout = self
-        self._killed = threading.Event()
-        self.terminate_calls = 0
-        self.kill_calls = 0
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self._killed.wait(timeout=0.5):
-            raise StopIteration
-        raise AssertionError("streamed runner did not cancel a silent subprocess")
-
-    def poll(self):
-        return -9 if self._killed.is_set() else None
-
-    def terminate(self):
-        self.terminate_calls += 1
-
-    def kill(self):
-        self.kill_calls += 1
-        self._killed.set()
-
-    def wait(self):
-        return -9 if self._killed.is_set() else 0
-
-
-def test_streamed_cancel_checks_silent_process_and_escalates_to_kill(monkeypatch):
-    process = _SilentProcess()
-    store = _Store()
-    state = _State(store)
-    clock = {"value": 0.0}
-
-    def _monotonic():
-        value = clock["value"]
-        clock["value"] += 1.0
-        return value
-
-    monkeypatch.setattr(runner.subprocess, "Popen", lambda *args, **kwargs: process)
-    monkeypatch.setattr(runner, "_service_popen_kwargs", lambda: {})
-    monkeypatch.setattr(runner.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(runner.time, "monotonic", _monotonic)
-
-    runner.run_streamed_command(
-        state,
-        "ollama:silent-cancel",
-        ["ollama", "pull", "model"],
+@pytest.mark.parametrize("ignore_terminate", [False, True])
+def test_streamed_cancel_stops_silent_process(tmp_path, ignore_terminate):
+    if ignore_terminate and sys.platform == "win32":
+        pytest.skip("Windows TerminateProcess cannot be ignored")
+    ready = tmp_path / "ready"
+    script = (
+        "import pathlib,signal,sys,time\n"
+        + ("signal.signal(signal.SIGTERM, signal.SIG_IGN)\n" if ignore_terminate else "")
+        + "pathlib.Path(sys.argv[1]).touch()\ntime.sleep(20)\n"
     )
+    store = DownloadStore(tmp_path / "jobs.db")
+    job, _ = store.upsert_job({"source": "Ollama", "name": "silent-test"})
+    target = job["target_id"]
+    store.claim_next_queued()
+    processes = []
+    cleared = []
+    errors = []
 
-    assert process.terminate_calls == 1
-    assert process.kill_calls == 1
-    assert store.updates[-1][1] == {
-        "status": "cancelled",
-        "detail": "Canceled",
-        "progress": "",
-        "return_code": -9,
-    }
-    assert state.clear_calls == ["ollama:silent-cancel"]
+    class State:
+        def set_process(self, _target, process):
+            processes.append(process)
+
+        def clear_process(self, target):
+            cleared.append(target)
+
+    state = State()
+    state.store = store
+
+    def run():
+        try:
+            runner.run_streamed_command(state, target, [
+                sys._base_executable, "-u", "-c", script, str(ready),
+            ])
+        except BaseException as exc:
+            errors.append(exc)
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    try:
+        deadline = time.monotonic() + 5
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(.02)
+        assert ready.exists()
+        store.mark_cancel_requested(target)
+        worker.join(4)
+        assert not worker.is_alive(), "silent output blocked cancellation"
+        assert not errors
+        assert processes[0].poll() is not None
+        final = store.get_job_by_target(target)
+        assert final["status"] == "cancelled"
+        assert final["return_code"] != 0
+        if ignore_terminate:
+            assert final["return_code"] == -9
+        assert cleared == [target]
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+        worker.join(5)
+        assert not worker.is_alive()

@@ -88,6 +88,19 @@ def test_hardware_no_fit_does_not_block_an_allowed_download_plan():
     asyncio.run(run())
 
 
+def test_canceling_download_does_not_offer_another_download():
+    async def run():
+        app = _HostApp()
+        async with app.run_test(size=(80, 24)) as pilot:
+            modal = ModelDetailModal({"source": "Ollama", "name": "fixture:tiny", "download_state": "canceling"})
+            app.push_screen(modal)
+            await pilot.pause()
+            assert not modal.query('#download-btn')
+            assert modal.query_one('#cancel-download-btn', Button).disabled
+
+    asyncio.run(run())
+
+
 def test_model_detail_keeps_actions_visible_at_80x24():
     """The detail modal must keep its action row inside a standard 80x24 viewport."""
     data = {

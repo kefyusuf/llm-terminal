@@ -112,7 +112,7 @@ class ModelDetailModal(ModalScreen):
         current_download_state = self.data.get("download_state", "idle")
 
         with VerticalScroll(id="modal-container"):
-            if blocked and current_download_state not in {"queued", "downloading"}:
+            if blocked and current_download_state not in {"queued", "downloading", "running", "canceling"}:
                 reason = {
                     "insufficient_disk": "Insufficient disk space for this download.",
                     "disk_unavailable": "Cannot check free disk space. Check the destination folder and retry.",
@@ -184,8 +184,9 @@ class ModelDetailModal(ModalScreen):
                 )
 
             with Horizontal(id="button-row"):
-                if current_download_state in {"queued", "downloading"}:
-                    yield Button("⏸ Cancel", variant="warning", id="cancel-download-btn")
+                if current_download_state in {"queued", "downloading", "running", "canceling"}:
+                    canceling = current_download_state == "canceling"
+                    yield Button("Canceling..." if canceling else "⏸ Cancel", variant="warning", id="cancel-download-btn", disabled=canceling)
                 else:
                     yield Button("⬇ Unknown size" if unknown else "⬇ Download", id="download-btn", disabled=blocked)
                 yield Button("📋 Copy", id="copy-btn")

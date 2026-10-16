@@ -8,6 +8,7 @@ from http.client import HTTPException
 from typing import Any
 from urllib.error import HTTPError
 
+from core.utils import extract_download_progress
 from downloads.download_history import (
     action_label_for_entry,
 )
@@ -156,6 +157,10 @@ class DownloadManager:
 
     def download_cell_text(self, model):
         state = model.get("download_state", "idle")
+        if state in {"downloading", "running"}:
+            progress = extract_download_progress(str(model.get("download_detail") or ""))
+            if progress is not None:
+                return f"[yellow]{progress}%[/yellow]"
         return state_markup_from_state_and_label(state, model.get("download_label"))
 
     def status_text_from_state(self, state, label=None):
@@ -236,6 +241,7 @@ class DownloadManager:
                 if (
                     item.get("download_state") != next_state
                     or item.get("download_label") != next_label
+                    or item.get("download_detail") != entry.get("detail", "")
                 ):
                     changed = True
                 item["download_state"] = next_state
