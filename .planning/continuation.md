@@ -4,6 +4,32 @@ Date: 2026-10-16. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #174 recorded the partial participant acceptance and merged at
+`57449a48dd6622a905377cd40bbdddf5ab64c558`; its PR CI passed 11/11.
+The subsequent participant report concerns a different HF selection, not a
+reported failure to cancel the agreed 19 MB sample. Read-only cache/installed
+plan checks for `antirez/deepseek-v4.1-flash-gguf` selected the pinned
+`DeepSeek-V4.1-Flash-Q2.gguf`: 365,713,686,528 file bytes, 365,780,795,392 required
+bytes and approximately 152,788,611,072 free bytes. The plan correctly rejects
+it as `insufficient_disk`; do not queue this large artifact or loosen preflight.
+
+Branch `fix/download-block-reason` keeps the disabled Download explanation visible
+without scrolling, with required/free GiB where known. Other blocked plans give
+actionable feedback; hardware `No Fit` alone does not disable an allowed plan.
+Two mounted viewport regressions failed before the change; 35 focused tests,
+Ruff, 38-file mypy and independent review pass. Check full verify, PR/Package and
+actual-main CI before completion or refreshing the installed candidate.
+
+The participant also found that the task-local prepared pilot always reselects
+the 19 MB sample and permits only that file. This is launcher behavior, not the
+product's normal startup. Supply a separately qualified normal-entry launcher
+that runs the installed main directly with persistent isolated state, without
+the prepared selection or sample-only guard. Preserve all prior model/state roots.
+Participant cancel/reopen/retry remains unverified; prioritize the reported
+blocked-feedback/startup confusion without adding download features.
+
+Earlier checkpoints below are historical.
+
 PR #173 is merged at `92a532144b17de7018c446a47b313f4cb5f86440`.
 PR/main CI passed 11/11; Package passed 19/19 with 18 matching consumer reports.
 Candidate `133d35540183f40d55e129d07a6e34c3ab4053f5` has the same Git tree;
