@@ -4,6 +4,30 @@ Date: 2026-10-16. Repository: `kefyusuf/llm-terminal`.
 
 ## Current narrow continuation
 
+PR #173 is merged at `92a532144b17de7018c446a47b313f4cb5f86440`.
+PR/main CI passed 11/11; Package passed 19/19 with 18 matching consumer reports.
+Candidate `133d35540183f40d55e129d07a6e34c3ab4053f5` has the same Git tree;
+62 runtime module bytes match the wheel, installed environment and merged main.
+All 27 focused tests, final-code full verify, 38-file mypy, independent review
+and 12 installed UI cases passed. Local proof: `.venv/visibility-completed-1016.json`.
+
+The participant then completed the pinned 19,077,344-byte HF download on this
+candidate and explicitly confirmed both UI issues resolved. Read-only checks
+verified the terminal job and final size/SHA-256. See the candidate-bound
+[participant record](../docs/windows-download-pilot-2026-10-16.md).
+This closes the reported table clipping/stale-active-message blockers, not the
+whole pilot. Earlier search feedback belongs to the earlier recorded candidate.
+
+Next narrow acceptance: participant cancel/reopen/retry of the same agreed small
+HF artifact. It remains unverified; maintainer rehearsals do not substitute for
+human outcomes. Do not acquire another model, interrupt shared services or claim
+power-loss/release acceptance. Existing participant data and user ignore files
+remain preserved. The fixed launcher uses a separate root/history; no shared-DB
+upgrade was performed. No new product feature or speculative bug fix is required
+by the successful visibility retest.
+
+Earlier checkpoints below are historical.
+
 PR #172 is merged at `49f9b32f4f34657d734699abc3b79e32021a46d2`.
 PR/main CI passed 11/11; Package passed 19/19 with 18 matching consumer reports.
 The Windows participant selected the pinned 19,077,344-byte HF sample. Its job
