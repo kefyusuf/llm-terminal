@@ -1,5 +1,13 @@
 # Qualified candidate restore rehearsal
 
+This page records historical service-based candidate evidence from 2026-10-04
+through 2026-10-08. The commands and endpoints below apply only to those archived
+artifacts. The current application owns an in-process `DownloadManager` and has
+no download-service module or HTTP endpoints; these results do not qualify that
+implementation. Current installed-package smoke constructs the manager, checks
+empty isolated history and shuts it down. Live cancellation/resume and candidate
+restore require fresh evidence for the exact new artifact.
+
 ## 2026-10-08 development pilot input pair
 
 The [new Windows report](evidence/qualified-pilot-candidate-restore-windows-2026-10-08.json)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from contextlib import suppress
 
 from textual import work
 from textual.widgets import DataTable
@@ -10,17 +11,16 @@ from textual.widgets import DataTable
 import config
 from app.widgets import SystemInfoWidget
 from core import cache_db
-from downloads.service_client import ensure_service_running, list_jobs
 from tui_app import AIModelViewer as BaseAIModelViewer
 
 _EXPECTED_STARTUP_ERRORS = (OSError, ValueError, RuntimeError)
 
 
 class AIModelViewer(BaseAIModelViewer):
-    """Base viewer variant that keeps download-service startup off the UI thread."""
+    """Base viewer variant that restores download history off the UI thread."""
 
     def on_mount(self) -> None:
-        """Mount the UI immediately and initialize the download service asynchronously."""
+        """Mount the UI immediately and restore download history asynchronously."""
         self.title = "AI Model Explorer"
         self._apply_ui_mode()
         self._configure_results_table_columns(force=True)
@@ -65,47 +65,23 @@ class AIModelViewer(BaseAIModelViewer):
             config.settings.hardware_poll_interval,
             self.request_system_info_refresh,
         )
-        self._run_download_service_startup_worker()
+        self._run_download_startup_worker()
 
     @work(thread=True)
-    def _run_download_service_startup_worker(self) -> None:
-        """Start/reuse the service and fetch the first job snapshot away from the UI thread."""
-        service_ok = False
+    def _run_download_startup_worker(self) -> None:
+        """Initialize the manager and fetch history away from the UI thread."""
         jobs = None
-        sync_failed = False
+        with suppress(_EXPECTED_STARTUP_ERRORS):
+            jobs = self.dl.backend.list_jobs(limit=self.dl.download_history_limit)
+        self.call_from_thread(self._apply_download_startup, jobs)
 
-        try:
-            service_ok = ensure_service_running()
-        except _EXPECTED_STARTUP_ERRORS:
-            service_ok = False
-
-        if service_ok:
-            try:
-                jobs = list_jobs(
-                    limit=self.dl.download_history_limit,
-                    timeout=self.dl.download_poll_request_timeout,
-                )
-            except _EXPECTED_STARTUP_ERRORS:
-                sync_failed = True
-
-        self.call_from_thread(
-            self._apply_download_service_startup,
-            service_ok,
-            jobs,
-            sync_failed,
-        )
-
-    def _apply_download_service_startup(self, service_ok: bool, jobs, sync_failed: bool) -> None:
+    def _apply_download_startup(self, jobs) -> None:
         """Apply the startup snapshot and enable periodic download polling on the UI thread."""
-        if not service_ok:
-            self.update_status(
-                "Download service is unavailable or outdated. Restart the app/service."
-            )
-        elif jobs is not None:
+        if jobs is not None:
             self.dl.sync_jobs(force=True, jobs=jobs)
-        elif sync_failed:
+        else:
             self.update_status(
-                "Download service started; initial history sync failed. Polling will retry."
+                "Initial download history sync failed. Polling will retry."
             )
 
         if self.download_status_timer is None:

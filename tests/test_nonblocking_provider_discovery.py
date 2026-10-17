@@ -6,6 +6,7 @@ import asyncio
 import json
 import threading
 import urllib.request
+from unittest.mock import MagicMock
 
 from textual.widgets import Input, Select
 
@@ -80,7 +81,8 @@ def test_slow_discovery_keeps_mounted_search_input_usable(monkeypatch):
     monkeypatch.delenv("AIMODEL_SMOKE", raising=False)
     monkeypatch.setattr(tui_app, "HardwareMonitor", Monitor)
     monkeypatch.setattr(viewer_module, "get_provider_filter_labels", labels)
-    monkeypatch.setattr(startup_module, "ensure_service_running", lambda: False)
+    monkeypatch.setattr("app.download_manager.BackendDownloadManager",
+                        lambda: MagicMock(list_jobs=lambda **kwargs: []))
     monkeypatch.setattr(startup_module.cache_db, "get_hardware_snapshot", lambda: None)
     monkeypatch.setattr(AIModelViewer, "request_system_info_refresh", lambda self, force=False: None)
     monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)

@@ -344,17 +344,13 @@ def smoke() -> int:
         timeout=tui_timeout,
         env=smoke_env,
     )
-    with tempfile.TemporaryDirectory(prefix="ai-model-explorer-smoke-") as state_dir:
-        download_env = dict(
-            smoke_env, AIMODEL_DOWNLOAD_DB_PATH=str(Path(state_dir) / "downloads.db")
-        )
-        run_smoke_step(
-            "download-service",
-            [str(venv_python), "-m", "downloads.download_service"],
-            root,
-            timeout=15,
-            env=download_env,
-        )
+    run_smoke_step(
+        "download-manager",
+        [str(venv_python), "-m", "downloads.manager"],
+        root,
+        timeout=15,
+        env=smoke_env,
+    )
     return 0
 
 

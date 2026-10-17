@@ -8,6 +8,7 @@ from urllib.error import URLError
 import pytest
 
 from app.download_manager import DownloadManager
+from downloads.manager import DownloadManager as BackendDownloadManager
 
 
 @pytest.fixture
@@ -20,7 +21,7 @@ def manager():
         "render_download_debug": MagicMock(),
         "find_model_by_target_id": MagicMock(return_value=None),
     }
-    return DownloadManager(**callbacks)
+    return DownloadManager(**callbacks, backend_manager=BackendDownloadManager.__new__(BackendDownloadManager))
 
 
 class TestInit:
@@ -32,6 +33,29 @@ class TestInit:
 
     def test_poll_not_running(self, manager):
         assert manager._download_poll_running is False
+
+    def test_preview_and_shutdown_use_the_owned_backend(self, manager):
+        backend = MagicMock()
+        backend.preview_job.return_value = {"allowed": False, "status": "insufficient_space"}
+        manager._backend_manager = backend
+        model = {"source": "Hugging Face", "id": "owner/repo"}
+
+        assert manager.preview_job(model) == backend.preview_job.return_value
+        backend.preview_job.assert_called_once_with(model)
+        manager.shutdown()
+        backend.shutdown.assert_called_once_with()
+        with pytest.raises(RuntimeError, match="closed"):
+            manager.preview_job(model)
+
+    def test_unmount_shuts_down_the_owned_downloads(self, manager):
+        from tui_app import AIModelViewer
+
+        backend = MagicMock()
+        manager._backend_manager = backend
+        viewer = AIModelViewer()
+        viewer.dl = manager
+        viewer.on_unmount()
+        backend.shutdown.assert_called_once_with()
 
 
 class TestDownloadCellText:
@@ -153,81 +177,77 @@ class TestRequestHistoryRefresh:
 
 
 class TestCancelDownload:
-    @patch("app.download_manager.cancel_job")
+    @patch("downloads.manager.DownloadManager.cancel_job")
     def test_success_returns_ok(self, mock_cancel, manager):
         mock_cancel.return_value = {"job": {}}
         ok, _ = manager.cancel_download({"source": "Ollama", "name": "llama3"})
         assert ok is True
 
-    @patch("app.download_manager.cancel_job", side_effect=Exception("fail"))
+    @patch("downloads.manager.DownloadManager.cancel_job", side_effect=Exception("fail"))
     def test_failure_returns_error(self, mock_cancel, manager):
         ok, _ = manager.cancel_download({"source": "Ollama", "name": "llama3"})
         assert ok is False
 
 
 class TestStartDownload:
-    @patch("app.download_manager.ensure_service_running", return_value=True)
-    @patch("app.download_manager.create_job")
-    def test_queues_download(self, mock_create, mock_ensure, manager):
+    @patch("downloads.manager.DownloadManager.create_job")
+    def test_queues_download(self, mock_create, manager):
         mock_create.return_value = {"queued": True}
         ok, msg = manager.start_download({"source": "HF", "name": "qwen"})
         assert ok is True
         assert "queued" in msg.lower()
 
-    @patch("app.download_manager.ensure_service_running", return_value=True)
-    @patch("app.download_manager.create_job")
-    def test_canonical_huggingface_source_is_downloadable(self, mock_create, mock_ensure, manager):
+    @patch("downloads.manager.DownloadManager.create_job")
+    def test_canonical_huggingface_source_is_downloadable(self, mock_create, manager):
         mock_create.return_value = {"queued": True}
         ok, _ = manager.start_download({"source": "Hugging Face", "name": "qwen"})
         assert ok is True
 
-    @patch("app.download_manager.ensure_service_running")
-    @patch("app.download_manager.create_job")
-    def test_non_downloadable_provider_is_rejected_before_service(self, mock_create, mock_ensure, manager):
+    @patch("downloads.manager.DownloadManager.create_job")
+    def test_non_downloadable_provider_is_rejected_before_submission(self, mock_create, manager):
         ok, msg = manager.start_download({"source": "LM Studio", "name": "local-model"})
         assert ok is False
         assert "not supported" in msg.lower()
-        mock_ensure.assert_not_called()
         mock_create.assert_not_called()
 
-    @patch("app.download_manager.ensure_service_running", return_value=False)
-    def test_service_unavailable(self, mock_ensure, manager):
-        ok, _ = manager.start_download({"source": "Ollama", "name": "llama3"})
+    @patch("downloads.manager.DownloadManager.create_job", side_effect=RuntimeError("closed"))
+    def test_closed_manager_reports_error(self, mock_create, manager):
+        ok, message = manager.start_download({"source": "Ollama", "name": "llama3"})
         assert ok is False
+        assert "closed" in message
 
-    @patch("app.download_manager.ensure_service_running", return_value=True)
-    @patch("app.download_manager.create_job", side_effect=Exception("fail"))
-    def test_create_fails(self, mock_create, mock_ensure, manager):
+    @patch("downloads.manager.DownloadManager.create_job", side_effect=Exception("fail"))
+    def test_create_fails(self, mock_create, manager):
         ok, _ = manager.start_download({"source": "Ollama", "name": "llama3"})
         assert ok is False
 
 
 class TestDeleteEntry:
-    def test_hf_data_removal_is_owned_by_service(self, manager):
+    def test_hf_data_removal_is_owned_by_backend(self, manager):
         manager.download_registry["test-id"] = {"state": "completed", "source": "Hugging Face"}
-        with patch("app.download_manager.delete_job") as remove:
+        with patch("downloads.manager.DownloadManager.delete_job") as remove:
             ok, _, _, _ = manager.delete_entry("test-id", delete_data=True)
         assert ok
         remove.assert_called_once_with("test-id", delete_data=True)
 
     def test_deletes_idle_entry(self, manager):
         manager.download_registry["test-id"] = {"state": "completed", "source": "Ollama", "name": "llama3"}
-        with patch("app.download_manager.delete_job"):
+        with patch("downloads.manager.DownloadManager.delete_job"):
             ok, _, _, _ = manager.delete_entry("test-id", delete_data=False)
         assert ok is True
         assert "test-id" not in manager.download_registry
 
     def test_returns_none_keys_on_delete_failure(self, manager):
         manager.download_registry["test-id"] = {"state": "idle"}
-        with patch("app.download_manager.delete_job", side_effect=Exception("fail")):
+        with patch("downloads.manager.DownloadManager.delete_job", side_effect=Exception("fail")):
             ok, _, keys, _ = manager.delete_entry("test-id")
         assert ok is False
         assert keys is None
 
 
 class TestPollJobs:
-    @patch("app.download_manager.list_jobs")
-    @patch("app.download_manager.get_active_download_debug")
+    @patch("downloads.manager.DownloadManager.list_jobs")
+    @patch("downloads.manager.DownloadManager.get_active_download_debug")
     def test_returns_jobs_and_debug(self, mock_debug, mock_jobs, manager):
         mock_jobs.return_value = [{"target_id": "x", "status": "running"}]
         mock_debug.return_value = {"count": 1}
@@ -236,8 +256,8 @@ class TestPollJobs:
         assert debug == {"count": 1}
         assert manager.take_poll_status_message() is None
 
-    @patch("app.download_manager.list_jobs", side_effect=URLError("offline"))
-    @patch("app.download_manager.get_active_download_debug", return_value={"count": 0})
+    @patch("downloads.manager.DownloadManager.list_jobs", side_effect=URLError("offline"))
+    @patch("downloads.manager.DownloadManager.get_active_download_debug", return_value={"count": 0})
     def test_expected_jobs_failure_surfaces_stale_status_once(
         self, mock_debug, mock_jobs, manager
     ):
@@ -246,14 +266,14 @@ class TestPollJobs:
         assert debug == {"count": 0}
         assert health is None
         assert manager.take_poll_status_message() == (
-            "Download service is unavailable; showing last known download state."
+            "Download history is unavailable; showing last known download state."
         )
 
         manager.poll_jobs()
         assert manager.take_poll_status_message() is None
 
-    @patch("app.download_manager.list_jobs")
-    @patch("app.download_manager.get_active_download_debug", return_value={"count": 0})
+    @patch("downloads.manager.DownloadManager.list_jobs")
+    @patch("downloads.manager.DownloadManager.get_active_download_debug", return_value={"count": 0})
     def test_success_after_poll_failure_surfaces_one_recovery_status(
         self, mock_debug, mock_jobs, manager
     ):
@@ -268,13 +288,13 @@ class TestPollJobs:
 
         jobs, _debug, _health = manager.poll_jobs()
         assert jobs == [{"target_id": "x", "status": "completed"}]
-        assert manager.take_poll_status_message() == "Download service status refresh restored."
+        assert manager.take_poll_status_message() == "Download status refresh restored."
 
         manager.poll_jobs()
         assert manager.take_poll_status_message() is None
 
     @patch(
-        "app.download_manager.list_jobs",
+        "downloads.manager.DownloadManager.list_jobs",
         side_effect=AssertionError("programming bug"),
     )
     def test_unexpected_jobs_failure_is_not_silently_swallowed(self, mock_jobs, manager):
@@ -283,7 +303,22 @@ class TestPollJobs:
 
 
 class TestSyncJobs:
-    @patch("app.download_manager.list_jobs")
+    @pytest.mark.parametrize("source, target, detail", [
+        ("Hugging Face", "hugging face:owner/repo", "Downloading | 50 MiB / 100 MiB | 2 MiB/s | ETA 25s"),
+        ("Ollama", "ollama:qwen:7b", "pulling abc | 50 MiB / 100 MiB | 2 MiB/s | ETA 25s"),
+    ])
+    def test_preserves_percentage_speed_and_eta(self, manager, source, target, detail):
+        manager.sync_jobs(jobs=[{
+            "target_id": target, "source": source, "status": "running",
+            "detail": detail, "progress": "50%",
+        }])
+        entry = next(iter(manager.download_registry.values()))
+        assert detail in entry["detail"]
+        assert "50%" in entry["detail"]
+        assert manager.download_cell_text({"download_state": "downloading",
+                                           "download_detail": entry["detail"]}) == "[yellow]50%[/yellow]"
+
+    @patch("downloads.manager.DownloadManager.list_jobs")
     @patch("app.download_manager.download_target_id", side_effect=lambda x: x.get("id", x.get("source", "?")))
     def test_sync_populates_registry(self, mock_dtid, mock_list, manager):
         mock_list.return_value = [

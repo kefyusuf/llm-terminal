@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable
-from http.client import HTTPException
 from typing import Any
-from urllib.error import HTTPError
 
 from core.utils import extract_download_progress
 from downloads.download_history import (
     action_label_for_entry,
 )
 from downloads.download_lifecycle import (
-    cancel_error_detail_from_http_error,
-    delete_error_detail_from_http_error,
     entry_identity_keys,
     should_cancel_before_delete,
     should_delete_ollama_data,
@@ -28,18 +25,10 @@ from downloads.download_status import (
     map_service_job_status,
     state_markup_from_state_and_label,
 )
-from downloads.service_client import (
-    cancel_job,
-    create_job,
-    delete_job,
-    ensure_service_running,
-    get_active_download_debug,
-    get_service_health,
-    list_jobs,
-)
+from downloads.manager import DownloadManager as BackendDownloadManager
 from providers.capabilities import get_all_provider_capabilities
 
-_DOWNLOAD_SERVICE_POLL_ERRORS = (OSError, ValueError, RuntimeError)
+_DOWNLOAD_POLL_ERRORS = (OSError, ValueError, RuntimeError)
 
 
 def _provider_slug_for_source(source: Any) -> str | None:
@@ -63,19 +52,15 @@ def _source_is_downloadable(source: Any) -> bool:
 
 
 def _download_poll_failure_status(exc: Exception) -> str:
-    """Return a stable user-facing status for expected service poll failures."""
+    """Return a stable user-facing status for expected history read failures."""
     suffix = "showing last known download state."
-    if isinstance(exc, HTTPError):
-        if exc.code == 401:
-            return f"Download service authentication failed; {suffix}"
-        return f"Download service status refresh failed (HTTP {exc.code}); {suffix}"
     if isinstance(exc, TimeoutError):
-        return f"Download service status refresh timed out; {suffix}"
+        return f"Download status refresh timed out; {suffix}"
     if isinstance(exc, OSError):
-        return f"Download service is unavailable; {suffix}"
+        return f"Download history is unavailable; {suffix}"
     if isinstance(exc, ValueError):
-        return f"Download service returned invalid status data; {suffix}"
-    return f"Download service configuration rejected; {suffix}"
+        return f"Download history contains invalid status data; {suffix}"
+    return f"Download manager is unavailable; {suffix}"
 
 
 class DownloadManager:
@@ -96,8 +81,11 @@ class DownloadManager:
         find_model_by_target_id: Callable[[str], dict | None],
         history_limit: int = 50,
         history_refresh_interval: float = 0.9,
-        poll_request_timeout: float = 0.35,
+        backend_manager: BackendDownloadManager | None = None,
     ):
+        self._backend_manager = backend_manager
+        self._backend_lock = threading.Lock()
+        self._closed = False
         self._update_status = update_status
         self._refresh_table = refresh_table
         self._refresh_download_history_table = refresh_download_history_table
@@ -114,7 +102,25 @@ class DownloadManager:
         self.download_history_refresh_pending = False
         self.download_history_limit = history_limit
         self.download_history_refresh_interval = history_refresh_interval
-        self.download_poll_request_timeout = poll_request_timeout
+
+    @property
+    def backend(self) -> BackendDownloadManager:
+        with self._backend_lock:
+            if self._closed:
+                raise RuntimeError("Download manager is closed")
+            if self._backend_manager is None:
+                self._backend_manager = BackendDownloadManager()
+            return self._backend_manager
+
+    def shutdown(self) -> None:
+        with self._backend_lock:
+            self._closed = True
+            backend = self._backend_manager
+        if backend is not None:
+            backend.shutdown()
+
+    def preview_job(self, model):
+        return self.backend.preview_job(model)
 
     def _record_entry(self, target_id, model=None, state=None, label=None, detail=None):
         if model is None:
@@ -169,11 +175,10 @@ class DownloadManager:
     def sync_jobs(self, force=False, jobs=None):
         if jobs is None:
             try:
-                jobs = list_jobs(
+                jobs = self.backend.list_jobs(
                     limit=self.download_history_limit,
-                    timeout=self.download_poll_request_timeout,
                 )
-            except _DOWNLOAD_SERVICE_POLL_ERRORS as exc:
+            except _DOWNLOAD_POLL_ERRORS as exc:
                 self._update_status(_download_poll_failure_status(exc))
                 return False
 
@@ -195,7 +200,10 @@ class DownloadManager:
             )
             label = label_for_state(mapped_status)
             provider_detail = str(job.get("detail") or "")
-            detail = provider_detail if provider_detail.startswith("pulling ") else job.get("progress") or provider_detail
+            progress = str(job.get("progress") or "")
+            detail = provider_detail
+            if progress and progress not in provider_detail:
+                detail = " | ".join(part for part in (provider_detail, progress) if part)
             self._record_entry(
                 target_id,
                 model={
@@ -311,7 +319,7 @@ class DownloadManager:
                 self._pending_poll_status = error_status
             return
         if previous is not None:
-            self._pending_poll_status = "Download service status refresh restored."
+            self._pending_poll_status = "Download status refresh restored."
 
     def take_poll_status_message(self) -> str | None:
         """Consume the next deduplicated poll status message for the UI thread."""
@@ -324,74 +332,47 @@ class DownloadManager:
         debug = None
         health = None
         try:
-            jobs = list_jobs(
+            jobs = self.backend.list_jobs(
                 limit=self.download_history_limit,
-                timeout=self.download_poll_request_timeout,
             )
-        except _DOWNLOAD_SERVICE_POLL_ERRORS as exc:
+        except _DOWNLOAD_POLL_ERRORS as exc:
             jobs = None
             self._record_poll_status_transition(_download_poll_failure_status(exc))
         else:
             self._record_poll_status_transition(None)
 
         try:
-            debug = get_active_download_debug(timeout=self.download_poll_request_timeout)
-        except _DOWNLOAD_SERVICE_POLL_ERRORS:
-            try:
-                health = get_service_health(timeout=self.download_poll_request_timeout)
-            except _DOWNLOAD_SERVICE_POLL_ERRORS:
-                health = None
+            debug = self.backend.get_active_download_debug()
+        except _DOWNLOAD_POLL_ERRORS:
+            health = None
         return jobs, debug, health
 
     def cancel_download(self, model):
         target_id = download_target_id(model)
         try:
-            response = cancel_job(target_id)
+            response = self.backend.cancel_job(target_id)
             _ = response.get("job")
             return True, f"Cancel requested: {model.get('name', target_id)}"
-        except HTTPError as exc:
-            return False, cancel_error_detail_from_http_error(exc)
-        except Exception:
-            return False, "Failed to cancel download through service."
+        except Exception as exc:
+            return False, f"Failed to cancel download: {exc}"
 
     def start_download(self, model):
         source = model.get("source")
         if not _source_is_downloadable(source):
             label = str(source or "this provider").strip() or "this provider"
             return False, f"Downloads are not supported for {label}."
-        try:
-            service_ready = ensure_service_running()
-        except (OSError, ValueError, RuntimeError):
-            service_ready = False
-        if not service_ready:
-            return False, (
-                "Download service is unavailable or cannot be upgraded safely. "
-                "Let active downloads finish, then retry."
-            )
         target_id = download_target_id(model)
         try:
-            response = create_job(model)
+            response = self.backend.create_job(model)
             if not isinstance(response, dict) or type(response.get("queued")) is not bool:
                 return False, (
-                    "Download service returned an invalid queue response. "
+                    "Download manager returned an invalid queue response. "
                     "Check download history before retrying."
                 )
             queued = response["queued"]
             if queued:
                 return True, f"Download queued: {model.get('name', target_id)}"
             return True, f"Download already active: {model.get('name', target_id)}"
-        except HTTPError as exc:
-            if exc.code == 503:
-                return False, (
-                    "Download service is temporarily unavailable (HTTP 503). "
-                    "Download was not queued; retry shortly."
-                )
-            return False, f"Failed to queue download: {exc}"
-        except (OSError, HTTPException, ValueError):
-            return False, (
-                "Download request outcome is unknown. "
-                "Check download history before retrying."
-            )
         except Exception as exc:
             return False, f"Failed to queue download: {exc}"
 
@@ -404,10 +385,10 @@ class DownloadManager:
 
         if should_cancel_before_delete(delete_data, state):
             try:
-                cancel_job(target_id)
+                self.backend.cancel_job(target_id)
                 deadline = time.monotonic() + 4
                 while True:
-                    latest = next((job for job in list_jobs(limit=1000, timeout=0.5)
+                    latest = next((job for job in self.backend.list_jobs(limit=1000)
                                    if job.get("target_id") == target_id), None)
                     if latest and latest.get("status") not in {"queued", "running"}:
                         break
@@ -448,11 +429,9 @@ class DownloadManager:
 
         try:
             if delete_data and source == "hugging face":
-                delete_job(target_id, delete_data=True)
+                self.backend.delete_job(target_id, delete_data=True)
             else:
-                delete_job(target_id)
-        except HTTPError as exc:
-            return False, delete_error_detail_from_http_error(exc), None, None
+                self.backend.delete_job(target_id)
         except Exception as exc:
             return False, f"Failed to delete download entry: {exc}", None, None
 

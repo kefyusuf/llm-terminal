@@ -2,42 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from typing import Any
-from urllib.error import HTTPError
-
-from loguru import logger
 
 from .download_status import is_active_state
-
-
-def cancel_error_detail_from_http_error(exc: HTTPError) -> str:
-    """Build a user-facing cancel error message from service HTTP payload."""
-    detail = "Failed to cancel download through service."
-    try:
-        payload = json.loads(exc.read().decode("utf-8"))
-        error_text = payload.get("error")
-        if error_text:
-            detail = f"Cancel failed: {error_text}"
-    except Exception:
-        logger.debug("Failed to parse cancel error payload from HTTP error")
-    return detail
-
-
-def delete_error_detail_from_http_error(exc: HTTPError) -> str:
-    """Build a user-facing delete error message from service HTTP payload."""
-    detail = "Failed to delete download entry."
-    try:
-        payload = json.loads(exc.read().decode("utf-8"))
-        error_text = payload.get("error")
-        if error_text == "cannot delete active job":
-            detail = "Cannot delete active job. Cancel it first."
-        elif error_text:
-            detail = f"Delete failed: {error_text}"
-    except Exception:
-        logger.debug("Failed to parse delete error payload from HTTP error")
-    return detail
 
 
 def should_cancel_before_delete(delete_data: bool, state: str) -> bool:

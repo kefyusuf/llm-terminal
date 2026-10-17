@@ -61,7 +61,6 @@ from search.search_orchestration import (
 from downloads.download_history import cancel_model_payload, fallback_entry_from_target, is_external_entry
 from downloads.download_manager import download_target_id
 from downloads.download_status import is_active_state
-from downloads.service_client import ensure_service_running
 from app.download_manager import DownloadManager
 from app.download_progress import DownloadProgressPanel
 from app.search_constants import (
@@ -88,7 +87,7 @@ logger = get_logger(__name__)
 class AIModelViewer(App):
     """Main TUI application for discovering, comparing, and downloading local LLM models.
 
-    Connects to a background :mod:`downloads.download_service` over HTTP, polls hardware
+    Owns an in-process download manager, polls hardware
     metrics via :class:`~hardware.HardwareMonitor`, and queries both the
     Ollama registry and Hugging Face for GGUF model results.
     """
@@ -281,7 +280,6 @@ class AIModelViewer(App):
             find_model_by_target_id=self._find_model_by_target_id,
             history_limit=config.settings.download_history_limit,
             history_refresh_interval=config.settings.download_history_refresh_interval,
-            poll_request_timeout=config.settings.download_poll_request_timeout,
         )
 
     _SEARCH_STATE_ATTRS = frozenset(
@@ -552,8 +550,11 @@ class AIModelViewer(App):
         self.update_status("Smoke mode startup complete.")
         self.exit()
 
+    def on_unmount(self) -> None:
+        self.dl.shutdown()
+
     def on_mount(self) -> None:
-        """Initialise the UI, start the download service, and set up polling timers."""
+        """Initialise the UI, restore download history, and set up polling timers."""
         self.title = "AI Model Explorer"
         self._apply_ui_mode()
         self._configure_results_table_columns(force=True)
@@ -575,13 +576,7 @@ class AIModelViewer(App):
             self.set_timer(1, self._finish_smoke_mode)
             return
 
-        service_ok = ensure_service_running()
-        if not service_ok:
-            self.update_status(
-                "Download service is unavailable or outdated. Restart the app/service."
-            )
-        else:
-            self.dl.sync_jobs(force=True)
+        self.dl.sync_jobs(force=True)
 
         cache_db.init_db()
         cache_db.cleanup_old_entries()
@@ -1349,11 +1344,6 @@ class AIModelViewer(App):
             debug_widget.update(f"Workers: {count} ({worker_text}) | Duplicates: {dup_text}")
             return
 
-        if health is not None:
-            version = health.get("version", "unknown")
-            debug_widget.update(f"Workers: legacy service ({version}) | Duplicates: unknown")
-            return
-
         debug_widget.update("Workers: unavailable | Duplicates: unknown")
 
     def _download_cell_text(self, model):
@@ -1379,10 +1369,8 @@ class AIModelViewer(App):
             specs,
             self.hf_model_info_cache,
         )
-        from downloads.service_client import preview_job
-
         try:
-            enriched["download_plan"] = preview_job(enriched)
+            enriched["download_plan"] = self.dl.preview_job(enriched)
         except (OSError, ValueError, RuntimeError):
             enriched["download_plan"] = {"status": "service_unavailable", "allowed": False}
         self.call_from_thread(self.on_hf_detail_ready, enriched)

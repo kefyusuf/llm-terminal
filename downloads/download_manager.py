@@ -49,7 +49,7 @@ def normalize_target_id(value):
 
 
 def build_download_command(model):
-    """Build the subprocess command list needed to download *model*.
+    """Build persisted provider arguments needed to download *model*.
 
     Raises:
         ValueError: If the model is missing required provider download metadata.

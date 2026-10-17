@@ -11,7 +11,6 @@ from rich.text import Text
 import config
 from core import cache_db
 from core.hardware import HardwareMonitor, check_ollama_running
-from downloads.service_client import get_service_health
 from providers.capabilities import get_all_provider_capabilities
 
 console = Console()
@@ -90,13 +89,6 @@ def info():
     if ollama_running:
         console.print("  [green]Running[/green]")
     else:
-        console.print("  [red]Not running[/red]")
-
-    console.print("\n[bold]Download Service:[/bold]")
-    try:
-        health = get_service_health()
-        console.print(f"  [green]Running[/green] (version {health.get('version', 'unknown')})")
-    except Exception:
         console.print("  [red]Not running[/red]")
 
     console.print("\n[bold]Cache:[/bold]")

@@ -118,9 +118,8 @@ def test_remote_source_requires_https(monkeypatch):
     assert result["code"] == "invalid_endpoint"
 
 
-def test_offline_reports_service_and_mlx_without_starting_them():
+def test_offline_reports_mlx_without_starting_it():
     report = diagnostics.collect_diagnostics(config.settings, offline=True)
-    assert check(report, "download_service")["status"] == "skipped"
     assert check(report, "mlx")["code"] in {"installed", "not_installed", "unsupported_platform"}
 
 

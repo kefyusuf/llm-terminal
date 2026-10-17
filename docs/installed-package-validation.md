@@ -14,8 +14,9 @@ The verifier checks:
 2. Required entry modules and each application package import from within the new environment and are listed in the installed distribution's files, with no checkout origins. The import probe uses Python isolated mode (`-I`).
 3. Both installed console scripts: CLI version/offline doctor, schema-1 hardware-plan/saved-comparison JSON and a headless TUI mount/exit.
 4. The installed REST health endpoint on an ephemeral loopback port.
-5. The installed download service's health and authenticated jobs endpoints, with isolated empty state and no model downloads.
-6. The real installed download-service client launcher. A recording wrapper delegates to the actual `Popen`, asserts the installed interpreter path, waits for the bounded service smoke subprocess and cleans up its owned handle. Windows exercises the existing `pythonw.exe` launch path; other platforms exercise the existing detached Python launch path.
+5. The installed `downloads.manager.DownloadManager` lifecycle in isolated mode:
+   construct against isolated empty state, list an empty history and shut down.
+   No detached service, IPC launcher or model download is involved.
 
 The original source directory can remain on disk for the driver and build artifacts. It is not a working directory, Python path, or module origin for the installed application checks. No shared runtimes/services are started or stopped. Smoke mode avoids remote model searches and inference. This is installation/runtime-startup evidence, not a model download, GPU inference, live-provider or deployment certification.
 
@@ -29,7 +30,7 @@ The current workflow now [builds one candidate](build-once-candidates.md) before
 the matrix and verifies the same wheel/sdist inputs in every consumer. The extra
 candidate job makes 19 workflow jobs while retaining 18 installation lanes.
 
-The native Windows Python **3.12.14** wheel and sdist checks passed for package version **1.0.1** on 2026-10-04. Their exact artifacts and resolved dependencies are recorded in [wheel evidence](evidence/package-windows-wheel-2026-10-04.json) and [sdist evidence](evidence/package-windows-sdist-2026-10-04.json). These are pre-commit local candidate reports, not a release or evidence for other machines. CI uploads fresh reports for its own artifacts and commit.
+Historical evidence before the in-process download refactor: native Windows Python **3.12.14** wheel and sdist checks passed for package version **1.0.1** on 2026-10-04. Their exact artifacts and resolved dependencies are recorded in [wheel evidence](evidence/package-windows-wheel-2026-10-04.json) and [sdist evidence](evidence/package-windows-sdist-2026-10-04.json). These are pre-commit local candidate reports, not evidence for the new manager, a release or other machines. CI uploads fresh reports for its own artifacts and commit.
 
 ## Running locally
 

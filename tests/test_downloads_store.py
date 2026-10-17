@@ -1,19 +1,11 @@
-"""Unit tests for the DownloadStore repository.
-
-The pre-split file had 25 mock-based tests in
-``test_download_service_store.py`` exercising every public method.
-After the split, those tests were already migrated; this file adds
-new tests for the migration helpers (normalize_target_ids,
-recover_orphaned_running_jobs, migrate_legacy_hf_commands) that
-weren't directly covered before.
-
-Each test creates a fresh store in a ``tmp_path`` so they are
-isolated and can run in any order.
-"""
+"""Download history CRUD, migrations, and interrupted work recovery."""
 
 from __future__ import annotations
 
 import json
+import sqlite3
+
+import pytest
 
 from downloads.store import DownloadStore
 
@@ -91,24 +83,8 @@ def test_upsert_replaces_completed_job(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# claim_next_queued + update_job
+# update_job
 # ---------------------------------------------------------------------------
-
-
-def test_claim_next_queued_returns_oldest_first(tmp_path):
-    store = _make_store(tmp_path)
-    store.upsert_job(_make_model("a/repo", name="a/repo"))
-    store.upsert_job(_make_model("b/repo", name="b/repo"))
-
-    job = store.claim_next_queued()
-    assert job is not None
-    assert job["target_id"] == "hugging face:a/repo"
-    assert job["status"] == "running"
-
-
-def test_claim_returns_none_when_queue_empty(tmp_path):
-    store = _make_store(tmp_path)
-    assert store.claim_next_queued() is None
 
 
 def test_update_job_writes_status_detail_progress(tmp_path):
@@ -157,7 +133,7 @@ def test_delete_completed_job_succeeds(tmp_path):
 def test_delete_running_job_blocked(tmp_path):
     store = _make_store(tmp_path)
     store.upsert_job(_make_model())
-    store.claim_next_queued()
+    store.update_job("hugging face:test/repo", status="running")
     ok, reason = store.delete_job("hugging face:test/repo")
     assert ok is False
     assert reason == "active"
@@ -215,16 +191,69 @@ def test_normalize_target_ids_collapses_duplicates(tmp_path):
     assert jobs[0]["target_id"] in {"hugging face:owner/repo", "Hugging Face:owner/repo"}
 
 
-def test_recover_orphaned_running_jobs_marks_failed(tmp_path):
+@pytest.mark.parametrize("status", ["queued", "running", "canceling"])
+def test_recover_interrupted_jobs_marks_resumable_and_preserves_command(tmp_path, status):
     store = _make_store(tmp_path)
-    store.upsert_job(_make_model())
-    store.claim_next_queued()  # status -> running
+    job, _ = store.upsert_job(_make_model())
+    target = job["target_id"]
+    command = store.get_command(target)
+    store.update_job(target, status=status, progress="50%", return_code=7)
+    with store._connect() as conn:
+        conn.execute("UPDATE jobs SET cancel_requested = 1 WHERE target_id = ?", (target,))
 
-    store.recover_orphaned_running_jobs()
+    reopened = DownloadStore(store.db_path)
+    reopened.recover_interrupted_jobs()
 
-    job = store.get_job_by_target("hugging face:test/repo")
-    assert job["status"] == "failed"
-    assert "service restarted" in job["detail"]
+    recovered = reopened.get_job_by_target(target)
+    assert recovered["status"] == "interrupted"
+    assert "resume" in recovered["detail"]
+    assert recovered["progress"] == ""
+    assert recovered["cancel_requested"] is False
+    assert recovered["return_code"] is None
+    assert reopened.get_command(target) == command
+    assert reopened.upsert_job(_make_model())[1] is True
+
+
+@pytest.mark.parametrize("status", ["completed", "failed", "cancelled", "interrupted"])
+def test_recovery_leaves_terminal_jobs_unchanged(tmp_path, status):
+    store = _make_store(tmp_path)
+    job, _ = store.upsert_job(_make_model())
+    expected = store.update_job(job["target_id"], status=status, detail="Saved detail")
+    store.recover_interrupted_jobs()
+    assert store.get_job_by_target(job["target_id"]) == expected
+
+
+def test_existing_database_gains_metadata_columns_without_losing_history(tmp_path):
+    path = tmp_path / "legacy.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute("""CREATE TABLE jobs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, target_id TEXT NOT NULL UNIQUE,
+            source TEXT NOT NULL, publisher TEXT, name TEXT NOT NULL,
+            command_json TEXT NOT NULL, status TEXT NOT NULL, detail TEXT,
+            progress TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL,
+            cancel_requested INTEGER NOT NULL DEFAULT 0, return_code INTEGER
+        )""")
+        conn.execute("""INSERT INTO jobs (
+            target_id, source, name, command_json, status, detail, created_at, updated_at
+        ) VALUES ('ollama:legacy', 'Ollama', 'legacy', '["ollama", "pull", "legacy"]',
+            'completed', 'Saved download', 1, 2)""")
+    store = DownloadStore(path)
+    store.recover_interrupted_jobs()
+    job = store.get_job_by_target("ollama:legacy")
+    assert job["detail"] == "Saved download"
+    assert job["status"] == "completed"
+    assert job["created_at"] == 1
+    assert job["artifact_metadata"] is None
+    assert job["download_plan_status"] == "unplanned"
+    assert store.get_command("ollama:legacy") == ["ollama", "pull", "legacy"]
+
+
+def test_canceling_job_remains_reserved_until_worker_stops(tmp_path):
+    store = _make_store(tmp_path)
+    job, _ = store.upsert_job(_make_model())
+    store.update_job(job["target_id"], status="canceling")
+    assert store.upsert_job(_make_model())[1] is False
+    assert store.delete_job(job["target_id"]) == (False, "active")
 
 
 def test_migrate_legacy_hf_commands_rewrites_old_format(tmp_path):

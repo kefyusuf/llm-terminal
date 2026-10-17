@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from downloads.download_service import DownloadStore
+from downloads.store import DownloadStore
 
 
 def test_upsert_job_rejects_duplicate_active_target(tmp_path):
@@ -99,7 +99,7 @@ def test_normalize_target_ids_rolls_back_duplicate_removal_on_update_failure(tmp
     assert store.list_jobs(limit=10) == expected
 
 
-def test_recover_orphaned_running_jobs_marks_failed(tmp_path):
+def test_recover_interrupted_jobs_preserves_legacy_running_history(tmp_path):
     store = DownloadStore(tmp_path / "jobs.db")
     with store._connect() as conn:
         conn.execute(
@@ -123,11 +123,11 @@ def test_recover_orphaned_running_jobs_marks_failed(tmp_path):
             ),
         )
 
-    store.recover_orphaned_running_jobs()
+    store.recover_interrupted_jobs()
     jobs = store.list_jobs(limit=10)
     assert jobs[0] is not None
-    assert jobs[0]["status"] == "failed"
-    assert "service restarted" in jobs[0]["detail"]
+    assert jobs[0]["status"] == "interrupted"
+    assert "resume" in jobs[0]["detail"]
 
 
 def test_delete_job_removes_non_active_entry(tmp_path):

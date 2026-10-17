@@ -1,7 +1,6 @@
 """Regression coverage for the Hugging Face model download directory."""
 
 from config import Settings, _default_data_dir
-from downloads.runner import _hf_download_script
 
 
 def test_hf_models_dir_defaults_to_user_data_directory(monkeypatch):
@@ -17,11 +16,3 @@ def test_hf_models_dir_accepts_environment_override(monkeypatch, tmp_path):
     monkeypatch.setenv("AIMODEL_HF_MODELS_DIR", str(target))
 
     assert Settings(_env_file=None).hf_models_dir == target
-
-
-def test_hf_download_script_uses_supplied_directory_argument():
-    """The worker script must use the configured directory passed by its parent process."""
-    script = _hf_download_script()
-
-    assert "local_dir=sys.argv[3]" in script
-    assert "local_dir='models'" not in script

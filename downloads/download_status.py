@@ -10,6 +10,7 @@ STATE_LABELS = {
     "canceling": "Canceling",
     "completed": "Completed",
     "failed": "Failed",
+    "interrupted": "Interrupted",
     "cancelled": "Canceled",
 }
 
@@ -21,6 +22,7 @@ STATE_MARKUP = {
     "canceling": "[orange]Canceling[/orange]",
     "completed": "[green]Completed[/green]",
     "failed": "[red]Failed[/red]",
+    "interrupted": "[yellow]Interrupted[/yellow]",
     "cancelled": "[yellow]Canceled[/yellow]",
 }
 
@@ -59,7 +61,7 @@ def map_service_job_status(
         if cancel_requested or detail_text.startswith("cancel"):
             return "canceling"
         return "downloading"
-    if status in {"queued", "completed", "failed", "cancelled", "canceling"}:
+    if status in {"queued", "completed", "failed", "cancelled", "canceling", "interrupted"}:
         return status
     return "idle"
 

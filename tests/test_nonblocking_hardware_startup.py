@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import MagicMock
 
 import pytest
 from textual.widgets import DataTable, Input, Select
@@ -34,8 +35,8 @@ def configure(monkeypatch, cached=None):
         viewer_module, "get_provider_filter_labels", lambda: ["Ollama", "Hugging Face"]
     )
     # Keep an unrelated startup failure from racing the hardware-status assertions.
-    monkeypatch.setattr(startup_module, "ensure_service_running", lambda: True)
-    monkeypatch.setattr(startup_module, "list_jobs", lambda **kwargs: [])
+    monkeypatch.setattr("app.download_manager.BackendDownloadManager",
+                        lambda: MagicMock(list_jobs=lambda **kwargs: []))
     monkeypatch.setattr(startup_module.cache_db, "get_hardware_snapshot", lambda: cached)
     monkeypatch.setattr(startup_module.cache_db, "set_hardware_snapshot", lambda specs: None)
     monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)
