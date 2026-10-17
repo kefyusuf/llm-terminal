@@ -36,8 +36,8 @@ llm-terminal/
 ## Package Boundaries
 
 - `app/`: runtime viewer extensions, responsive startup, modals, widgets, search state, and TUI-side download coordination.
-- `downloads/`: download state, lifecycle helpers, command builder, and background service.
-  Includes the local service client used by the TUI and CLI, plus the standalone HF downloader.
+- `downloads/`: in-process download manager, provider backends, SQLite history,
+  download state, artifact preflight and provider argument helpers.
 - `core/`: shared cache persistence, hardware detection, logging, model metadata, scoring, quantization, and parsing helpers.
 - `results/`: results-table layout, formatting, and filtering.
 - `search/`: in-memory search cache, provider-aware pagination helpers, and parallel search orchestration with cancellation and diagnostics.
@@ -50,9 +50,12 @@ llm-terminal/
 - TUI: `main.py` -> `app.viewer.AIModelViewer` -> `app.startup_viewer.AIModelViewer` -> `tui_app.AIModelViewer` -> Textual `App`.
 - CLI: `cli.py` calls shared hardware/scoring services and provider search functions directly; it does not route every search through the TUI orchestrator.
 - REST: `api_server.py` owns its HTTP handlers and currently searches Ollama and Hugging Face.
-- Downloads: `python -m downloads.download_service` starts a separate localhost service; `downloads/api.py`, `downloads/store.py`, and `downloads/runner.py` own transport, persistence, and execution respectively.
+- Downloads: the TUI owns `downloads.manager.DownloadManager`; bounded worker threads
+  call `downloads/backends.py`, while `downloads/store.py` persists job history.
+  App exit cancels and joins workers. Startup marks abandoned queued/running jobs
+  interrupted; submitting again resumes retained HF partial files or Ollama pulls.
 
-The runtime viewer adds asynchronous service startup, provider selectors, live-first stale-cache fallback, and table-content consistency checks over the base TUI. Inspect this inheritance chain before changing a method in `tui_app.py`: the runtime may override it.
+The runtime viewer adds asynchronous startup, provider selectors, live-first stale-cache fallback, and table-content consistency checks over the base TUI. Inspect this inheritance chain before changing a method in `tui_app.py`: the runtime may override it.
 
 Search results use `providers.base.SearchResult` and model dictionaries described by `core.models.ModelResult`. The orchestrator returns `SearchOutcome`; the TUI applies it to `app/search_results_state.py` and renders it through `results/` helpers. Provider capabilities, rather than result counts, govern pagination and download support.
 

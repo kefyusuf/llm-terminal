@@ -105,59 +105,8 @@ def test_linked_auxiliary_cache_blocks_plan(tmp_path, monkeypatch):
     assert rejected["status"] == "unsafe_destination"
 
 
-def test_hf_child_cannot_report_success_without_a_real_file(tmp_path, monkeypatch):
-    import sys
-
-    from downloads.runner import _hf_download_script
-
-    monkeypatch.setitem(
-        sys.modules, "huggingface_hub", SimpleNamespace(hf_hub_download=lambda **kw: "missing")
-    )
-    monkeypatch.setattr(
-        sys, "argv", ["-c", "owner/repo", "model.gguf", str(tmp_path), "a" * 40, "100", ""]
-    )
-    with pytest.raises(ValueError, match="missing"):
-        exec(_hf_download_script(), {})
 
 
-def test_service_previews_and_queues_server_owned_plan(tmp_path, monkeypatch):
-    import json
-    import threading
-    from http.server import ThreadingHTTPServer
-    from urllib.request import Request, urlopen
-
-    import config
-    from downloads import preflight
-    from downloads.api import _make_handler
-
-    monkeypatch.setattr(config.settings, "hf_models_dir", tmp_path / "models")
-    monkeypatch.setattr(preflight.shutil, "disk_usage", lambda *_: SimpleNamespace(free=10**9))
-    state = SimpleNamespace(store=DownloadStore(tmp_path / "jobs.db"))
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(state, "test-token"))
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-
-        def request(path):
-            req = Request(
-                f"http://127.0.0.1:{server.server_port}{path}",
-                data=json.dumps({"model": selection()}).encode(),
-                headers={"Content-Type": "application/json", "Authorization": "Bearer test-token"},
-                method="POST",
-            )
-            with urlopen(req, timeout=3) as response:
-                return json.load(response)
-
-        plan = request("/jobs/plan")["plan"]
-        assert plan["allowed"]
-        assert state.store.list_jobs() == []
-        job = request("/jobs")["job"]
-        assert job["download_plan"]["destination"] == plan["destination"]
-        assert not (tmp_path / "models").exists()
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=3)
 
 
 def test_cli_offline_plan_has_versioned_json_and_no_queue(tmp_path, monkeypatch):
@@ -190,12 +139,6 @@ def test_copied_hf_command_is_exact_and_pinned():
     assert "--revision" in command
 
 
-def test_preflight_requires_new_service_protocol():
-    from downloads.service_client import is_service_compatible
-
-    assert not is_service_compatible({"version": "1.8"})
-    assert not is_service_compatible({"version": "2.0"})
-    assert is_service_compatible({"version": "2.1"})
 
 
 def test_unusable_configured_root_blocks_plan(tmp_path, monkeypatch):
@@ -279,38 +222,8 @@ def test_unknown_size_ui_click_is_explicit_acknowledgement():
     asyncio.run(scenario())
 
 
-def test_upgrade_does_not_interrupt_active_legacy_jobs(monkeypatch):
-    from downloads import service_client
-
-    actions = []
-    monkeypatch.setattr(service_client, "is_service_running", lambda: True)
-    monkeypatch.setattr(
-        service_client, "get_service_health", lambda: {"ok": True, "version": "1.8"}
-    )
-    monkeypatch.setattr(service_client, "list_jobs", lambda **kw: [{"status": "running"}])
-    monkeypatch.setattr(service_client, "stop_service", lambda: actions.append("stop") or True)
-    monkeypatch.setattr(service_client, "_start_service_process", lambda: actions.append("start"))
-    monkeypatch.setattr(service_client, "_wait_for_service", lambda **kw: True)
-    assert service_client.ensure_service_running() is False
-    assert actions == []
 
 
-def test_stop_service_never_kills_unrelated_matching_processes(monkeypatch):
-    from urllib.error import URLError
-
-    from downloads import service_client
-
-    def unavailable(*args, **kw):
-        raise URLError("unavailable")
-
-    monkeypatch.setattr(service_client, "_request", unavailable)
-    monkeypatch.setattr(service_client, "_owned_service_process", None, raising=False)
-    monkeypatch.setattr(
-        service_client,
-        "psutil",
-        SimpleNamespace(process_iter=lambda *a: pytest.fail("must not enumerate other processes")),
-    )
-    assert service_client.stop_service() is False
 
 
 @pytest.mark.parametrize("repository", [42, "a/b/c", "-flags", "../repo", "model name"])

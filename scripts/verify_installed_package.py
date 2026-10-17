@@ -25,15 +25,6 @@ def assert_installed_origin(origin, prefix, checkout, recorded):
 """
 exec(ORIGIN_VALIDATOR)
 
-LAUNCHER_VALIDATOR = """
-from pathlib import Path
-
-def assert_launcher_interpreter(executable, expected):
-    # Preserve the invoked POSIX venv path: its symlink resolves to base Python.
-    if Path(executable).absolute() != Path(expected).absolute():
-        raise ValueError("download service must use the installed interpreter")
-"""
-exec(LAUNCHER_VALIDATOR)
 
 INSTALLED_PROBE = (
     ORIGIN_VALIDATOR
@@ -48,7 +39,7 @@ recorded = {Path(distribution.locate_file(item)).resolve() for item in distribut
 modules = (
     "main", "cli", "api_server", "config", "tui_app", "app.viewer", "app.startup_viewer",
     "app.modals", "core.scoring", "core.diagnostics", "core.hardware", "core.exports", "core.model_facts",
-    "downloads.service_client", "downloads.download_service", "downloads.parent_lifetime", "providers.hf_provider",
+    "downloads.manager", "downloads.backends", "providers.hf_provider",
     "providers.ollama_provider", "providers.lmstudio_provider", "providers.docker_provider",
     "providers.mlx_provider", "results.results_presenter", "search.search_orchestration", "terminal_ui",
 )
@@ -66,41 +57,6 @@ print(json.dumps({
 }))
 """
 )
-
-SERVICE_CLIENT_PROBE = (
-    LAUNCHER_VALIDATOR
-    + """
-import subprocess
-import sys
-from pathlib import Path
-from downloads import service_client
-
-owned = []
-original = subprocess.Popen
-
-def start_owned(args, **kwargs):
-    expected = Path(sys.executable)
-    if sys.platform.startswith("win"):
-        expected = expected.with_name("pythonw.exe")
-    assert_launcher_interpreter(args[0], expected)
-    process = original(args, **kwargs)
-    owned.append(process)
-    return process
-
-service_client.subprocess.Popen = start_owned
-try:
-    service_client._start_service_process()
-    if len(owned) != 1 or owned[0].wait(timeout=20) != 0:
-        raise RuntimeError("installed download-service launch failed")
-finally:
-    for process in owned:
-        if process.poll() is None:
-            process.kill()
-        process.wait(timeout=5)
-print("installed-service-client-launch-ok")
-"""
-)
-
 
 def select_artifact(dist_dir: Path, kind: str) -> Path:
     candidates = sorted(dist_dir.glob("*.whl" if kind == "wheel" else "*.tar.gz"))
@@ -131,8 +87,6 @@ def isolated_environment(runtime: Path) -> dict[str, str]:
             "AIMODEL_CACHE_DB_PATH": str(runtime / "cache.db"),
             "AIMODEL_DOWNLOAD_DB_PATH": str(runtime / "downloads.db"),
             "AIMODEL_HF_MODELS_DIR": str(runtime / "models"),
-            "AIMODEL_DOWNLOAD_SERVICE_HOST": "127.0.0.1",
-            "AIMODEL_DOWNLOAD_SERVICE_TOKEN": "package-smoke-owned-token",
             "AIMODEL_OLLAMA_API_BASE": "http://127.0.0.1:1",
             "LMSTUDIO_HOST": "http://127.0.0.1:1",
             "DOCKER_MODEL_RUNNER_HOST": "http://127.0.0.1:1",
@@ -252,20 +206,9 @@ def verify_package(artifact: Path, checkout: Path) -> dict:
             45,
         )
         run_step("installed REST health", [str(python), "-I", "-m", "api_server"], cwd, env, 20)
-        run_step(
-            "installed download-service health and authenticated jobs",
-            [str(python), "-I", "-m", "downloads.download_service"],
-            cwd,
-            env,
-            20,
-        )
-        run_step(
-            "installed client subprocess launch",
-            [str(python), "-I", "-c", SERVICE_CLIENT_PROBE],
-            cwd,
-            env,
-            30,
-        )
+        run_step("installed download manager", [str(python), "-I", "-c",
+                 "from downloads.manager import DownloadManager; manager = DownloadManager(); "
+                 "assert manager.list_jobs() == []; manager.shutdown()"], cwd, env, 20)
         return {
             "schema_version": 1,
             "status": "passed",
@@ -285,8 +228,7 @@ def verify_package(artifact: Path, checkout: Path) -> dict:
                 "saved_comparison_json",
                 "tui_entry",
                 "rest_health",
-                "download_service_health_jobs",
-                "client_subprocess_launch",
+                "download_manager_lifecycle",
             ],
         }
 

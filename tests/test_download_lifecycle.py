@@ -1,6 +1,4 @@
 from downloads.download_lifecycle import (
-    cancel_error_detail_from_http_error,
-    delete_error_detail_from_http_error,
     entry_identity_keys,
     reset_results_download_state,
     should_cancel_before_delete,
@@ -8,24 +6,6 @@ from downloads.download_lifecycle import (
     trim_download_registry,
     upsert_download_registry_entry,
 )
-
-
-class _HttpErrorStub:
-    def __init__(self, payload: bytes):
-        self._payload = payload
-
-    def read(self):
-        return self._payload
-
-
-def test_cancel_error_detail_uses_error_payload_message():
-    err = _HttpErrorStub(b'{"error": "job not found"}')
-    assert cancel_error_detail_from_http_error(err) == "Cancel failed: job not found"
-
-
-def test_delete_error_detail_maps_active_job_message():
-    err = _HttpErrorStub(b'{"error": "cannot delete active job"}')
-    assert delete_error_detail_from_http_error(err) == "Cannot delete active job. Cancel it first."
 
 
 def test_should_cancel_before_delete_only_for_active_states():

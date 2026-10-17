@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from unittest.mock import MagicMock
 
 import app.startup_viewer as startup_module
 import app.viewer as viewer_module
@@ -40,11 +41,10 @@ def _configure_mount(monkeypatch) -> None:
     monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)
 
 
-def test_mount_runs_service_readiness_and_initial_job_io_off_ui_thread(monkeypatch):
-    """Mounted runtime startup must keep service readiness and first job I/O off the UI thread."""
+def test_mount_restores_initial_download_history_off_ui_thread(monkeypatch):
+    """History I/O runs off the UI thread and the first snapshot is applied on the UI thread."""
     _configure_mount(monkeypatch)
     ui_thread_id = threading.get_ident()
-    ensure_thread_ids: list[int] = []
     list_thread_ids: list[int] = []
     sync_calls: list[tuple[int, bool, object]] = []
     jobs = [
@@ -59,19 +59,14 @@ def test_mount_runs_service_readiness_and_initial_job_io_off_ui_thread(monkeypat
         }
     ]
 
-    def _ensure_service_running() -> bool:
-        ensure_thread_ids.append(threading.get_ident())
-        return True
-
     def _list_jobs(*, limit=50, timeout=2.0):
         _ = (limit, timeout)
         list_thread_ids.append(threading.get_ident())
         return jobs
 
-    monkeypatch.setattr(startup_module, "ensure_service_running", _ensure_service_running)
-    monkeypatch.setattr(startup_module, "list_jobs", _list_jobs)
 
     app = AIModelViewer()
+    app.dl._backend_manager = MagicMock(list_jobs=_list_jobs)
 
     def _sync_jobs(force=False, jobs=None):
         sync_calls.append((threading.get_ident(), force, jobs))
@@ -89,8 +84,6 @@ def test_mount_runs_service_readiness_and_initial_job_io_off_ui_thread(monkeypat
 
     asyncio.run(_run())
 
-    assert ensure_thread_ids
-    assert ensure_thread_ids[0] != ui_thread_id
     assert list_thread_ids
     assert list_thread_ids[0] != ui_thread_id
     assert sync_calls

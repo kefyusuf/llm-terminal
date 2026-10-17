@@ -11,8 +11,8 @@ import json
 import os
 import platform
 import sys
-import threading
 import time
+from contextlib import suppress
 from pathlib import Path
 
 
@@ -37,7 +37,7 @@ def prepare_workspace(path):
 
 
 def run_trial(args):
-    # Set isolation before imports that create default cache/service state.
+    # Set isolation before imports that create default cache/download state.
     root = prepare_workspace(args.work_dir)
     os.environ.update({
         "AIMODEL_CACHE_DB_PATH": str(root / "cache.db"),
@@ -52,8 +52,8 @@ def run_trial(args):
     import config
     from core.artifacts import hf_artifact_metadata
     from downloads.download_manager import build_download_command
+    from downloads.manager import DownloadManager
     from downloads.preflight import verify_hf_artifact
-    from downloads.runner import run_hf_download
     from downloads.store import DownloadStore
 
     config.settings.hf_models_dir = root / "models"
@@ -69,78 +69,50 @@ def run_trial(args):
         raise ValueError("upstream sample revision does not match the request")
     model["artifact_metadata"] = metadata
 
-    class State:
-        def __init__(self):
-            self.store = DownloadStore(root / "jobs.db")
-            self.process = None
-            self.started = threading.Event()
+    manager = DownloadManager(root / "jobs.db", max_workers=1, models_dir=root / "models")
 
-        def set_process(self, target, process):
-            self.process = process
-            self.started.set()
-
-        def clear_process(self, target):
-            pass  # Retain the owned handle for bounded cleanup.
-
-    state = State()
-    job, _ = state.store.upsert_job(model, models_dir=root / "models")
-    target = job["target_id"]
-    duplicate, created = state.store.upsert_job(model, models_dir=root / "models")
-    if created or duplicate["id"] != job["id"]:
-        raise RuntimeError("active duplicate replaced the original job")
-
-    def download(cancel_mode=None):
-        state.started.clear()
-        errors = []
-
-        def worker():
-            try:
-                run_hf_download(state, target, state.store.get_command(target))
-            except Exception as exc:
-                errors.append(type(exc).__name__)
-
-        thread = threading.Thread(target=worker, daemon=True)
-        thread.start()
+    def download(cancel_mode=None, *, check_duplicate=False):
+        submission = manager.create_job(model)
+        job = submission["job"]
+        target = job["target_id"]
+        if check_duplicate:
+            duplicate = manager.create_job(model)
+            if duplicate["queued"] or duplicate["job"]["id"] != job["id"]:
+                raise RuntimeError("active duplicate replaced the original job")
         partial_bytes = 0
         deadline = time.monotonic() + args.timeout
-        try:
-            if not state.started.wait(min(10, args.timeout)):
-                raise RuntimeError("owned download child did not start")
-            if cancel_mode == "early":
-                state.store.mark_cancel_requested(target)
-            elif cancel_mode == "partial":
-                directory = Path(job["download_plan"]["model_directory"])
-                while thread.is_alive() and time.monotonic() < deadline:
-                    partial_bytes = sum(path.stat().st_size for path in directory.rglob("*.incomplete")
-                                        if path.is_file())
-                    if partial_bytes > 0:
-                        state.store.mark_cancel_requested(target)
-                        break
-                    time.sleep(0.005)
-            thread.join(max(0, deadline - time.monotonic()))
-            if thread.is_alive() or errors:
-                raise RuntimeError("owned download failed or exceeded the deadline")
-            return state.store.get_job_by_target(target), partial_bytes
-        finally:
-            if thread.is_alive():
-                state.store.mark_cancel_requested(target)
-                thread.join(3)
-                if state.process is not None and state.process.poll() is None:
-                    state.process.kill()
-                    thread.join(3)
+        if cancel_mode == "early":
+            manager.cancel_job(target)
+        directory = Path(job["download_plan"]["model_directory"])
+        while time.monotonic() < deadline:
+            current = manager.store.get_job_by_target(target)
+            # Wait for worker bookkeeping before the next submission.
+            if (current["status"] not in {"queued", "running", "canceling"}
+                    and target not in manager.get_active_download_debug()["active_targets"]):
+                return current, partial_bytes, job
+            if cancel_mode == "partial" and partial_bytes == 0:
+                for path in directory.rglob("*.incomplete"):
+                    # The SDK may rename a completed partial file.
+                    with suppress(FileNotFoundError):
+                        partial_bytes += path.stat().st_size
+                if partial_bytes > 0:
+                    manager.cancel_job(target)
+            time.sleep(0.005)
+        manager.cancel_job(target)
+        raise RuntimeError("in-process download exceeded the trial deadline")
 
     started = time.monotonic()
-    cancelled, _ = download("early")
-    if cancelled["status"] != "cancelled":
-        raise RuntimeError("early cancellation did not produce a cancelled job")
-    state.store = DownloadStore(root / "jobs.db")
-    preserved = state.store.get_job_by_target(target)["download_plan"] == job["download_plan"]
-    state.store.upsert_job(model, models_dir=root / "models")
-    partial, partial_bytes = download("partial")
-    partial_observed = partial["status"] == "cancelled" and partial_bytes > 0
-    state.store = DownloadStore(root / "jobs.db")
-    state.store.upsert_job(model, models_dir=root / "models")
-    completed, _ = download()
+    try:
+        cancelled, _, job = download("early", check_duplicate=True)
+        if cancelled["status"] != "cancelled":
+            raise RuntimeError("early cancellation did not produce a cancelled job")
+        reopened = DownloadStore(root / "jobs.db")
+        preserved = reopened.get_job_by_target(job["target_id"])["download_plan"] == job["download_plan"]
+        partial, partial_bytes, _ = download("partial")
+        partial_observed = partial["status"] == "cancelled" and partial_bytes > 0
+        completed, _, _ = download()
+    finally:
+        manager.shutdown()
     report = {"schema_version": 1, "platform": platform.system(),
               "ci_source_sha": os.environ.get("GITHUB_SHA"),
               "python_version": platform.python_version(),
@@ -152,8 +124,9 @@ def run_trial(args):
               "partial_bytes_observed": partial_bytes, "completion_status": completed["status"],
               "elapsed_seconds": round(time.monotonic() - started, 3),
               "verified_bytes_and_sha256": False,
-              "limits": ["No inference or usage permission claim", "No forced service restart",
-                         "Partial resume belongs to the HF SDK; network byte reuse not measured",
+              "limits": ["No inference or usage permission claim", "No forced application restart",
+                         "Deadline requests cancellation; thread shutdown waits for network timeout",
+                         "SDK-compatible partial files retained; network byte reuse not measured",
                          "Byte limit caps selected file size, not retries or total wire bytes"]}
     if completed["status"] == "completed":
         verify_hf_artifact(job["download_plan"]["model_directory"], args.filename,

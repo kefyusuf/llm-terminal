@@ -398,28 +398,23 @@ def test_smoke_runs_tui_smoke_check(tmp_path, monkeypatch):
     assert calls[2][2]["env"]["AIMODEL_SMOKE"] == "1"
 
 
-def test_smoke_runs_download_service_check(tmp_path, monkeypatch):
+def test_smoke_runs_inprocess_download_manager_check(tmp_path, monkeypatch):
     dev = _load_dev_module()
     venv_python = tmp_path / ".venv" / "Scripts" / "python.exe"
     venv_python.parent.mkdir(parents=True)
     venv_python.write_text("", encoding="utf-8")
-
     calls = []
 
-    def _fake_run(cmd, check, cwd, **kwargs):
-        calls.append((cmd, cwd, kwargs))
-
-        class _Result:
-            returncode = 0
-
-        return _Result()
+    def fake_run(command, check, cwd, **kwargs):
+        calls.append((command, cwd, kwargs))
 
     monkeypatch.setattr(dev, "project_root", lambda: tmp_path)
     monkeypatch.setattr(dev.platform, "system", lambda: "Windows")
-    monkeypatch.setattr(dev.subprocess, "run", _fake_run)
+    monkeypatch.setattr(dev.subprocess, "run", fake_run)
 
     assert dev.smoke() == 0
-    assert calls[3][0] == [str(venv_python), "-m", "downloads.download_service"]
+    assert calls[3][0] == [str(venv_python), "-m", "downloads.manager"]
+    assert calls[3][1] == tmp_path
     assert calls[3][2]["timeout"] == 15
     assert calls[3][2]["env"]["AIMODEL_SMOKE"] == "1"
 

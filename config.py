@@ -79,14 +79,10 @@ class Settings(BaseSettings):
     ollama_api_base: str = "http://localhost:11434"
     ollama_timeout: int = 5
 
-    # Download service settings
+    # Download settings
     download_db_path: Path = Field(default_factory=_default_download_db_path)
-    download_service_host: str = "127.0.0.1"
-    download_service_port: int = 8765
-    download_service_token: str | None = None
     download_history_limit: int = 50
     download_history_refresh_interval: float = 0.9
-    download_poll_request_timeout: float = 0.35
     download_max_workers: int = 2
 
     # Hardware monitoring

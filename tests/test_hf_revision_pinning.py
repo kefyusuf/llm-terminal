@@ -1,12 +1,10 @@
 """Resolved HF revisions survive enrichment, persistence and execution."""
 
-import sys
 from types import SimpleNamespace
 
 import pytest
 
 from downloads.download_manager import build_download_command
-from downloads.runner import _hf_download_script
 from downloads.store import DownloadStore
 from providers import hf_provider
 
@@ -40,24 +38,6 @@ def test_command_rejects_non_commit_revision(revision):
         build_download_command(selected)
 
 
-@pytest.mark.parametrize("revision", [REVISION, ""])
-def test_download_script_passes_revision_to_sdk(monkeypatch, revision):
-    calls = []
-    monkeypatch.setitem(
-        sys.modules,
-        "huggingface_hub",
-        SimpleNamespace(hf_hub_download=lambda **kw: calls.append(kw)),
-    )
-    monkeypatch.setattr(sys, "argv", ["-c", "owner/repo", "model.gguf", "destination", revision])
-    exec(_hf_download_script(), {})
-    assert calls == [
-        {
-            "repo_id": "owner/repo",
-            "filename": "model.gguf",
-            "local_dir": "destination",
-            "revision": revision or None,
-        }
-    ]
 
 
 def test_queued_revision_survives_restart_and_duplicate_request(tmp_path):
@@ -80,7 +60,7 @@ def test_queued_revision_survives_restart_and_duplicate_request(tmp_path):
     )
     reopened = DownloadStore(path)
     assert reopened.get_command(queued["target_id"])[3] == REVISION
-    assert reopened.claim_next_queued()["artifact"] == queued["artifact"]
+    assert reopened.get_job_by_target(queued["target_id"])["artifact"] == queued["artifact"]
 
 
 def test_legacy_job_exposes_unknown_revision(tmp_path):

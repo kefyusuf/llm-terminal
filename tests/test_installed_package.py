@@ -33,21 +33,6 @@ def test_rejects_checkout_and_non_distribution_imports(tmp_path):
             verifier.assert_installed_origin(origin, prefix, checkout, recorded)
 
 
-def test_launcher_accepts_venv_interpreter_without_resolving_its_symlink(tmp_path, monkeypatch):
-    verifier = load_verifier()
-
-    def unexpected_resolve(*args, **kwargs):
-        raise AssertionError(
-            "POSIX venv interpreter symlinks must not be resolved to the base Python"
-        )
-
-    monkeypatch.setattr(Path, "resolve", unexpected_resolve)
-    expected = tmp_path / "environment" / "bin" / "python"
-    verifier.assert_launcher_interpreter(expected, expected)
-    with pytest.raises(ValueError, match="installed interpreter"):
-        verifier.assert_launcher_interpreter(tmp_path / "base-python", expected)
-
-
 def test_environment_removes_source_paths_and_user_configuration(tmp_path, monkeypatch):
     verifier = load_verifier()
     monkeypatch.setenv("PYTHONPATH", "/checkout")
@@ -62,7 +47,7 @@ def test_environment_removes_source_paths_and_user_configuration(tmp_path, monke
     assert "HF_TOKEN" not in env and "AIMODEL_HF_TOKEN" not in env
     assert env["AIMODEL_SMOKE"] == "1"
     assert Path(env["AIMODEL_CACHE_DB_PATH"]).parent == tmp_path
-    assert env["AIMODEL_DOWNLOAD_SERVICE_HOST"] == "127.0.0.1"
+    assert "AIMODEL_DOWNLOAD_SERVICE_HOST" not in env
     assert env["LMSTUDIO_HOST"] != "http://private"
     assert "PIP_TARGET" not in env and "PIP_USER" not in env
 

@@ -123,8 +123,10 @@ def plan_hf_download(model, models_dir, *, reserved_bytes=0, allow_unknown_size=
     return plan
 
 
-def verify_hf_artifact(directory, filename, size=None, sha256=None):
+def verify_hf_artifact(directory, filename, size=None, sha256=None, *, cancel_check=None):
     """Require a real contained file and match all supplied byte/digest facts."""
+    if cancel_check is not None:
+        cancel_check()
     validate_hf_target_file(filename)
     root = Path(directory).resolve()
     check_managed_directory(root)
@@ -138,7 +140,11 @@ def verify_hf_artifact(directory, filename, size=None, sha256=None):
             digest = hashlib.sha256()
             with path.open("rb") as handle:
                 for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    if cancel_check is not None:
+                        cancel_check()
                     digest.update(chunk)
+            if cancel_check is not None:
+                cancel_check()
             if digest.hexdigest().lower() != sha256.lower():
                 raise ValueError("downloaded artifact SHA-256 does not match metadata")
     except OSError as exc:

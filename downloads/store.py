@@ -1,23 +1,4 @@
-"""Download job persistence — SQLite-backed CRUD + migrations.
-
-Extracted from downloads/download_service.py during the architecture
-review (candidate #5). Owns the ``jobs`` table schema, the
-``DownloadStore`` repository, and three one-shot migrations:
-
-- ``normalize_target_ids``: collapse duplicate target_ids that
-  accumulated across versions.
-- ``recover_orphaned_running_jobs``: mark running jobs as failed on
-  service startup (they were abandoned by the previous process).
-- ``migrate_legacy_hf_commands``: rewrite old
-  ``huggingface_hub.commands.huggingface_cli ...`` commands to the
-  new ``hf_api_download`` sentinel format.
-
-The store has zero imports outside ``sqlite3``/``json``/``threading``/
-``pathlib`` and the project-internal ``download_manager`` (for
-``download_target_id`` / ``build_download_command``). It can be
-instantiated with a fresh path in tests and exercised in isolation
-without spinning up the service.
-"""
+"""SQLite download history, compatible schema migrations, and safe artifact plans."""
 
 from __future__ import annotations
 
@@ -25,6 +6,7 @@ import json
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from core.artifacts import bound_artifact_metadata
@@ -48,10 +30,15 @@ class DownloadStore:
         self.lock = threading.Lock()
         self._init_db()
 
+    @contextmanager
     def _connect(self):
         conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _init_db(self):
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -110,15 +97,16 @@ class DownloadStore:
             for normalized, row_id in update_rows:
                 conn.execute("UPDATE jobs SET target_id = ? WHERE id = ?", (normalized, row_id))
 
-    def recover_orphaned_running_jobs(self):
+    def recover_interrupted_jobs(self):
+        """Recover work abandoned when the owning application exited."""
         now = time.time()
         with self.lock, self._connect() as conn:
             conn.execute(
                 """
                 UPDATE jobs
-                SET status = 'failed', detail = 'service restarted during download',
-                    progress = '', cancel_requested = 0, updated_at = ?
-                WHERE status = 'running'
+                SET status = 'interrupted', detail = 'App exited during download; submit again to resume',
+                    progress = '', cancel_requested = 0, return_code = NULL, updated_at = ?
+                WHERE status IN ('queued', 'running', 'canceling')
                 """,
                 (now,),
             )
@@ -235,7 +223,7 @@ class DownloadStore:
         return self._row_to_dict(row)
 
     def _reserved_bytes(self, conn, exclude_target=None):
-        rows = conn.execute("SELECT * FROM jobs WHERE status IN ('queued', 'running') AND target_id != ?", (exclude_target or "",)).fetchall()
+        rows = conn.execute("SELECT * FROM jobs WHERE status IN ('queued', 'running', 'canceling') AND target_id != ?", (exclude_target or "",)).fetchall()
         return sum((self._row_to_dict(row).get("artifact_metadata") or {}).get("size_bytes") or 0 for row in rows)
 
     def plan_job(self, model, models_dir):
@@ -263,7 +251,7 @@ class DownloadStore:
                 "SELECT * FROM jobs WHERE target_id = ?", (target_id,)
             ).fetchone()
 
-            if existing is not None and existing["status"] in {"queued", "running"}:
+            if existing is not None and existing["status"] in {"queued", "running", "canceling"}:
                 return self._row_to_dict(existing), False
 
             plan = None
@@ -336,27 +324,6 @@ class DownloadStore:
             row = conn.execute("SELECT * FROM jobs WHERE target_id = ?", (target_id,)).fetchone()
         return self._row_to_dict(row)
 
-    def claim_next_queued(self, *, exclude_targets=()):
-        now = time.time()
-        excluded = tuple(exclude_targets)
-        exclusion = ""
-        if excluded:
-            placeholders = ",".join("?" for _ in excluded)
-            exclusion = f" AND target_id NOT IN ({placeholders})"
-        with self.lock, self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM jobs WHERE status = 'queued'" + exclusion
-                + " ORDER BY updated_at ASC LIMIT 1", excluded,
-            ).fetchone()
-            if row is None:
-                return None
-            conn.execute(
-                "UPDATE jobs SET status = 'running', detail = 'Starting', updated_at = ? WHERE id = ?",
-                (now, row["id"]),
-            )
-            updated = conn.execute("SELECT * FROM jobs WHERE id = ?", (row["id"],)).fetchone()
-        return self._row_to_dict(updated)
-
     def update_job(self, target_id, status=None, detail=None, progress=None, return_code=None):
         now = time.time()
         fields = ["updated_at = ?"]
@@ -400,7 +367,7 @@ class DownloadStore:
             ).fetchone()
             if row is None:
                 return False, "not_found"
-            if row["status"] in {"queued", "running"}:
+            if row["status"] in {"queued", "running", "canceling"}:
                 return False, "active"
             if delete_data:
                 job = self._row_to_dict(row)
@@ -427,8 +394,6 @@ class DownloadStore:
         return True, "deleted"
 
 
-# Re-exported for tests/legacy callers; this used to live in
-# download_service.py and the migration module imports it directly.
 def normalize_target_id(target_id: str) -> str:
     from .download_manager import normalize_target_id as _normalize
 

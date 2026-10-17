@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import MagicMock
 
 from textual.widgets import Select
 
@@ -31,7 +32,8 @@ class _DummyMonitor:
 def _configure_mount(monkeypatch) -> None:
     monkeypatch.delenv("AIMODEL_SMOKE", raising=False)
     monkeypatch.setattr(base_app, "HardwareMonitor", _DummyMonitor)
-    monkeypatch.setattr(base_app, "ensure_service_running", lambda: True)
+    monkeypatch.setattr("app.download_manager.BackendDownloadManager",
+                        lambda: MagicMock(list_jobs=lambda **kwargs: []))
     monkeypatch.setattr(base_app.cache_db, "init_db", lambda: None)
     monkeypatch.setattr(base_app.cache_db, "cleanup_old_entries", lambda: None)
     monkeypatch.setattr(base_app.cache_db, "get_hardware_snapshot", lambda: None)

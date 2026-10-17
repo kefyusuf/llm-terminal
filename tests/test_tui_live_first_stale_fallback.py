@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import time
+from unittest.mock import MagicMock
 
 from textual.widgets import DataTable
 
@@ -67,6 +69,8 @@ class _SearchViewer(AIModelViewer):
 def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
     monkeypatch.setattr("tui_app.HardwareMonitor", _DummyMonitor)
     monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ["Ollama"])
+    monkeypatch.setattr("app.download_manager.BackendDownloadManager",
+                        lambda: MagicMock(list_jobs=lambda **kwargs: []))
 
     calls: list[tuple[int, str, tuple[str, ...]]] = []
 
@@ -92,7 +96,10 @@ def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
             )
 
             app.start_search("qwen")
-            await pilot.pause(0.5)
+            deadline = time.monotonic() + 10
+            while app.last_search_error != "Offline — showing cached results":
+                assert time.monotonic() < deadline, "Timed out waiting for stale fallback"
+                await pilot.pause(0.05)
 
             assert calls == [(1, "qwen", ("ollama",))]
             assert [model["name"] for model in app.all_results] == ["qwen2.5:7b"]

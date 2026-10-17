@@ -14,7 +14,7 @@ AI Model Explorer helps answer three practical questions:
 2. Which models will actually fit this hardware?
 3. How can I compare or download them without switching between several tools?
 
-The repository combines a Textual TUI, a scriptable Click CLI, a localhost REST API, hardware-aware scoring, provider orchestration, stale-cache fallback, and a persistent background download service.
+The repository combines a Textual TUI, a scriptable Click CLI, a localhost REST API, hardware-aware scoring, provider orchestration, stale-cache fallback, and an in-process download manager with persistent history.
 
 ## Features
 
@@ -75,14 +75,13 @@ REST `/api/v1/providers` returns availability immediately with additive `discove
 
 ### Download Management
 
-- Persistent localhost download service.
+- Application-owned download manager with persistent SQLite history.
 - Queue, monitor, cancel and delete jobs.
 - Bounded parallel workers (`AIMODEL_DOWNLOAD_MAX_WORKERS`, default `2`).
 - Ollama pull and Hugging Face download paths.
-- Persistent history independent of TUI lifetime.
+- Downloads stop when the app exits. Interrupted jobs remain in history and can be submitted again to resume HF partial files or Ollama pulls.
 - Periodic polling failures preserve the last known download state and surface deduplicated stale/recovery status instead of silently appearing current.
 - Action-triggered download synchronization also preserves last-known state and reports a failed refresh instead of silently appearing current; unexpected programming failures are not masked.
-- Loopback-only transport; optional bearer token for non-health service endpoints.
 
 ### REST API
 
@@ -166,11 +165,11 @@ Use a supported Python 3.10-3.14 interpreter for bootstrap. On Windows that can 
 
 `scripts/dev.py verify` runs the required local checks: pytest, import smoke and Ruff.
 
-`scripts/dev.py coverage` runs the deterministic pytest-cov lane and enforces the threshold configured in `pyproject.toml`. The canonical Ubuntu/Python 3.12 lane now measures **67.44% total coverage** (`5095` statements, `1659` missed) and enforces a **60%** merge floor. Focused deterministic tests raised `downloads/runner.py` from **24% to 90%**, `downloads/service_client.py` from **46% to 90%**, and `core/hardware.py` from **44% to 52%** while pinning concrete correctness contracts. The staged 50% → 55% → 60% coverage ratchet is complete; future increases should remain evidence-driven and must not rely on production-code exclusions.
+`scripts/dev.py coverage` runs the deterministic pytest-cov lane and enforces the threshold configured in `pyproject.toml`. The recorded Ubuntu/Python 3.12 result before the in-process download refactor was **67.44% total coverage** (`5095` statements, `1659` missed), with a **60%** merge floor. Those measurements include the retired service implementation and do not measure the new manager. The staged 50% → 55% → 60% coverage ratchet is complete; future increases should remain evidence-driven and must not rely on production-code exclusions.
 
-`scripts/dev.py smoke` runs bounded/offline-safe smoke checks for the CLI, REST API, TUI startup path and download service.
+`scripts/dev.py smoke` runs bounded/offline-safe smoke checks for the CLI, REST API, TUI startup path and download manager lifecycle.
 
-Package CI verifies wheel installations on Linux/Windows/macOS with Python 3.10–3.14 and sdist installations on each OS with Python 3.12, using fresh environments outside the checkout. It checks installed module origins, console scripts, REST and download-service startup and records resolved dependencies. See [installed package validation](docs/installed-package-validation.md) for the checks, local evidence and limits.
+Package CI verifies wheel installations on Linux/Windows/macOS with Python 3.10–3.14 and sdist installations on each OS with Python 3.12, using fresh environments outside the checkout. It checks installed module origins, console scripts, REST startup and the download manager lifecycle, and records resolved dependencies. See [installed package validation](docs/installed-package-validation.md) for the checks, local evidence and limits.
 
 The [operation-specific support matrix](docs/support-matrix.md) separates tested
 installation/startup from live download recovery and unverified inference.
@@ -226,9 +225,6 @@ python -m api_server --port 9000
 |---|---|---|
 | `AIMODEL_HF_TOKEN` | - | Canonical Hugging Face read-only token; standard `HF_TOKEN` is accepted as fallback |
 | `AIMODEL_HF_MODELS_DIR` | OS-specific user-data `models/` | Hugging Face model download directory |
-| `AIMODEL_DOWNLOAD_SERVICE_HOST` | `127.0.0.1` | Download-service bind/client host; non-loopback hosts are rejected |
-| `AIMODEL_DOWNLOAD_SERVICE_PORT` | `8765` | Download-service port |
-| `AIMODEL_DOWNLOAD_SERVICE_TOKEN` | - | Optional bearer token for download-service endpoints except `/health` |
 | `AIMODEL_DOWNLOAD_MAX_WORKERS` | `2` | Parallel download worker count |
 | `AIMODEL_HF_SEARCH_LIMIT` | `15` | Hugging Face results per page |
 | `AIMODEL_HF_SEARCH_MAX_PAGES` | `10` | Maximum Hugging Face pages |
@@ -244,7 +240,6 @@ python -m api_server --port 9000
 AIMODEL_HF_TOKEN=hf_your_token_here
 # HF_TOKEN=hf_your_token_here
 # AIMODEL_HF_MODELS_DIR=/custom/path/models
-# AIMODEL_DOWNLOAD_SERVICE_TOKEN=replace-with-a-long-random-secret
 AIMODEL_UI_MODE=compact
 AIMODEL_THEME=nord
 ```
@@ -284,7 +279,7 @@ llm-terminal/
   providers/                # Provider implementations + capabilities
   search/                   # Search cache/orchestration/cancellation/pagination
   results/                  # Result layout/presentation/filtering
-  downloads/                # Download service, API, store, runner, client/helpers
+  downloads/                # In-process manager, provider backends, history/preflight helpers
   requirements/             # Dependency intent + committed Windows/Linux locks
   scripts/                  # Dev/release/maintenance tools
   terminal_ui/              # Theme/style assets and isolated legacy internals
@@ -333,7 +328,7 @@ Documentation maintenance rules are in `docs/maintenance.md`.
 
 - `terminal_ui/` is not the primary application entry point; it mainly contains theme/style assets plus isolated legacy internals.
 - Runtime databases, logs and Hugging Face model files use OS-specific per-user application-data locations by default; configuration can override them.
-- The download service remains loopback-only. LAN/public transport is intentionally rejected until an authenticated TLS design exists.
+- Download workers belong to the TUI process; history persists after downloads stop on app exit.
 - REST API binds to `127.0.0.1:8787` by default and is intended for local use.
 - Optional provider detection failures are contained so unavailable local runtimes do not prevent other providers from working.
 - Ollama remote discovery still depends on `ollama.com` HTML structure; parser resilience is an active roadmap priority.

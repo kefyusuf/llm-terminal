@@ -201,21 +201,6 @@ def collect_diagnostics(
             True,
         ),
     }
-    from downloads.service_client import service_base_url
-
-    try:
-        endpoints["download_service"] = (service_base_url() + "/health", False)
-    except (RuntimeError, ValueError):
-        checks.append(
-            {
-                "name": "download_service",
-                **_result(
-                    "error",
-                    "invalid_endpoint",
-                    "Configure a loopback download-service host and valid port.",
-                ),
-            }
-        )
     completed: queue.Queue[tuple[str, dict[str, Any]]] = queue.Queue()
 
     def run(name: str, url: str, required: bool) -> None:

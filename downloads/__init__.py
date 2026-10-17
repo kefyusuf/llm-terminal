@@ -1,1 +1,1 @@
-"""Download domain helpers and background service package."""
+"""Application-owned downloads and persistent history."""
