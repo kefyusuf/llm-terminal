@@ -10,12 +10,10 @@ from unittest.mock import MagicMock
 import pytest
 from textual.widgets import DataTable, Input, Select
 
-import app.startup_viewer as startup_module
-import app.viewer as viewer_module
 import tui_app
-from app.viewer import AIModelViewer
 from app.widgets import SystemInfoWidget
 from providers import SearchResult
+from tui_app import AIModelViewer
 
 SPECS = {
     "cpu_name": "Detected CPU",
@@ -32,14 +30,14 @@ SPECS = {
 def configure(monkeypatch, cached=None):
     monkeypatch.delenv("AIMODEL_SMOKE", raising=False)
     monkeypatch.setattr(
-        viewer_module, "get_provider_filter_labels", lambda: ["Ollama", "Hugging Face"]
+        "app.search_controller.get_provider_filter_labels", lambda: ["Ollama", "Hugging Face"]
     )
     # Keep an unrelated startup failure from racing the hardware-status assertions.
-    monkeypatch.setattr("app.download_manager.BackendDownloadManager",
+    monkeypatch.setattr("app.download_tracker.DownloadManager",
                         lambda: MagicMock(list_jobs=lambda **kwargs: []))
-    monkeypatch.setattr(startup_module.cache_db, "get_hardware_snapshot", lambda: cached)
-    monkeypatch.setattr(startup_module.cache_db, "set_hardware_snapshot", lambda specs: None)
-    monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)
+    monkeypatch.setattr(tui_app.cache_db, "get_hardware_snapshot", lambda: cached)
+    monkeypatch.setattr(tui_app.cache_db, "set_hardware_snapshot", lambda specs: None)
+    monkeypatch.setattr("app.download_controller.DownloadController.request_poll", lambda self, force=False: None)
 
 
 @pytest.mark.parametrize("cached", [None, dict(SPECS, cpu_name="Cached CPU")])
@@ -63,19 +61,19 @@ def test_hardware_probe_leaves_mounted_input_and_cached_header_usable(monkeypatc
         assert threading.get_ident() != ui_thread, "process scan ran on UI thread"
         return True
 
-    monkeypatch.setattr(tui_app, "HardwareMonitor", SlowMonitor)
-    monkeypatch.setattr(tui_app, "check_ollama_running", check_running)
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", SlowMonitor)
+    monkeypatch.setattr("app.status_bar.check_ollama_running", check_running)
 
     async def run():
         app = AIModelViewer()
         # Exercise a scheduled search that outlives a single pilot pause.
-        app._search_debounce_delay = 0.5
+        app.search.debounce_delay = 0.5
 
         def search(query, specs, **kwargs):
             searches.append((query, specs.copy()))
             return SearchResult.empty()
 
-        monkeypatch.setattr(app.hf_provider, "search", search)
+        monkeypatch.setattr(app.search.hf_provider, "search", search)
         async with app.run_test(size=(120, 40)) as pilot:
             try:
                 for _ in range(40):
@@ -87,10 +85,10 @@ def test_hardware_probe_leaves_mounted_input_and_cached_header_usable(monkeypatc
                 if cached:
                     assert "Cached CPU" in str(header.render())
                     assert "checking" in str(header.render())
-                    assert app._current_specs_for_search_ui()["cpu_name"] == "Cached CPU"
+                    assert app.status.specs_for_search()["cpu_name"] == "Cached CPU"
                 else:
                     assert "Detecting hardware" in str(header.render())
-                    assert app._current_specs_for_search_ui()["cpu_name"] == "Detecting hardware"
+                    assert app.status.specs_for_search()["cpu_name"] == "Detecting hardware"
                 search_input = app.query_one("#search-input", Input)
                 search_input.focus()
                 await pilot.press("x")
@@ -99,30 +97,30 @@ def test_hardware_probe_leaves_mounted_input_and_cached_header_usable(monkeypatc
                 await pilot.pause()
                 await pilot.press("enter")
                 for _ in range(120):
-                    if app.search_counter == 1:
+                    if app.state.counter == 1:
                         break
                     await asyncio.sleep(0.025)
-                assert app.search_counter == 1
+                assert app.state.counter == 1
                 assert app.query_one("#results-table", DataTable).loading
                 release.set()
                 for _ in range(120):
                     if (
-                        app.latest_specs == SPECS
-                        and app.ollama_running
+                        app.status.latest_specs == SPECS
+                        and app.status.ollama_running
                         and searches
                         and not app.query_one("#results-table", DataTable).loading
                     ):
                         break
                     await asyncio.sleep(0.025)
-                assert app.latest_specs == SPECS
-                assert app.ollama_running is True
+                assert app.status.latest_specs == SPECS
+                assert app.status.ollama_running is True
                 assert searches == [("x", SPECS)]
                 assert not app.query_one("#results-table", DataTable).loading
                 assert "Detected GPU" in str(header.render())
             finally:
                 release.set()
-                if app._search_debounce_timer is not None:
-                    app._search_debounce_timer.stop()
+                if app.search._debounce_timer is not None:
+                    app.search._debounce_timer.stop()
 
     try:
         asyncio.run(run())
@@ -141,13 +139,13 @@ def test_concurrent_workers_reuse_one_hardware_initialization(monkeypatch):
             entered.set()
             release.wait(5)
 
-    monkeypatch.setattr(tui_app, "HardwareMonitor", SlowMonitor)
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", SlowMonitor)
     app = AIModelViewer()
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
-            first = pool.submit(app._get_hardware_monitor)
+            first = pool.submit(app.status.hardware_monitor)
             assert entered.wait(1)
-            second = pool.submit(app._get_hardware_monitor)
+            second = pool.submit(app.status.hardware_monitor)
             # Both concurrent consumers must remain pending until detection completes.
             threading.Event().wait(0.1)
             assert not first.done() and not second.done()
@@ -172,26 +170,26 @@ def test_failed_hardware_initialization_reports_pending_retry_and_recovers(monke
         def get_specs(self):
             return SPECS.copy()
 
-    monkeypatch.setattr(tui_app, "HardwareMonitor", RecoveringMonitor)
-    monkeypatch.setattr(tui_app, "check_ollama_running", lambda: False)
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", RecoveringMonitor)
+    monkeypatch.setattr("app.status_bar.check_ollama_running", lambda: False)
 
     async def run():
         app = AIModelViewer()
         async with app.run_test(size=(120, 40)):
             for _ in range(80):
-                if attempts and not app._system_info_refresh_running:
+                if attempts and not app.status._refresh_running:
                     break
                 await asyncio.sleep(0.01)
-            assert app.latest_specs is None
+            assert app.status.latest_specs is None
             assert "unavailable" in str(app.query_one(SystemInfoWidget).render())
             prior_attempts = len(attempts)
             recover.set()
-            app.request_system_info_refresh(force=True)
+            app.status.request_system_info_refresh(force=True)
             for _ in range(80):
-                if app.latest_specs == SPECS:
+                if app.status.latest_specs == SPECS:
                     break
                 await asyncio.sleep(0.01)
-            assert app.latest_specs == SPECS
+            assert app.status.latest_specs == SPECS
             assert len(attempts) == prior_attempts + 1
             assert "Detected GPU" in str(app.query_one(SystemInfoWidget).render())
 
@@ -208,20 +206,20 @@ def test_hardware_failure_in_user_workers_keeps_application_open(monkeypatch, op
             threading.Event().wait(worker_delay)
         raise OSError("private probe path")
 
-    monkeypatch.setattr(tui_app, "HardwareMonitor", unavailable)
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", unavailable)
 
     async def run():
         app = AIModelViewer()
-        monkeypatch.setattr(app.search_cache, "get", lambda *args: None)
-        monkeypatch.setattr(app.search_cache, "get_stale", lambda *args: None)
+        monkeypatch.setattr(app.search.cache, "get", lambda *args: None)
+        monkeypatch.setattr(app.search.cache, "get_stale", lambda *args: None)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
             await asyncio.wait_for(app.workers.wait_for_complete(), timeout=5)
             await pilot.pause()
             if operation == "search":
-                app.start_search("example")
+                app.search.start("example")
             else:
-                app.open_hf_detail_worker({"id": "example/model"})
+                app.details.open_hf_detail({"id": "example/model"})
 
             async def wait_for_hardware_failure():
                 while "Hardware detection unavailable" not in str(app.query_one("#status-bar").render()):
@@ -236,7 +234,7 @@ def test_hardware_failure_in_user_workers_keeps_application_open(monkeypatch, op
             search_input.focus()
             await pilot.press("x")
             assert search_input.value == "x"
-            if app._search_debounce_timer is not None:
-                app._search_debounce_timer.stop()
+            if app.search._debounce_timer is not None:
+                app.search._debounce_timer.stop()
 
     asyncio.run(run())

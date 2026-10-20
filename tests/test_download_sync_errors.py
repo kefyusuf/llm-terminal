@@ -5,12 +5,12 @@ from urllib.error import URLError
 
 import pytest
 
-from app.download_manager import DownloadManager
+from app.download_tracker import DownloadTracker
 from downloads.manager import DownloadManager as BackendDownloadManager
 
 
-def _manager() -> DownloadManager:
-    return DownloadManager(
+def _manager() -> DownloadTracker:
+    return DownloadTracker(
         update_status=MagicMock(),
         refresh_table=MagicMock(),
         refresh_download_history_table=MagicMock(),

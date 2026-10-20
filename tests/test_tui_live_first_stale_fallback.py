@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 from textual.widgets import DataTable
 
-from app.viewer import AIModelViewer
+from tui_app import AIModelViewer
 
 STALE_MODEL = {
     "source": "Ollama",
@@ -55,8 +55,8 @@ class _FailedOutcome:
 
 class _SearchViewer(AIModelViewer):
     async def on_mount(self) -> None:
-        self._apply_ui_mode()
-        self._configure_results_table_columns(force=True)
+        self.layout.apply_ui_mode()
+        self.table.configure_columns(force=True)
         self.query_one("#results-table", DataTable).zebra_stripes = True
 
     def request_system_info_refresh(self, force=False) -> None:
@@ -67,9 +67,9 @@ class _SearchViewer(AIModelViewer):
 
 
 def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
-    monkeypatch.setattr("tui_app.HardwareMonitor", _DummyMonitor)
-    monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ["Ollama"])
-    monkeypatch.setattr("app.download_manager.BackendDownloadManager",
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", _DummyMonitor)
+    monkeypatch.setattr("app.search_controller.get_provider_filter_labels", lambda: ["Ollama"])
+    monkeypatch.setattr("app.download_tracker.DownloadManager",
                         lambda: MagicMock(list_jobs=lambda **kwargs: []))
 
     calls: list[tuple[int, str, tuple[str, ...]]] = []
@@ -85,9 +85,9 @@ def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
         app = _SearchViewer()
         async with app.run_test(size=(100, 30)) as pilot:
             specs = _DummyMonitor().get_specs()
-            app.latest_specs = specs
-            app.search_cache.ttl_seconds = -1
-            app.search_cache.set(
+            app.status.latest_specs = specs
+            app.search.cache.ttl_seconds = -1
+            app.search.cache.set(
                 "ollama:qwen",
                 results=[STALE_MODEL],
                 error="",
@@ -95,14 +95,14 @@ def test_expired_cache_is_used_only_after_live_search_failure(monkeypatch):
                 specs=specs,
             )
 
-            app.start_search("qwen")
+            app.search.start("qwen")
             deadline = time.monotonic() + 10
-            while app.last_search_error != "Offline — showing cached results":
+            while app.state.last_error != "Offline — showing cached results":
                 assert time.monotonic() < deadline, "Timed out waiting for stale fallback"
                 await pilot.pause(0.05)
 
             assert calls == [(1, "qwen", ("ollama",))]
-            assert [model["name"] for model in app.all_results] == ["qwen2.5:7b"]
-            assert app.last_search_error == "Offline — showing cached results"
+            assert [model["name"] for model in app.state.results] == ["qwen2.5:7b"]
+            assert app.state.last_error == "Offline — showing cached results"
 
     asyncio.run(_run())

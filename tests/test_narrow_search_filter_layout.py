@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 from textual.widgets import Select
 
-import app.viewer as viewer_module
 import tui_app as base_app
+from tui_app import AIModelViewer
 
 
 class _DummyMonitor:
@@ -31,21 +31,19 @@ class _DummyMonitor:
 
 def _configure_mount(monkeypatch) -> None:
     monkeypatch.delenv("AIMODEL_SMOKE", raising=False)
-    monkeypatch.setattr(base_app, "HardwareMonitor", _DummyMonitor)
-    monkeypatch.setattr("app.download_manager.BackendDownloadManager",
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", _DummyMonitor)
+    monkeypatch.setattr("app.download_tracker.DownloadManager",
                         lambda: MagicMock(list_jobs=lambda **kwargs: []))
     monkeypatch.setattr(base_app.cache_db, "init_db", lambda: None)
     monkeypatch.setattr(base_app.cache_db, "cleanup_old_entries", lambda: None)
     monkeypatch.setattr(base_app.cache_db, "get_hardware_snapshot", lambda: None)
-    monkeypatch.setattr(viewer_module, "get_provider_filter_labels", lambda: ("Ollama", "Hugging Face"))
+    monkeypatch.setattr("app.search_controller.get_provider_filter_labels", lambda: ("Ollama", "Hugging Face"))
     monkeypatch.setattr(
-        base_app.AIModelViewer,
-        "request_system_info_refresh",
+        "app.status_bar.StatusController.request_system_info_refresh",
         lambda self, force=False: None,
     )
     monkeypatch.setattr(
-        base_app.AIModelViewer,
-        "request_download_poll",
+        "app.download_controller.DownloadController.request_poll",
         lambda self, force=False: None,
     )
 
@@ -53,9 +51,9 @@ def _configure_mount(monkeypatch) -> None:
 def test_use_case_selector_fits_and_stays_synced_at_80_columns(monkeypatch):
     """The compact use-case selector must fit and synchronize mouse/keyboard state."""
     _configure_mount(monkeypatch)
-    app = viewer_module.AIModelViewer()
-    app.ui_mode = "comfortable"
-    app.compact_mode = False
+    app = AIModelViewer()
+    app.layout.ui_mode = "comfortable"
+    app.layout.compact_mode = False
     monkeypatch.setattr(app.dl, "sync_jobs", lambda force=False, jobs=None: True)
 
     async def _run() -> None:
@@ -75,11 +73,11 @@ def test_use_case_selector_fits_and_stays_synced_at_80_columns(monkeypatch):
 
             selector.value = "coding"
             await pilot.pause()
-            assert app.use_case_filter == "coding"
+            assert app.state.use_case_filter == "coding"
 
             app.action_cycle_use_case()
             await pilot.pause()
-            assert app.use_case_filter == "vision"
+            assert app.state.use_case_filter == "vision"
             assert selector.value == "vision"
 
     asyncio.run(_run())

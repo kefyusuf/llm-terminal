@@ -11,10 +11,8 @@ from unittest.mock import MagicMock
 from textual.widgets import Input, Select
 
 import api_server
-import app.startup_viewer as startup_module
-import app.viewer as viewer_module
 import tui_app
-from app.viewer import AIModelViewer
+from tui_app import AIModelViewer
 
 
 class Monitor:
@@ -79,14 +77,14 @@ def test_slow_discovery_keeps_mounted_search_input_usable(monkeypatch):
         return ["Ollama", "Hugging Face", "LM Studio"]
 
     monkeypatch.delenv("AIMODEL_SMOKE", raising=False)
-    monkeypatch.setattr(tui_app, "HardwareMonitor", Monitor)
-    monkeypatch.setattr(viewer_module, "get_provider_filter_labels", labels)
-    monkeypatch.setattr("app.download_manager.BackendDownloadManager",
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", Monitor)
+    monkeypatch.setattr("app.search_controller.get_provider_filter_labels", labels)
+    monkeypatch.setattr("app.download_tracker.DownloadManager",
                         lambda: MagicMock(list_jobs=lambda **kwargs: []))
-    monkeypatch.setattr(startup_module.cache_db, "get_hardware_snapshot", lambda: None)
-    monkeypatch.setattr(AIModelViewer, "request_system_info_refresh", lambda self, force=False: None)
-    monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)
-    monkeypatch.setattr(AIModelViewer, "run_search_worker", lambda self, *args: None)
+    monkeypatch.setattr(tui_app.cache_db, "get_hardware_snapshot", lambda: None)
+    monkeypatch.setattr("app.status_bar.StatusController.request_system_info_refresh", lambda self, force=False: None)
+    monkeypatch.setattr("app.download_controller.DownloadController.request_poll", lambda self, force=False: None)
+    monkeypatch.setattr("app.search_controller.SearchController._search_worker", lambda self, *args: None)
 
     async def run():
         app = AIModelViewer()
@@ -99,21 +97,21 @@ def test_slow_discovery_keeps_mounted_search_input_usable(monkeypatch):
             selector = app.query_one("#provider-select", Select)
             selector.value = "Hugging Face"
             await pilot.pause()
-            assert app.current_filter == "Hugging Face"
+            assert app.state.current_filter == "Hugging Face"
             search_input = app.query_one("#search-input", Input)
             search_input.focus()
             await pilot.press("x")
             assert search_input.value == "x"
             release.set()
             for _ in range(30):
-                if "LM Studio" in app.provider_filter_labels:
+                if "LM Studio" in app.search.provider_labels:
                     break
                 await asyncio.sleep(0.01)
-            assert app.provider_filter_labels == ("Ollama", "Hugging Face", "LM Studio")
+            assert app.search.provider_labels == ("Ollama", "Hugging Face", "LM Studio")
             await pilot.pause(0.2)
-            assert app.current_filter == "Hugging Face"
+            assert app.state.current_filter == "Hugging Face"
             assert selector.value == "Hugging Face"
-            assert app.search_counter == 0
+            assert app.state.counter == 0
 
     try:
         asyncio.run(run())

@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from textual.widgets import DataTable
 
-from app.viewer import AIModelViewer
+from tui_app import AIModelViewer
 
 
 class TableOnlyViewer(AIModelViewer):
@@ -95,7 +95,7 @@ def main():
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     root = Path(__file__).resolve().parents[1]
     fingerprints = {name: hashlib.sha256((root / name).read_bytes()).hexdigest()
-                    for name in ("tui_app.py", "app/viewer.py", "scripts/benchmark_results_table.py")}
+                    for name in ("tui_app.py", "app/results_table.py", "scripts/benchmark_results_table.py")}
     report = {"schema_version": 1, "source_sha": source, "python": platform.python_version(),
               "runtime_source_sha256": fingerprints,
               "platform": platform.platform(), "measurement": "synchronous headless refresh only",

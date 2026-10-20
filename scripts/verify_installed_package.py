@@ -37,7 +37,7 @@ import platform
 distribution = metadata.distribution("ai-model-explorer")
 recorded = {Path(distribution.locate_file(item)).resolve() for item in distribution.files or []}
 modules = (
-    "main", "cli", "api_server", "config", "tui_app", "app.viewer", "app.startup_viewer",
+    "main", "cli", "api_server", "config", "tui_app",
     "app.modals", "core.scoring", "core.diagnostics", "core.hardware", "core.exports", "core.model_facts",
     "downloads.manager", "downloads.backends", "providers.hf_provider",
     "providers.ollama_provider", "providers.lmstudio_provider", "providers.docker_provider",

@@ -396,23 +396,10 @@ class DownloadJobModal(ModalScreen):
 
     @on(Button.Pressed, "#job-cancel-delete-btn")
     def cancel_and_delete(self):
-        """Cancel active download AND delete partial data"""
-        model_data = {
-            "source": self.entry.get("source", "-"),
-            "name": self.entry.get("name", "-"),
-            "id": self.entry.get("target_id", "").split(":", maxsplit=1)[1]
-            if ":" in str(self.entry.get("target_id", ""))
-            else self.entry.get("target_id", ""),
-        }
-
-        cancel_fn = getattr(self.app, "cancel_model_download", None)
-        if callable(cancel_fn):
-            cancel_fn(model_data)
-
+        """Delete partial data; the delete path cancels an active job first."""
         delete_fn = getattr(self.app, "delete_download_entry", None)
         if callable(delete_fn):
             delete_fn(str(self.entry.get("target_id", "")), delete_data=True)
-
         self.dismiss()
 
     @on(Button.Pressed, "#job-close-btn")

@@ -6,18 +6,25 @@ from unittest.mock import MagicMock
 import pytest
 from textual.css.query import NoMatches
 
-from app.viewer import AIModelViewer, cycle_provider_label, provider_compact_tag
+from app.search_constants import cycle_provider_label, provider_compact_tag
+from app.search_controller import SearchController
+from app.search_results_state import SearchResultsState
 
 
 def _viewer_harness(*, query: str = "") -> SimpleNamespace:
     harness = SimpleNamespace(
-        provider_filter_labels=("Ollama", "Hugging Face"),
-        current_filter="Ollama",
-        start_search=MagicMock(),
-        update_status=MagicMock(),
-        refresh_table=MagicMock(),
+        search_input=SimpleNamespace(value=query),
+        status=SimpleNamespace(update=MagicMock()),
+        table=SimpleNamespace(refresh=MagicMock()),
+        update_status=None,
     )
-    harness.search_input = SimpleNamespace(value=query)
+    harness.update_status = harness.status.update
+    harness.state = SearchResultsState()
+    harness.search = SearchController(
+        harness, harness.state, cache=None, hf_provider=None, ollama_provider=None
+    )
+    harness.search.provider_labels = ("Ollama", "Hugging Face")
+    harness.search.start = MagicMock()
     return harness
 
 
@@ -67,11 +74,11 @@ def test_missing_selector_is_best_effort_and_provider_refresh_continues():
 
     viewer.query_one = query_one
 
-    AIModelViewer._apply_provider_filter(viewer, "Hugging Face", sync_widget=True)
+    viewer.search.set_provider("Hugging Face", sync_widget=True)
 
-    assert viewer.current_filter == "Hugging Face"
-    viewer.refresh_table.assert_called_once_with()
-    viewer.start_search.assert_not_called()
+    assert viewer.state.current_filter == "Hugging Face"
+    viewer.table.refresh.assert_called_once_with()
+    viewer.search.start.assert_not_called()
     viewer.update_status.assert_called_once_with("Provider filter set to Hugging Face.")
 
 
@@ -87,11 +94,11 @@ def test_unexpected_selector_sync_failure_is_not_swallowed():
     viewer.query_one = query_one
 
     with pytest.raises(AssertionError, match="programming bug"):
-        AIModelViewer._apply_provider_filter(viewer, "Hugging Face", sync_widget=True)
+        viewer.search.set_provider("Hugging Face", sync_widget=True)
 
-    assert viewer.current_filter == "Hugging Face"
-    viewer.refresh_table.assert_not_called()
-    viewer.start_search.assert_not_called()
+    assert viewer.state.current_filter == "Hugging Face"
+    viewer.table.refresh.assert_not_called()
+    viewer.search.start.assert_not_called()
 
 
 def test_selector_sync_updates_widget_before_search_dispatch():
@@ -107,9 +114,9 @@ def test_selector_sync_updates_widget_before_search_dispatch():
 
     viewer.query_one = query_one
 
-    AIModelViewer._apply_provider_filter(viewer, "Hugging Face", sync_widget=True)
+    viewer.search.set_provider("Hugging Face", sync_widget=True)
 
     assert selector.value == "Hugging Face"
-    viewer.start_search.assert_called_once_with("qwen")
-    viewer.refresh_table.assert_not_called()
+    viewer.search.start.assert_called_once_with("qwen")
+    viewer.table.refresh.assert_not_called()
     viewer.update_status.assert_called_once_with("Provider switched to Hugging Face. Searching...")

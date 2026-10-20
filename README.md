@@ -269,12 +269,11 @@ AIMODEL_THEME=nord
 ```text
 llm-terminal/
   main.py                   # Primary TUI entry point
-  app/viewer.py             # Runtime AIModelViewer/provider selector
-  tui_app.py                # Base Textual application
+  tui_app.py                # Textual application shell composing app/ controllers
   cli.py                    # Click CLI
   api_server.py             # Local REST API
   config.py                 # Pydantic settings
-  app/                      # Modals, widgets, TUI state/download support
+  app/                      # TUI controllers, modals, widgets, search state
   core/                     # Hardware, scoring, cache, HTTP, errors, intelligence
   providers/                # Provider implementations + capabilities
   search/                   # Search cache/orchestration/cancellation/pagination

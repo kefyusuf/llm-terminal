@@ -4,10 +4,9 @@ import asyncio
 
 from textual.widgets import DataTable
 
-import app.viewer as viewer_module
 import tui_app as tui_module
 from app.modals import PlanModeModal
-from app.viewer import AIModelViewer
+from tui_app import AIModelViewer
 
 
 class _DummyMonitor:
@@ -51,10 +50,9 @@ def _model(name: str = "qwen2.5:7b") -> dict:
 
 
 def _configure_mounted_test_app(monkeypatch) -> None:
-    monkeypatch.setattr(tui_module, "HardwareMonitor", _DummyMonitor)
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", _DummyMonitor)
     monkeypatch.setattr(
-        viewer_module,
-        "get_provider_filter_labels",
+        "app.search_controller.get_provider_filter_labels",
         lambda: ["Ollama", "Hugging Face"],
     )
     monkeypatch.setattr(tui_module.AIModelViewer, "_smoke_mode_enabled", lambda _self: True)
@@ -70,9 +68,9 @@ def test_compare_shortcut_uses_selected_datatable_row(monkeypatch):
         app = AIModelViewer()
 
         async with app.run_test(size=(120, 40)) as pilot:
-            app.all_results = [model]
-            app.current_filter = "Ollama"
-            app.refresh_table()
+            app.state.results = [model]
+            app.state.current_filter = "Ollama"
+            app.table.refresh()
 
             table = app.query_one("#results-table", DataTable)
             table.focus()
@@ -82,7 +80,7 @@ def test_compare_shortcut_uses_selected_datatable_row(monkeypatch):
             await pilot.press("c")
             await pilot.pause()
 
-            assert app.comparison_set == [model]
+            assert app.details.comparison_set == [model]
 
     asyncio.run(_run())
 
@@ -96,9 +94,9 @@ def test_plan_action_opens_modal_for_selected_datatable_row(monkeypatch):
         app = AIModelViewer()
 
         async with app.run_test(size=(120, 40)) as pilot:
-            app.all_results = [model]
-            app.current_filter = "Ollama"
-            app.refresh_table()
+            app.state.results = [model]
+            app.state.current_filter = "Ollama"
+            app.table.refresh()
 
             table = app.query_one("#results-table", DataTable)
             table.focus()
