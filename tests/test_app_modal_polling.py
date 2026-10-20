@@ -1,3 +1,4 @@
+import app.status_bar as status_module
 import tui_app as app_module
 
 
@@ -21,29 +22,25 @@ def _make_viewer(monkeypatch):
                 "has_gpu": self.nvidia_available,
             }
 
-    monkeypatch.setattr(app_module, "HardwareMonitor", _DummyMonitor)
+    monkeypatch.setattr(status_module, "HardwareMonitor", _DummyMonitor)
     return app_module.AIModelViewer()
 
 
 def test_modal_pause_blocks_non_forced_poll_requests(monkeypatch):
     viewer = _make_viewer(monkeypatch)
-    viewer._modal_poll_pause_count = 1
+    viewer.status.modal_poll_pause_count = 1
 
     called = {"system": 0, "download": 0}
 
-    monkeypatch.setattr(
-        viewer,
-        "_run_system_info_refresh_worker",
-        lambda: called.__setitem__("system", called["system"] + 1),
-    )
-    monkeypatch.setattr(
-        viewer,
-        "_run_download_poll_worker",
-        lambda: called.__setitem__("download", called["download"] + 1),
-    )
+    def _run_worker(work, *, group, **_kwargs):
+        _ = work
+        key = "system" if group == "system-info" else "download"
+        called[key] += 1
 
-    viewer.request_system_info_refresh(force=False)
-    viewer.request_download_poll(force=False)
+    monkeypatch.setattr(viewer, "run_worker", _run_worker)
+
+    viewer.status.request_system_info_refresh(force=False)
+    viewer.downloads.request_poll(force=False)
 
     assert called["system"] == 0
     assert called["download"] == 0
@@ -51,7 +48,7 @@ def test_modal_pause_blocks_non_forced_poll_requests(monkeypatch):
 
 def test_modal_resume_triggers_forced_refresh(monkeypatch):
     viewer = _make_viewer(monkeypatch)
-    viewer._modal_poll_pause_count = 1
+    viewer.status.modal_poll_pause_count = 1
 
     forced_calls = {"system": 0, "download": 0}
 
@@ -63,8 +60,8 @@ def test_modal_resume_triggers_forced_refresh(monkeypatch):
         if force:
             forced_calls["download"] += 1
 
-    monkeypatch.setattr(viewer, "request_system_info_refresh", _system)
-    monkeypatch.setattr(viewer, "request_download_poll", _download)
+    monkeypatch.setattr(viewer.status, "request_system_info_refresh", _system)
+    monkeypatch.setattr(viewer.downloads, "request_poll", _download)
 
     viewer._set_modal_poll_pause(False)
 

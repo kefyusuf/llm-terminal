@@ -75,3 +75,30 @@ FIT_COMPACT_TAGS = {
     "partial": "PART",
     "nofit": "NO",
 }
+
+PROVIDER_COMPACT_TAGS = {
+    "Ollama": "OL",
+    "Hugging Face": "HF",
+    "LM Studio": "LM",
+    "Docker": "DK",
+    "MLX": "MLX",
+}
+
+
+def option_label(options, key: str, default: str) -> str:
+    """Return the display label for *key* in an (key, label) option list."""
+    return next((label for option_key, label in options if option_key == key), default)
+
+
+def provider_compact_tag(label: str) -> str:
+    """Return a short stable tag for a provider label in compact mode."""
+    return PROVIDER_COMPACT_TAGS.get(label, label[:3].upper() or "-")
+
+
+def cycle_provider_label(labels, current: str) -> str:
+    """Return the next provider label, recovering unknown state to the first option."""
+    if not labels:
+        return current
+    if current not in labels:
+        return labels[0]
+    return labels[(labels.index(current) + 1) % len(labels)]

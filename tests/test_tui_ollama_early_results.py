@@ -10,7 +10,7 @@ import pytest
 import requests
 from textual.widgets import DataTable
 
-from app.viewer import AIModelViewer
+from tui_app import AIModelViewer
 
 
 class _Monitor:
@@ -28,8 +28,8 @@ class _Monitor:
 class _Viewer(AIModelViewer):
     async def on_mount(self, event):
         event.prevent_default()
-        self._apply_ui_mode()
-        self._configure_results_table_columns(force=True)
+        self.layout.apply_ui_mode()
+        self.table.configure_columns(force=True)
 
     def request_system_info_refresh(self, force=False):
         pass
@@ -52,8 +52,8 @@ def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatc
 
     monkeypatch.setattr(cache_db, "_cache_db_path", tmp_path / "cache.db")
     cache_db.init_db()
-    monkeypatch.setattr("tui_app.HardwareMonitor", _Monitor)
-    monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ["Ollama"])
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", _Monitor)
+    monkeypatch.setattr("app.search_controller.get_provider_filter_labels", lambda: ["Ollama"])
     release = threading.Event()
     slow_entered = threading.Event()
 
@@ -88,8 +88,8 @@ def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatc
     async def run():
         app = _Viewer()
         async with app.run_test(size=(110, 35)) as pilot:
-            app.sort_mode = "name"
-            app.start_search("preview")
+            app.state.sort_mode = "name"
+            app.search.start("preview")
             try:
                 assert await asyncio.to_thread(slow_entered.wait, 2)
                 table = app.query_one("#results-table", DataTable)
@@ -97,25 +97,25 @@ def test_search_renders_a_scored_prefix_without_caching_or_completing(monkeypatc
                     pilot, lambda: not table.loading and table.row_count == 1,
                     "the scored prefix to render",
                 )
-                assert [r["name"] for r in app.all_results] == ["z-prefix-fast"]
-                assert app.all_results[0]["size_source"] == "exact"
-                assert app.search_cache.get_stale("ollama:preview") is None
-                assert app._search_inflight_signature is not None
+                assert [r["name"] for r in app.state.results] == ["z-prefix-fast"]
+                assert app.state.results[0]["size_source"] == "exact"
+                assert app.search.cache.get_stale("ollama:preview") is None
+                assert app.state.inflight_signature is not None
                 assert table.loading is False and table.row_count == 1
                 selected = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
             finally:
                 release.set()
             await asyncio.wait_for(app.workers.wait_for_complete(), timeout=5)
             await _wait_for_ui(
-                pilot, lambda: app._search_inflight_signature is None,
+                pilot, lambda: app.state.inflight_signature is None,
                 "the search to complete after releasing the slow detail",
             )
-            assert [r["name"] for r in app.all_results] == ["z-prefix-fast", "a-prefix-slow"]
+            assert [r["name"] for r in app.state.results] == ["z-prefix-fast", "a-prefix-slow"]
             assert table.coordinate_to_cell_key(table.cursor_coordinate).row_key == selected
-            assert len(app.search_cache.get_stale("ollama:preview")["results"]) == 2
-            assert app._search_inflight_signature is None
-            app.on_search_results_ready(app.active_search_id, [{"name": "late-preview"}])
-            assert [r["name"] for r in app.all_results] == ["z-prefix-fast", "a-prefix-slow"]
+            assert len(app.search.cache.get_stale("ollama:preview")["results"]) == 2
+            assert app.state.inflight_signature is None
+            app.search.on_results_ready(app.state.active_id, [{"name": "late-preview"}])
+            assert [r["name"] for r in app.state.results] == ["z-prefix-fast", "a-prefix-slow"]
 
     asyncio.run(run())
 
@@ -126,8 +126,8 @@ def test_new_search_ignores_late_rows_from_cancelled_search(monkeypatch, tmp_pat
 
     monkeypatch.setattr(cache_db, "_cache_db_path", tmp_path / "cache.db")
     cache_db.init_db()
-    monkeypatch.setattr("tui_app.HardwareMonitor", _Monitor)
-    monkeypatch.setattr("app.viewer.get_provider_filter_labels", lambda: ["Ollama"])
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", _Monitor)
+    monkeypatch.setattr("app.search_controller.get_provider_filter_labels", lambda: ["Ollama"])
     release = threading.Event()
     entered = threading.Event()
     returned = threading.Event()
@@ -160,26 +160,26 @@ def test_new_search_ignores_late_rows_from_cancelled_search(monkeypatch, tmp_pat
     async def run():
         app = _Viewer()
         async with app.run_test(size=(110, 35)) as pilot:
-            app.start_search("old")
+            app.search.start("old")
             try:
                 assert await asyncio.to_thread(entered.wait, 2)
-                old_id = app.active_search_id
-                app.start_search("new")
+                old_id = app.state.active_id
+                app.search.start("new")
                 await _wait_for_ui(
                     pilot,
-                    lambda: app.active_search_id != old_id
-                    and app._search_inflight_signature is None,
+                    lambda: app.state.active_id != old_id
+                    and app.state.inflight_signature is None,
                     "the replacement search to complete",
                     timeout=5,
                 )
-                assert [r["name"] for r in app.all_results] == ["new-ready"]
-                app.on_search_results_ready(old_id, [{"name": "old-late"}])
+                assert [r["name"] for r in app.state.results] == ["new-ready"]
+                app.search.on_results_ready(old_id, [{"name": "old-late"}])
                 release.set()
                 assert await asyncio.to_thread(returned.wait, 1)
                 await pilot.pause(.1)
-                assert [r["name"] for r in app.all_results] == ["new-ready"]
-                assert app.search_cache.get_stale("ollama:old") is None
-                assert app.search_cache.get_stale("ollama:new")["results"][0]["name"] == "new-ready"
+                assert [r["name"] for r in app.state.results] == ["new-ready"]
+                assert app.search.cache.get_stale("ollama:old") is None
+                assert app.search.cache.get_stale("ollama:new")["results"][0]["name"] == "new-ready"
             finally:
                 release.set()
 

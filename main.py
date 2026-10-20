@@ -3,7 +3,7 @@
 import asyncio
 import os
 
-from app.viewer import AIModelViewer
+from tui_app import AIModelViewer
 
 
 def smoke_mode_enabled() -> bool:

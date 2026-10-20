@@ -4,10 +4,8 @@ import asyncio
 import threading
 from unittest.mock import MagicMock
 
-import app.startup_viewer as startup_module
-import app.viewer as viewer_module
-import tui_app as app_module
-from app.viewer import AIModelViewer
+import tui_app
+from tui_app import AIModelViewer
 
 
 class _DummyMonitor:
@@ -32,13 +30,13 @@ class _DummyMonitor:
 
 def _configure_mount(monkeypatch) -> None:
     monkeypatch.delenv("AIMODEL_SMOKE", raising=False)
-    monkeypatch.setattr(app_module, "HardwareMonitor", _DummyMonitor)
-    monkeypatch.setattr(viewer_module, "get_provider_filter_labels", lambda: ["Ollama"])
-    monkeypatch.setattr(startup_module.cache_db, "init_db", lambda: None)
-    monkeypatch.setattr(startup_module.cache_db, "cleanup_old_entries", lambda: None)
-    monkeypatch.setattr(startup_module.cache_db, "get_hardware_snapshot", lambda: None)
-    monkeypatch.setattr(AIModelViewer, "request_system_info_refresh", lambda self, force=False: None)
-    monkeypatch.setattr(AIModelViewer, "request_download_poll", lambda self, force=False: None)
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", _DummyMonitor)
+    monkeypatch.setattr("app.search_controller.get_provider_filter_labels", lambda: ["Ollama"])
+    monkeypatch.setattr(tui_app.cache_db, "init_db", lambda: None)
+    monkeypatch.setattr(tui_app.cache_db, "cleanup_old_entries", lambda: None)
+    monkeypatch.setattr(tui_app.cache_db, "get_hardware_snapshot", lambda: None)
+    monkeypatch.setattr("app.status_bar.StatusController.request_system_info_refresh", lambda self, force=False: None)
+    monkeypatch.setattr("app.download_controller.DownloadController.request_poll", lambda self, force=False: None)
 
 
 def test_mount_restores_initial_download_history_off_ui_thread(monkeypatch):

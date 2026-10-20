@@ -22,10 +22,8 @@ Checks used separate runtime paths below `.venv/` so test state did not populate
 
 ```text
 main.py
-  app.viewer.AIModelViewer
-    app.startup_viewer.AIModelViewer
-      tui_app.AIModelViewer
-        Textual App
+  tui_app.AIModelViewer (Textual App)
+    status / layout / table / search / downloads / details controllers
 
 TUI search input
   debounce / active search generation / fresh search cache
@@ -49,7 +47,7 @@ CLI and REST share providers, hardware, and scoring with the TUI but have their 
 
 `search/search_cache.py` retains search pages only in memory. `core/cache_db.py` persists model metadata and hardware snapshots. `downloads/store.py` persists jobs independently of the TUI's lifetime. These are three separate state owners.
 
-The download-only table update path is already implemented. `app/viewer.py` guards it with ordered rendered-content and column-layout signatures; changed content/order/layout takes the full rebuild path. Remaining performance work should measure these paths before expanding incremental updates.
+The download-only table update path is already implemented. `app/results_table.ResultsTableView` guards it with ordered rendered-content and column-layout signatures; changed content/order/layout takes the full rebuild path. Remaining performance work should measure these paths before expanding incremental updates.
 
 ## Limits and Next Work
 

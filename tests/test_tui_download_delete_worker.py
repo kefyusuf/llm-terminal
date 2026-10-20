@@ -5,9 +5,8 @@ from types import SimpleNamespace
 
 from textual.app import App
 
-import app.viewer as viewer_module
-import tui_app as tui_module
-from app.viewer import AIModelViewer, DownloadJobModal
+from app.modals import DownloadJobModal
+from tui_app import AIModelViewer
 
 
 class _DummyMonitor:
@@ -31,8 +30,8 @@ class _DummyMonitor:
 
 
 def _make_viewer(monkeypatch):
-    monkeypatch.setattr(tui_module, "HardwareMonitor", _DummyMonitor)
-    monkeypatch.setattr(viewer_module, "get_provider_filter_labels", lambda: ["Ollama"])
+    monkeypatch.setattr("app.status_bar.HardwareMonitor", _DummyMonitor)
+    monkeypatch.setattr("app.search_controller.get_provider_filter_labels", lambda: ["Ollama"])
     return AIModelViewer()
 
 
@@ -47,13 +46,13 @@ def test_delete_download_entry_schedules_worker_before_blocking_manager_call(mon
     monkeypatch.setattr(viewer.dl, "delete_entry", _unexpected_inline_delete)
     monkeypatch.setattr(
         viewer,
-        "_run_delete_download_entry_worker",
-        lambda target_id, delete_data=False: scheduled.append((target_id, delete_data)),
+        "run_worker",
+        lambda work, **kwargs: scheduled.append(kwargs["group"]),
     )
 
     viewer.delete_download_entry("ollama:qwen2.5:7b", delete_data=True)
 
-    assert scheduled == [("ollama:qwen2.5:7b", True)]
+    assert scheduled == ["downloads"]
 
 
 def test_cancel_and_delete_delegates_single_combined_delete_operation():

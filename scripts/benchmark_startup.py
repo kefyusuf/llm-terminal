@@ -124,7 +124,7 @@ async def measure_child():
     from textual.widgets import Input
 
     import api_server
-    from app.viewer import AIModelViewer
+    from tui_app import AIModelViewer
 
     app = AIModelViewer()
     input_started = None

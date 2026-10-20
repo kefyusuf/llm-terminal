@@ -4,7 +4,7 @@
 
 Viewer construction does not run CPU-name lookup, NVML initialization, or vendor subprocess probes. The first metrics worker initializes `HardwareMonitor`; search and model-detail workers share that monitor through a per-viewer initialization lock. Only successful construction is published, so concurrent workers cannot create duplicate monitors and a failed constructor can be retried.
 
-The runtime entry point (`main.py` -> `app.viewer` -> `app.startup_viewer`) renders cached hardware immediately, with Ollama status marked `checking` until the background process scan completes. A cold start shows `Detecting hardware...`. UI-side search-cache compatibility checks use the latest/cached snapshot or a conservative pending placeholder; they never initiate detection. Submitted searches wait for actual hardware in their background worker before calling providers.
+The runtime entry point (`main.py` -> `tui_app` -> `app/status_bar.StatusController`) renders cached hardware immediately, with Ollama status marked `checking` until the background process scan completes. A cold start shows `Detecting hardware...`. UI-side search-cache compatibility checks use the latest/cached snapshot or a conservative pending placeholder; they never initiate detection. Submitted searches wait for actual hardware in their background worker before calling providers.
 
 When initial metrics detection fails, the cold header reports that polling will retry. Cached data remains available during refresh failure. Expected `OSError`, `ValueError` and `RuntimeError` failures in search or detail workers produce a retry diagnostic instead of a Textual worker panic. Periodic metrics polling or the next user operation can retry initialization. Unexpected programming errors remain visible.
 

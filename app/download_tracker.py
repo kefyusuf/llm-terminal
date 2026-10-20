@@ -25,7 +25,7 @@ from downloads.download_status import (
     map_service_job_status,
     state_markup_from_state_and_label,
 )
-from downloads.manager import DownloadManager as BackendDownloadManager
+from downloads.manager import DownloadManager
 from providers.capabilities import get_all_provider_capabilities
 
 _DOWNLOAD_POLL_ERRORS = (OSError, ValueError, RuntimeError)
@@ -63,7 +63,7 @@ def _download_poll_failure_status(exc: Exception) -> str:
     return f"Download manager is unavailable; {suffix}"
 
 
-class DownloadManager:
+class DownloadTracker:
     """Manages download registry, job lifecycle, and polling state.
 
     Owns all download-related state and provides methods for the UI layer
@@ -81,7 +81,7 @@ class DownloadManager:
         find_model_by_target_id: Callable[[str], dict | None],
         history_limit: int = 50,
         history_refresh_interval: float = 0.9,
-        backend_manager: BackendDownloadManager | None = None,
+        backend_manager: DownloadManager | None = None,
     ):
         self._backend_manager = backend_manager
         self._backend_lock = threading.Lock()
@@ -104,12 +104,12 @@ class DownloadManager:
         self.download_history_refresh_interval = history_refresh_interval
 
     @property
-    def backend(self) -> BackendDownloadManager:
+    def backend(self) -> DownloadManager:
         with self._backend_lock:
             if self._closed:
                 raise RuntimeError("Download manager is closed")
             if self._backend_manager is None:
-                self._backend_manager = BackendDownloadManager()
+                self._backend_manager = DownloadManager()
             return self._backend_manager
 
     def shutdown(self) -> None:

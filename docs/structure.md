@@ -47,7 +47,13 @@ llm-terminal/
 
 ## Runtime Entry Paths
 
-- TUI: `main.py` -> `app.viewer.AIModelViewer` -> `app.startup_viewer.AIModelViewer` -> `tui_app.AIModelViewer` -> Textual `App`.
+- TUI: `main.py` -> `tui_app.AIModelViewer` (Textual `App`). The app owns widgets,
+  bindings, and timers and composes controllers that share one `SearchResultsState`:
+  `StatusController` (`app/status_bar.py`), `LayoutController` (`app/view_layout.py`),
+  `ResultsTableView` (`app/results_table.py`), `SearchController`
+  (`app/search_controller.py`), `DownloadController` (`app/download_controller.py`,
+  wrapping `app/download_tracker.DownloadTracker`), and `DetailsController`
+  (`app/model_details.py`).
 - CLI: `cli.py` calls shared hardware/scoring services and provider search functions directly; it does not route every search through the TUI orchestrator.
 - REST: `api_server.py` owns its HTTP handlers and currently searches Ollama and Hugging Face.
 - Downloads: the TUI owns `downloads.manager.DownloadManager`; bounded worker threads

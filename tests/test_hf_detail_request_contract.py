@@ -4,7 +4,8 @@ from types import SimpleNamespace
 from requests.exceptions import RequestException
 
 import config
-from app.viewer import AIModelViewer
+from app.model_details import DetailsController
+from app.search_results_state import SearchResultsState
 from providers import hf_provider
 
 REVISION = "a" * 40
@@ -84,7 +85,11 @@ def test_missing_selected_file_is_explicit_and_preserves_requested_revision(monk
 
 def test_detail_ready_does_not_claim_failed_metadata_loaded():
     messages = []
-    viewer = SimpleNamespace(all_results=[], refresh_table=lambda: None,
-                             update_status=messages.append, open_model_detail_modal=lambda _: None)
-    AIModelViewer.on_hf_detail_ready(viewer, {**selected(), "metadata_fetch_status": "failed"})
+    app = SimpleNamespace(
+        status=SimpleNamespace(update=messages.append),
+        table=SimpleNamespace(refresh=lambda: None),
+        push_screen=lambda _screen: None,
+    )
+    details = DetailsController(app, SearchResultsState(), hf_model_info_cache={})
+    details.on_hf_detail_ready({**selected(), "metadata_fetch_status": "failed"})
     assert messages == ["Detailed metadata unavailable. Showing retained facts and estimates."]
