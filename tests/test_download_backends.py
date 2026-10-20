@@ -2,6 +2,7 @@
 
 import json
 import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -148,7 +149,7 @@ def test_hf_cancel_retains_sdk_partial_and_resumes(tmp_path, monkeypatch):
 
 def test_hf_ignored_range_restarts_instead_of_appending(tmp_path, monkeypatch):
     job, command = hf_setup(tmp_path, monkeypatch)
-    paths = backends.get_local_download_paths(
+    paths = backends.hf_download_paths(
         Path(job["download_plan"]["model_directory"]), "model.gguf"
     )
     paths.incomplete_path("b" * 40).write_bytes(b"mo")
@@ -162,7 +163,7 @@ def test_hf_ignored_range_restarts_instead_of_appending(tmp_path, monkeypatch):
 @pytest.mark.parametrize("content_range", ["bytes 0-2/5", "bytes 2-4/6", "malformed"])
 def test_hf_invalid_resume_range_does_not_touch_partial(tmp_path, monkeypatch, content_range):
     job, command = hf_setup(tmp_path, monkeypatch)
-    paths = backends.get_local_download_paths(
+    paths = backends.hf_download_paths(
         Path(job["download_plan"]["model_directory"]), "model.gguf"
     )
     partial = paths.incomplete_path("b" * 40)
@@ -207,14 +208,13 @@ def test_hf_mismatched_digest_cannot_complete(tmp_path, monkeypatch):
 
 
 def test_hf_same_size_existing_file_needs_matching_identity(tmp_path, monkeypatch):
-    from huggingface_hub._local_folder import write_download_metadata
-
     job, command = hf_setup(tmp_path, monkeypatch)
-    paths = backends.get_local_download_paths(
+    paths = backends.hf_download_paths(
         Path(job["download_plan"]["model_directory"]), "model.gguf"
     )
     paths.file_path.write_bytes(b"stale")
-    write_download_metadata(paths.file_path.parent, "model.gguf", "c" * 40, "d" * 40)
+    # Three-line commit/etag/timestamp format shared with huggingface_hub.
+    paths.metadata_path.write_text("\n".join(["c" * 40, "d" * 40, str(time.time())]) + "\n")
     session = Session(Response(chunks=[b"model"]))
     monkeypatch.setattr(backends, "create_session", lambda **_: session)
     backends.download(job, command, threading.Event(), lambda *_: None)
@@ -251,7 +251,7 @@ def test_hf_sdk_lock_wait_can_be_cancelled(tmp_path, monkeypatch):
     from huggingface_hub.utils import WeakFileLock
 
     job, command = hf_setup(tmp_path, monkeypatch)
-    paths = backends.get_local_download_paths(
+    paths = backends.hf_download_paths(
         Path(job["download_plan"]["model_directory"]), "model.gguf"
     )
     attempted = threading.Event()
@@ -296,7 +296,7 @@ def test_hf_hash_verification_checks_cancel_between_chunks(tmp_path, monkeypatch
         lambda *_, **__: SimpleNamespace(commit_hash="a" * 40, etag=expected, size=len(payload)),
     )
     if existing:
-        paths = backends.get_local_download_paths(
+        paths = backends.hf_download_paths(
             Path(job["download_plan"]["model_directory"]), "model.gguf"
         )
         paths.file_path.write_bytes(payload)
@@ -320,3 +320,19 @@ def test_hf_hash_verification_checks_cancel_between_chunks(tmp_path, monkeypatch
     with pytest.raises(backends.DownloadCancelled):
         backends.download(job, command, cancel, lambda *_: None)
     assert hashed_chunks == [1024 * 1024]
+
+
+@pytest.mark.parametrize("depth", [1, 220])
+def test_hf_download_paths_match_sdk_layout_for_resume(tmp_path, depth):
+    """Partials from earlier SDK-based downloads must resolve to the same paths."""
+    from huggingface_hub._local_folder import get_local_download_paths
+
+    local_dir = tmp_path / ("d" * depth)
+    ours = backends.hf_download_paths(local_dir, "sub/model.gguf")
+    sdk = get_local_download_paths(local_dir, "sub/model.gguf")
+    assert (ours.file_path, ours.lock_path, ours.metadata_path) == (
+        sdk.file_path,
+        sdk.lock_path,
+        sdk.metadata_path,
+    )
+    assert ours.incomplete_path("e" * 40) == sdk.incomplete_path("e" * 40)
