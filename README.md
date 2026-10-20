@@ -2,7 +2,7 @@
 
 AI Model Explorer is a terminal-first workspace for discovering, scoring, comparing, and downloading local LLM models across Ollama, Hugging Face, LM Studio, Docker Model Runner, and MLX.
 
-> **Measured (2026-10-15):** 127 `test_*.py` files (808 test functions) · coverage 67.44% on the canonical Ubuntu/Python 3.12 lane, with a 60% merge floor — recorded under [Installation](#installation) · MIT · CI on `main`: [ci.yml](.github/workflows/ci.yml) · [live.yml](.github/workflows/live.yml) · [package.yml](.github/workflows/package.yml) · startup and provider-discovery latency are measured in [docs/startup-measurements.md](docs/startup-measurements.md) and [docs/provider-discovery.md](docs/provider-discovery.md) · one ADR in [docs/adr/](docs/adr/) · `pyproject.toml` says `1.0.1`, no GitHub Release has been published from that version yet.
+> **Measured (2026-10-20):** 117 `test_*.py` files (725 test functions, 881 collected tests) · coverage 83.99% on Windows/Python 3.12, with a 60% merge floor — recorded under [Installation](#installation) · MIT · CI on `main`: [ci.yml](.github/workflows/ci.yml) · [live.yml](.github/workflows/live.yml) · [package.yml](.github/workflows/package.yml) · startup and provider-discovery latency are measured in [docs/startup-measurements.md](docs/startup-measurements.md) and [docs/provider-discovery.md](docs/provider-discovery.md) · one ADR in [docs/adr/](docs/adr/) · `pyproject.toml` says `1.0.1`, no GitHub Release has been published from that version yet.
 
 This is a tooling repository: it answers "which local model fits this machine" for me, in Python, and it is not a service I run for other people. The production-facing work in my profile is the PHP/Laravel and Go repositories; this one is where the same discipline (evidence in CI, ADRs, a security policy) is applied to a tool rather than to a product.
 
@@ -165,7 +165,7 @@ Use a supported Python 3.10-3.14 interpreter for bootstrap. On Windows that can 
 
 `scripts/dev.py verify` runs the required local checks: pytest, import smoke and Ruff.
 
-`scripts/dev.py coverage` runs the deterministic pytest-cov lane and enforces the threshold configured in `pyproject.toml`. The recorded Ubuntu/Python 3.12 result before the in-process download refactor was **67.44% total coverage** (`5095` statements, `1659` missed), with a **60%** merge floor. Those measurements include the retired service implementation and do not measure the new manager. The staged 50% → 55% → 60% coverage ratchet is complete; future increases should remain evidence-driven and must not rely on production-code exclusions.
+`scripts/dev.py coverage` runs the deterministic pytest-cov lane and enforces the threshold configured in `pyproject.toml`. The latest local result (2026-10-20, Windows/Python 3.12, after the in-process download manager and TUI controller refactors) is **83.99% total coverage** (`5876` statements, `941` missed), with a **60%** merge floor. The previous Ubuntu/Python 3.12 record of 67.44% still included the retired download service. The staged 50% → 55% → 60% coverage ratchet is complete; future increases should remain evidence-driven and must not rely on production-code exclusions.
 
 `scripts/dev.py smoke` runs bounded/offline-safe smoke checks for the CLI, REST API, TUI startup path and download manager lifecycle.
 
@@ -180,7 +180,7 @@ for all installation consumers. [Release readiness](docs/release-readiness.md)
 records the remaining runtime, pilot, downgrade and publication gates; a green
 package build is not a stable-release or model-inference certification.
 
-The current verify baseline contains **600+ tests**.
+The current verify baseline contains **881 tests** (880 passing, 1 skipped).
 
 ## Run
 
@@ -282,7 +282,7 @@ llm-terminal/
   requirements/             # Dependency intent + committed Windows/Linux locks
   scripts/                  # Dev/release/maintenance tools
   terminal_ui/              # Theme/style assets and isolated legacy internals
-  tests/                    # 600+ deterministic tests + optional live tests
+  tests/                    # Deterministic tests + optional live tests
   docs/                     # Maintained project/process documentation
   .planning/                # Active roadmap and current codebase baseline
 ```

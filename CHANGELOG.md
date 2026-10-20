@@ -57,6 +57,7 @@
 
 ### Search, cache, and performance
 
+- Replaced the TUI viewer's seven mixins and two override subclasses (`app/viewer.py`, `app/startup_viewer.py`) with controllers sharing one `SearchResultsState` (status, layout, results table, search, downloads, details); `tui_app.py` is a thin Textual shell and `app/download_manager.py` became `app/download_tracker.DownloadTracker` (#180).
 - Moved provider fan-out/fan-in into a Textual-independent `SearchOrchestrator` with focused cancellation and error-path tests.
 - Added hardware-aware search caching with stale-entry fallback for TUI disconnected/offline recovery.
 - Switched requests-based provider traffic to a shared pooled session with retryable GET handling.
@@ -64,6 +65,9 @@
 - Consolidated model-size estimation on the MoE-aware implementation and replaced repeated GPU-bandwidth linear scans with pre-built lookup maps.
 
 ### Download service and local security boundary
+
+- Replaced the out-of-process localhost download service, its HTTP client, auth/version handshake and parent watchdog with an application-owned `downloads.manager.DownloadManager` (bounded thread pool, per-job cancellation). HF transfers stream directly with etag-scoped resumable partials; Ollama uses the `/api/pull` stream. Downloads stop on app exit and are recorded as interrupted, then resume when submitted again (#179). The entries below describe the retired service.
+- Computed HF local-download lock/metadata/partial paths in `downloads/hf_paths.py` instead of importing the private `huggingface_hub._local_folder`; a parity test guards resume compatibility with earlier SDK-written partials (#181).
 
 - Serialized queued cancellation against worker claim and kept claimed jobs active until worker acknowledgement, preventing cancellation/deletion from orphaning an unregistered download; both worker types check cancellation before launch.
 - Added service-owned terminal HF selected-file removal with shared/cache preservation, protocol 2.1 gating and confirmed cancellation; fixed module-launched API/worker state separation and propagated graceful shutdown to active children.
