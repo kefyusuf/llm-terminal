@@ -1,4 +1,4 @@
-"""Tests for app.download_manager.DownloadManager."""
+"""Tests for app.download_tracker.DownloadTracker."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from urllib.error import URLError
 
 import pytest
 
-from app.download_manager import DownloadManager
+from app.download_tracker import DownloadTracker
 from downloads.manager import DownloadManager as BackendDownloadManager
 
 
@@ -21,7 +21,7 @@ def manager():
         "render_download_debug": MagicMock(),
         "find_model_by_target_id": MagicMock(return_value=None),
     }
-    return DownloadManager(**callbacks, backend_manager=BackendDownloadManager.__new__(BackendDownloadManager))
+    return DownloadTracker(**callbacks, backend_manager=BackendDownloadManager.__new__(BackendDownloadManager))
 
 
 class TestInit:
@@ -128,7 +128,7 @@ class TestEnsureDownloadFields:
     def test_adds_download_fields_from_registry(self, manager):
         manager.download_registry["test-id"] = {"state": "downloading", "label": "Active", "detail": "50%"}
         results = [{"source": "Ollama", "name": "llama3"}]
-        with patch("app.download_manager.download_target_id", return_value="test-id"):
+        with patch("app.download_tracker.download_target_id", return_value="test-id"):
             changed = manager.ensure_download_fields(results)
         assert changed is True
         assert results[0]["download_state"] == "downloading"
@@ -136,7 +136,7 @@ class TestEnsureDownloadFields:
     def test_no_change_when_already_synced(self, manager):
         manager.download_registry["test-id"] = {"state": "idle", "label": "Idle", "detail": ""}
         results = [{"download_state": "idle", "download_label": "Idle", "download_detail": ""}]
-        with patch("app.download_manager.download_target_id", return_value="test-id"):
+        with patch("app.download_tracker.download_target_id", return_value="test-id"):
             changed = manager.ensure_download_fields(results)
         assert changed is False
 
@@ -319,7 +319,7 @@ class TestSyncJobs:
                                            "download_detail": entry["detail"]}) == "[yellow]50%[/yellow]"
 
     @patch("downloads.manager.DownloadManager.list_jobs")
-    @patch("app.download_manager.download_target_id", side_effect=lambda x: x.get("id", x.get("source", "?")))
+    @patch("app.download_tracker.download_target_id", side_effect=lambda x: x.get("id", x.get("source", "?")))
     def test_sync_populates_registry(self, mock_dtid, mock_list, manager):
         mock_list.return_value = [
             {"target_id": "hf:test/model", "source": "HF", "publisher": "meta", "name": "llama", "status": "completed"},
