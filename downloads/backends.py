@@ -10,12 +10,12 @@ from contextlib import contextmanager
 
 from filelock import Timeout
 from huggingface_hub import get_hf_file_metadata, hf_hub_url
-from huggingface_hub._local_folder import get_local_download_paths
 from huggingface_hub.utils import WeakFileLock, build_hf_headers
 
 import config
 from core.http_client import create_session
 from downloads.download_manager import prepare_hf_destination
+from downloads.hf_paths import hf_download_paths
 from downloads.preflight import (
     DISK_SAFETY_MARGIN,
     check_managed_directory,
@@ -142,7 +142,7 @@ def _download_hf(job, command, cancel_event, report):
     sha256 = metadata.get("sha256") or (remote.etag if len(remote.etag) == 64 else None)
     # Keep the Hub SDK's etag-scoped partial paths, allowing old SDK downloads
     # and interrupted in-process transfers to resume the same exact artifact.
-    paths = get_local_download_paths(directory, command[2])
+    paths = hf_download_paths(directory, command[2])
     with _download_lock(paths.lock_path, cancel_event):
         _download_hf_file(
             paths, directory, command, remote, size, sha256, token, cancel_event, report
