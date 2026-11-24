@@ -8,7 +8,7 @@ annotated-types==0.7.0
     # via pydantic
 beautifulsoup4==4.14.3
     # via -r requirements/requirements.in
-certifi==2026.4.22
+certifi==2026.10.18
     # via requests
 charset-normalizer==3.4.7
     # via requests
@@ -19,13 +19,13 @@ colorama==0.4.6
     #   click
     #   loguru
     #   tqdm
-filelock==3.29.0
+filelock==4.2.1
     # via huggingface-hub
-fsspec==2026.4.0
+fsspec==2026.6.0
     # via huggingface-hub
 huggingface-hub==0.36.2
     # via -r requirements/requirements.in
-idna==3.13
+idna==3.15
     # via requests
 linkify-it-py==2.1.0
     # via markdown-it-py
@@ -54,7 +54,7 @@ pydantic==2.13.4
     # via pydantic-settings
 pydantic-core==2.46.4
     # via pydantic
-pydantic-settings==2.14.0
+pydantic-settings==2.14.2
     # via -r requirements/requirements.in
 pygments==2.20.0
     # via rich
@@ -72,7 +72,7 @@ rich==13.9.4
     # via
     #   -r requirements/requirements.in
     #   textual
-soupsieve==2.8.3
+soupsieve==4.0
     # via beautifulsoup4
 textual==0.89.1
     # via -r requirements/requirements.in
@@ -92,7 +92,7 @@ typing-inspection==0.4.2
     #   pydantic-settings
 uc-micro-py==2.0.0
     # via linkify-it-py
-urllib3==2.7.0
+urllib3==2.8.0
     # via requests
 win32-setctime==1.2.0
     # via loguru
